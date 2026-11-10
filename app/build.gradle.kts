@@ -10,13 +10,14 @@ android {
         applicationId = "ru.dikoveriya.lab"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
+        versionCode = 30000 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
         versionName = "0.3.0-dev"
     }
     signingConfigs {
-        if (file("signing/dikoveriya.jks").isFile) {
+        if (file("signing/dikoveriya.p12").isFile) {
             create("persistent") {
-            storeFile = file("signing/dikoveriya.jks")
+            storeFile = file("signing/dikoveriya.p12")
+            storeType = "PKCS12"
             storePassword = System.getenv("LAB_KEYSTORE_PASS") ?: ""
             keyAlias = System.getenv("LAB_KEY_ALIAS") ?: "dikoveriya"
             keyPassword = System.getenv("LAB_KEY_PASS") ?: ""
@@ -25,11 +26,20 @@ android {
     }
     buildTypes {
         getByName("debug") {
-            if (file("signing/dikoveriya.jks").isFile) {
+            if (file("signing/dikoveriya.p12").isFile) {
                 signingConfig = signingConfigs.getByName("persistent")
+            } else if (System.getenv("GITHUB_ACTIONS") == "true") {
+                error("Permanent signing key is missing; refusing an APK signed with a temporary debug key")
             }
         }
-        getByName("release") { isMinifyEnabled = false }
+        getByName("release") {
+            isMinifyEnabled = false
+            if (file("signing/dikoveriya.p12").isFile) {
+                signingConfig = signingConfigs.getByName("persistent")
+            } else if (System.getenv("GITHUB_ACTIONS") == "true") {
+                error("Permanent signing key is missing; refusing an APK signed with a temporary key")
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
