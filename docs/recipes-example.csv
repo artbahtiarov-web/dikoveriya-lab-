@@ -1,0 +1,3 @@
+family;name;purpose;plant;ingredient;dose_per_l;unit;contains_sugar;contains_agar;stock_mg_ml;version;status
+;Шаблон среды для проверки калькулятора;Размножение;Alocasia Black Velvet Aurea;Компонент A (демо);1;г/л;0;0;0;0;Черновик
+;Шаблон среды для проверки калькулятора;Размножение;Alocasia Black Velvet Aurea;Компонент B (демо);10;мг/л;0;0;0;0;Черновик
