@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           test -f qa/check_v050.py || { echo "::error::Missing baseline validator"; exit 1; }
           python3 qa/check_v050.py
+          python3 -m unittest discover -s qa -p 'test_*.py' -v
 
       - name: Run unit tests and build debug APK with Android's temporary test certificate
         env:
