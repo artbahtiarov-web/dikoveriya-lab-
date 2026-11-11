@@ -107,7 +107,7 @@ fun LabDatabase.growthSamples(cultureId: Long): List<GrowthSample> = readableDat
     if(c.isNull(7))null else c.getInt(7),c.getString(8))) } }
 
 fun LabDatabase.addGrowthSample(cultureId: Long, explants: Int?, shoots: Int?, plants: Int?, contaminated: Int?, notes: String) {
-    require(listOf(explants, shoots, plants, contaminated).any { it != null }) { "Укажи хотя бы один показатель" }
+    require(listOf(explants, shoots, plants, contaminated).any { it != null } || notes.isNotBlank()) { "Укажи показатель или примечание" }
     require(listOf(explants, shoots, plants, contaminated).all { it == null || it in 0..1000000 }) { "Некорректное количество" }
     val db = writableDatabase
     db.atomicResult {
