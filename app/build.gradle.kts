@@ -38,7 +38,9 @@ android {
             isMinifyEnabled = false
             if (file("signing/dikoveriya.p12").isFile) {
                 signingConfig = signingConfigs.getByName("persistent")
-            } else if (System.getenv("GITHUB_ACTIONS") == "true") {
+            } else if (System.getenv("GITHUB_ACTIONS") == "true" && System.getenv("LAB_PR_DEBUG_BUILD") != "true") {
+                // The release variant is configured for PR debug tests but NEVER built there.
+                // The main/release workflow requires and verifies the permanent certificate.
                 error("Permanent signing key is missing; refusing an APK signed with a temporary key")
             }
         }
