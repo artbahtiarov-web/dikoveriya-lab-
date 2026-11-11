@@ -2,6 +2,9 @@ package ru.dikoveriya.lab
 
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,6 +37,7 @@ fun DikoveriyaApp() {
     val db=remember{LabDatabase(context.applicationContext)}
     var refresh by remember { mutableIntStateOf(0) }
     var tab by remember { mutableStateOf("Главная") }
+    val tabHistory=remember{mutableStateListOf<String>()}
     var subsection by remember { mutableStateOf("") }
     var dialog by remember { mutableStateOf("") }
     var cultureId by remember { mutableStateOf<Long?>(null) }
@@ -49,12 +53,17 @@ fun DikoveriyaApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var search by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf("Все") }
+    var showIngredients by remember { mutableStateOf(false) }
+    var plantRecipeFilter by remember { mutableStateOf("Все растения") }
+    var purposeRecipeFilter by remember { mutableStateOf("Любое назначение") }
+    var lastExitRequest by remember { mutableLongStateOf(0L) }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
     val plants=remember(refresh){db.plants()}
     val mothers=remember(refresh){db.mothers()}
     val cultures=remember(refresh){db.cultures()}
     val recipes=remember(refresh){db.recipes()}
+    val ingredients=remember(refresh){db.ingredients()}
     val batches=remember(refresh){db.batches()}
     val tasks=remember(refresh){db.tasks()}
     val materials=remember(refresh){db.materials()}
@@ -99,15 +108,33 @@ fun DikoveriyaApp() {
         }
     }
     val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
-    val openSection: (String)->Unit = {tab="Ещё";subsection=it}
+    val openSection: (String)->Unit = {if(tab!="Ещё")tabHistory.add(tab);tab="Ещё";subsection=it}
     val openCulture: (Long)->Unit = {cultureId=it}
+    // Android system Back gesture from either edge uses this handler. Dialogs own their Back events.
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && actionCultureId==null &&
+        recipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
+        when {
+            subsection.isNotEmpty() -> subsection=""
+            tabHistory.isNotEmpty() -> { tab=tabHistory.removeAt(tabHistory.lastIndex); subsection="" }
+            tab!="Главная" -> { tab="Главная"; subsection="" }
+            else -> {
+                val now=SystemClock.elapsedRealtime()
+                if(now-lastExitRequest<2200L) (context as? android.app.Activity)?.finish()
+                else { lastExitRequest=now; Toast.makeText(context,"Повтори жест «Назад» для выхода",Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
 
-    MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xFF255B47))) {
+    MaterialTheme(colorScheme=lightColorScheme(
+        primary=Color(0xFF455E50), onPrimary=Color.White,
+        background=Color(0xFFF5F6F2), surface=Color(0xFFFCFDF9),
+        surfaceVariant=Color(0xFFE6EAE2), onSurface=Color(0xFF24322A)
+    )) {
         Scaffold(bottomBar={
             NavigationBar {
                 listOf("Главная","Растения","Работа","Аналитика","Ещё").forEachIndexed{index, name->
                     val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;3->Icons.Outlined.BarChart;else->Icons.Outlined.Menu}
-                    NavigationBarItem(selected=tab==name,onClick={tab=name;subsection=""},icon={Icon(icon,contentDescription=null)},label={Text(name,maxLines=1)})
+                    NavigationBarItem(selected=tab==name,onClick={if(name=="Главная")tabHistory.clear() else if(tab!=name)tabHistory.add(tab);tab=name;subsection=""},icon={Icon(icon,contentDescription=null)},label={Text(name,maxLines=1)})
                 }
             }
         }){ padding ->
@@ -218,8 +245,22 @@ fun DikoveriyaApp() {
                                         OutlinedButton(onClick={exportRecipes.launch("dikoveriya-recipes.csv")}){Text("Экспорт CSV")}
                                     } }
                                     item { Text("CSV можно редактировать в Excel или Google Sheets. После импорта создаётся новая версия-черновик; старые приготовления не изменяются. Автоматическое подключение Google пока не настроено.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+                                    item { OutlinedButton(onClick={showIngredients=!showIngredients}) { Text(if(showIngredients) "Скрыть компоненты" else "Компоненты среды · ${ingredients.size}") } }
+                                    if(showIngredients) item { OutlinedButton(onClick={dialog="newIngredient"}) { Text("+ Добавить компонент") } }
+                                    if(showIngredients && ingredients.isEmpty()) item { Text("Компонентов пока нет") }
+                                    if(showIngredients) items(ingredients,key={"ingredient-${it.id}"}) { ing ->
+                                        SmallCard(ing.name,"${ing.category} · ${ing.unit}") { dialog="ingredientInfo:${ing.id}" }
+                                    }
                                     item { SectionTitle("Рецептуры") }
-                                    items(recipes,key={"recipe-${it.id}"}){r->SmallCard(r.name,"${r.purpose} · версия ${r.version} · ${r.status}"){recipeId=r.id}}
+                                    item { PickOne("Растение",listOf("Все растения")+plants.map{it.name},plantRecipeFilter,{plantRecipeFilter=it}) }
+                                    item { PickOne("Назначение",listOf("Любое назначение")+LabTerms.purposes,purposeRecipeFilter,{purposeRecipeFilter=it}) }
+                                    items(recipes.filter { r ->
+                                        (plantRecipeFilter=="Все растения" || r.plantId==null || plants.firstOrNull{it.id==r.plantId}?.name==plantRecipeFilter) &&
+                                        (purposeRecipeFilter=="Любое назначение" || r.purpose==purposeRecipeFilter)
+                                    },key={"recipe-${it.id}"}) { r ->
+                                        val plantName=plants.firstOrNull{it.id==r.plantId}?.name?:"Для любых растений"
+                                        SmallCard(r.name,"$plantName · ${r.purpose} · версия ${r.version} · ${r.status}"){recipeId=r.id}
+                                    }
                                     item { SectionTitle("Партии приготовлений") }
                                     items(batches,key={"batch-${it.id}"}){b->SmallCard(b.code,"${b.recipeName} · ${b.volumeMl} мл · ${b.status} · ${formatDate(b.preparedAt)}"){batchId=b.id}}
                                 }
@@ -273,6 +314,9 @@ fun DikoveriyaApp() {
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
                 "newCulture" -> AddCultureDialog(plants,mothers,batches,onClose={dialog=""},onSave={p,q,m,b,place,note,kind->if(act{db.addCulture(p,q,m,b,place,note,kind)})dialog=""})
+                "newIngredient" -> AddIngredientDialog(onClose={dialog=""},onSave={name,category,unit,notes->
+                    if(act{db.addIngredient(name,category,unit,notes)})dialog=""
+                })
                 "newRecipe" -> AddRecipeDialog(plants,onClose={dialog=""},onSave={name,purpose,p,note->if(act{db.createRecipe(name,purpose,p,note)})dialog=""})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
@@ -280,6 +324,13 @@ fun DikoveriyaApp() {
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
                 "newIncident" -> AddIncidentDialog(cultures,onClose={dialog=""},onSave={t,n,c->if(act{db.addIncident(t,n,c)})dialog=""})
                 "newExperiment" -> AddExperimentDialog(onClose={dialog=""},onSave={t,h->if(act{db.addExperiment(t,h)})dialog=""})
+            }
+            if(dialog.startsWith("ingredientInfo:")){
+                val ing=ingredients.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
+                if(ing!=null) DialogForm(ing.name,close={dialog=""}){
+                    Text("Категория: ${ing.category} · ${ing.unit}")
+                    Text(ing.notes.ifBlank{"Дополнительные сведения не указаны"})
+                }
             }
             if(dialog.startsWith("plantInfo:")){
                 val p=plants.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
@@ -320,7 +371,7 @@ fun DikoveriyaApp() {
                 )
             }}
             recipeId?.let{id->recipes.firstOrNull{it.id==id}?.let{r->
-                RecipeDialog(r,db.recipeParts(id),onClose={recipeId=null},
+                RecipeDialog(r,db.recipeParts(id),ingredients,onClose={recipeId=null},
                     onAdd={name,amount,unit,sugar,agar,stock->act{db.addRecipePart(id,name,amount,unit,sugar,agar,stock)}},
                     onRemove={part->act{db.removeRecipePart(part)}},
                     onActivate={act{db.activateRecipe(id)}},

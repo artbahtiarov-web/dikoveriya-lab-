@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 5) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 6) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -30,6 +30,18 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
     }
     private fun createExtra(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS ingredient_catalog (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT NOT NULL, unit TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Babio MS (готовая смесь)","Базовая среда","г/л","Проверь этикетку конкретной партии: комплексная смесь может уже содержать сахарозу и агар."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Сахароза","Углеводы","г/л","Если уже входит в готовую смесь, не добавляй повторно."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Агар","Загуститель","г/л","Если уже входит в готовую смесь, не добавляй повторно."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("6-БАП (6-бензиламинопурин)","Регулятор роста","мг/л","Цитокинин; дозировку выбирай по протоколу."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("NAA (НУК)","Регулятор роста","мг/л","Ауксин; дозировку выбирай по протоколу."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("IBA (ИМК)","Регулятор роста","мг/л","Ауксин; дозировку выбирай по протоколу."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Активированный уголь","Добавка","г/л","Может связывать регуляторы роста и другие вещества."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Мио-инозитол","Витамины","мг/л",""))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Тиамин (B1)","Витамины","мг/л",""))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Железо-ЭДТА","Минералы","мг/л","Учитывай соли железа уже входящие в базовую среду."))
+        db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Кокосовая вода","Добавка","мл/л","Состав натурального материала изменчив."))
         db.execSQL("CREATE TABLE IF NOT EXISTS recipe_imports (sha256 TEXT PRIMARY KEY, imported_at INTEGER NOT NULL, description TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE IF NOT EXISTS culture_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), filename TEXT NOT NULL UNIQUE, caption TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS lineage (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_culture_id INTEGER NOT NULL REFERENCES cultures(id), child_culture_id INTEGER NOT NULL UNIQUE REFERENCES cultures(id), used_qty INTEGER NOT NULL, resulting_qty INTEGER NOT NULL, event_group TEXT NOT NULL)")
@@ -60,6 +72,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(done,due_at)")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 6) createExtra(db)
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE plants ADD COLUMN description TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE cultures ADD COLUMN stage TEXT NOT NULL DEFAULT 'В пробирке'")
@@ -648,11 +661,12 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     companion object {
         /** Tables are restored in parent-first order; all foreign key constraints stay enabled. */
         val BACKUP_ORDER_V4=listOf("plants","mother_plants","recipes","recipe_parts","recipe_imports","batches","cultures","culture_photos","events","lineage","assessments","tasks","materials","material_moves","equipment","incidents","experiments","experiment_cultures","sales")
-        val BACKUP_ORDER=BACKUP_ORDER_V4+listOf("lab_operations","operation_changes","culture_links","incident_links","incident_followups","operation_losses")
+        val BACKUP_ORDER_V5=BACKUP_ORDER_V4+listOf("lab_operations","operation_changes","culture_links","incident_links","incident_followups","operation_losses")
+        val BACKUP_ORDER=BACKUP_ORDER_V5+listOf("ingredient_catalog")
     }
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",5).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",6).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         BACKUP_ORDER.forEach{table->
             val arr=JSONArray()
@@ -679,10 +693,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..5) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..6) { "Неизвестная версия резервной копии" }
         val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        val importOrder=if(fromVersion==4) BACKUP_ORDER_V4 else BACKUP_ORDER
+        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;else->BACKUP_ORDER}
         importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
@@ -705,6 +719,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                     }
                     insertOrThrow(table,null,values)
                 }
+            }
+            if(fromVersion<6) {
+                // Imported older backups have no ingredient catalog. Restore safe names without doses.
+                createExtra(this)
             }
             if(fromVersion==4) {
                 execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")

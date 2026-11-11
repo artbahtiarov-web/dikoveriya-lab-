@@ -69,7 +69,7 @@ object LabBackup {
             }
             val data=json?:error("В архиве отсутствует база данных")
             val root=JSONObject(data)
-            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..5){"Неподдерживаемая версия копии"}
+            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..6){"Неподдерживаемая версия копии"}
             val photoRows=root.getJSONObject("tables").getJSONArray("culture_photos")
             val expected=buildSet{for(i in 0 until photoRows.length())add(photoRows.getJSONObject(i).getString("filename"))}
             require(expected==found){"В архиве нет части фотографий или есть лишние фотографии"}

@@ -206,7 +206,7 @@ fun ChooseBatchRecipeDialog(recipes:List<RecipeRecord>,onClose:()->Unit,onPick:(
 }
 @Composable
 fun RecipeDialog(
-    r:RecipeRecord,parts:List<RecipePart>,onClose:()->Unit,
+    r:RecipeRecord,parts:List<RecipePart>,catalog:List<IngredientEntry>,onClose:()->Unit,
     onAdd:(String,Double,String,Boolean,Boolean,Double)->Unit,onRemove:(Long)->Unit,
     onActivate:()->Unit,onRevise:()->Unit,
     onPrepare:(Int,String,String,String,Map<String,Double>)->Unit
@@ -245,6 +245,14 @@ fun RecipeDialog(
                     HorizontalDivider()
                 }
                 if(r.status=="Черновик"){
+                    if(catalog.isNotEmpty()) PickOne("Из справочника",listOf("Ввести вручную")+catalog.map{it.name},
+                        catalog.firstOrNull{it.name==partName}?.name?:"Ввести вручную",{ name ->
+                            if(name!="Ввести вручную") {
+                                val choice=catalog.first{it.name==name}
+                                partName=choice.name
+                                partUnit=choice.unit
+                            } else partName=""
+                        },"Справочник подставляет название и единицу. Дозировку для каждой рецептуры задаёшь отдельно по проверенному источнику.")
                     Field("Компонент",partName,{partName=it})
                     Field("Количество на 1 л",partAmount,{partAmount=it},numeric=true)
                     PickOne("Единица",listOf("г/л","мг/л","мл/л","мг/л из раствора"),partUnit,{partUnit=it},"Если выбрано «мг/л из раствора», укажи концентрацию запаса в мг/мл: приложение переведёт дозу в мл.")
