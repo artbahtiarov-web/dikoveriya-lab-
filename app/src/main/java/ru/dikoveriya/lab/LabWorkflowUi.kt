@@ -279,6 +279,7 @@ fun GrowthDialog(db:LabDatabase,c:CultureRecord,onClose:()->Unit,onChanged:()->U
     var newRecipe by remember{mutableStateOf<Long?>(null)}
     var mediumReason by remember{mutableStateOf("")}
     var errorMessage by remember{mutableStateOf<String?>(null)}
+    var savedMessage by remember{mutableStateOf<String?>(null)}
     AlertDialog(onDismissRequest=onClose,title={Text("Рост и результаты · ${c.code}")},text={
         Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)){
             Text(c.plantName,fontWeight=FontWeight.SemiBold)
@@ -295,6 +296,7 @@ fun GrowthDialog(db:LabDatabase,c:CultureRecord,onClose:()->Unit,onChanged:()->U
                 }catch(e:Exception){errorMessage=e.message}}){Text("Записать смену среды")}
             }
             HorizontalDivider()
+            if(savedMessage!=null) Text(savedMessage!!,color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.SemiBold)
             Text("Новый осмотр",fontWeight=FontWeight.SemiBold)
             Text("Заполняй только измеренные показатели. Пустое поле означает отсутствие измерения, а не ноль. Осмотр не меняет складской остаток: для пересадок и списаний используй «Что произошло?»." ,style=MaterialTheme.typography.bodySmall)
             Field("Эксплантов, шт.",explants,{explants=it.filter(Char::isDigit)},numeric=true)
@@ -305,15 +307,16 @@ fun GrowthDialog(db:LabDatabase,c:CultureRecord,onClose:()->Unit,onChanged:()->U
             Button(onClick={try {
                 db.addGrowthSample(c.id,explants.asCount(),shoots.asCount(),plants.asCount(),contaminated.asCount(),note)
                 explants="";shoots="";plants="";contaminated="";note="";revision++;onChanged();errorMessage=null
-            }catch(e:Exception){errorMessage=e.message}}){Text("Сохранить измерение")}
+                savedMessage="Сохранено. Запись добавлена в историю наблюдений."
+            }catch(e:Exception){savedMessage=null;errorMessage=e.message}}){Text("Сохранить наблюдение")}
             if(errorMessage!=null)Text(errorMessage!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             HorizontalDivider()
             Text("История наблюдений",fontWeight=FontWeight.SemiBold)
-            if(samples.isEmpty()) Text("Пока нет измерений")
+            if(samples.isEmpty()) Text("Пока нет наблюдений")
             samples.take(25).forEach{sample->
                 val values=listOfNotNull(sample.explants?.let{"экспланты $it"},sample.shoots?.let{"побеги $it"},
                     sample.plants?.let{"растения $it"},sample.contaminated?.let{"заражено $it"}).joinToString(" · ")
-                SmallCard(formatDate(sample.date),"$values${if(sample.notes.isNotBlank())" · ${sample.notes}" else ""}"){}
+                SmallCard(formatDate(sample.date),listOf(values,sample.notes).filter{it.isNotBlank()}.joinToString(" · ")){}
             }
         }
     },confirmButton={TextButton(onClick=onClose){Text("Закрыть")}})
