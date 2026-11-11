@@ -28,7 +28,9 @@ android {
         getByName("debug") {
             if (file("signing/dikoveriya.p12").isFile) {
                 signingConfig = signingConfigs.getByName("persistent")
-            } else if (System.getenv("GITHUB_ACTIONS") == "true") {
+            } else if (System.getenv("GITHUB_ACTIONS") == "true" && System.getenv("LAB_PR_DEBUG_BUILD") != "true") {
+                // Only pull-request validation is allowed to use the temporary Android debug certificate.
+                // Release builds must always use the existing permanent signing certificate.
                 error("Permanent signing key is missing; refusing an APK signed with a temporary debug key")
             }
         }
