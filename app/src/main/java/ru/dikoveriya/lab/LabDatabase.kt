@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 6) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 7) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -22,7 +22,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE plants (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE mother_plants (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), origin TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Активен', notes TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE cultures (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), quantity INTEGER NOT NULL CHECK(quantity >= 0), status TEXT NOT NULL, passage INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, stage TEXT NOT NULL DEFAULT 'В пробирке', location TEXT NOT NULL DEFAULT '', medium_batch_id INTEGER REFERENCES batches(id), mother_id INTEGER REFERENCES mother_plants(id), notes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL DEFAULT 0, origin_state TEXT NOT NULL DEFAULT 'Не установлено', quantity_kind TEXT NOT NULL DEFAULT 'Не уточнено')")
+        db.execSQL("CREATE TABLE cultures (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), quantity INTEGER NOT NULL CHECK(quantity >= 0), status TEXT NOT NULL, passage INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, stage TEXT NOT NULL DEFAULT 'В пробирке', location TEXT NOT NULL DEFAULT '', medium_batch_id INTEGER REFERENCES batches(id), mother_id INTEGER REFERENCES mother_plants(id), notes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL DEFAULT 0, origin_state TEXT NOT NULL DEFAULT 'Не установлено', quantity_kind TEXT NOT NULL DEFAULT 'Не уточнено', medium_recipe_id INTEGER REFERENCES recipes(id))")
         db.execSQL("CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), kind TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL, before_qty INTEGER, after_qty INTEGER, medium_batch_id INTEGER, event_group TEXT, occurred_at INTEGER)")
         createExtra(db)
         listOf("Alocasia Black Velvet Aurea", "Alocasia Dragon Scale Mint", "Philodendron Burle Marx Flame").forEach { n ->
@@ -30,6 +30,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
     }
     private fun createExtra(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS culture_measurements (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), recipe_id INTEGER REFERENCES recipes(id), observed_at INTEGER NOT NULL, explants INTEGER CHECK(explants>=0), shoots INTEGER CHECK(shoots>=0), plants INTEGER CHECK(plants>=0), contaminated INTEGER CHECK(contaminated>=0), notes TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE IF NOT EXISTS culture_recipe_history (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), recipe_id INTEGER NOT NULL REFERENCES recipes(id), applied_at INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_measure_culture ON culture_measurements(culture_id,observed_at)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_measure_recipe ON culture_measurements(recipe_id,observed_at)")
         db.execSQL("CREATE TABLE IF NOT EXISTS ingredient_catalog (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, category TEXT NOT NULL, unit TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Babio MS (готовая смесь)","Базовая среда","г/л","Проверь этикетку конкретной партии: комплексная смесь может уже содержать сахарозу и агар."))
         db.execSQL("INSERT OR IGNORE INTO ingredient_catalog(name,category,unit,notes) VALUES (?,?,?,?)", arrayOf("Сахароза","Углеводы","г/л","Если уже входит в готовую смесь, не добавляй повторно."))
@@ -46,7 +50,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         db.execSQL("CREATE TABLE IF NOT EXISTS culture_photos (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), filename TEXT NOT NULL UNIQUE, caption TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS lineage (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_culture_id INTEGER NOT NULL REFERENCES cultures(id), child_culture_id INTEGER NOT NULL UNIQUE REFERENCES cultures(id), used_qty INTEGER NOT NULL, resulting_qty INTEGER NOT NULL, event_group TEXT NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY AUTOINCREMENT, family TEXT NOT NULL, version INTEGER NOT NULL, name TEXT NOT NULL, purpose TEXT NOT NULL, plant_id INTEGER REFERENCES plants(id), status TEXT NOT NULL DEFAULT 'Черновик', notes TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, UNIQUE(family,version))")
-        db.execSQL("CREATE TABLE IF NOT EXISTS recipe_parts (id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL REFERENCES recipes(id), name TEXT NOT NULL, per_l REAL NOT NULL CHECK(per_l > 0), unit TEXT NOT NULL, has_sugar INTEGER NOT NULL DEFAULT 0, has_agar INTEGER NOT NULL DEFAULT 0, stock_mg_ml REAL NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS recipe_parts (id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL REFERENCES recipes(id), name TEXT NOT NULL, per_l REAL NOT NULL CHECK(per_l > 0), unit TEXT NOT NULL, has_sugar INTEGER NOT NULL DEFAULT 0, has_agar INTEGER NOT NULL DEFAULT 0, stock_mg_ml REAL NOT NULL DEFAULT 0, sugar_g_l REAL, agar_g_l REAL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS batches (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, recipe_id INTEGER NOT NULL REFERENCES recipes(id), volume_ml INTEGER NOT NULL CHECK(volume_ml > 0), prepared_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'Готова', actual_json TEXT NOT NULL, ph TEXT NOT NULL DEFAULT '', sterilization TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE IF NOT EXISTS assessments (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), batch_id INTEGER REFERENCES batches(id), starting_qty INTEGER NOT NULL, healthy_qty INTEGER NOT NULL, contaminated_qty INTEGER NOT NULL DEFAULT 0, observation_days INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', observed_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER REFERENCES cultures(id), title TEXT NOT NULL, due_at INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '')")
@@ -108,7 +112,15 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             createExtra(db)
             db.execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
         }
-
+        if (oldVersion < 7) {
+            db.execSQL("ALTER TABLE cultures ADD COLUMN medium_recipe_id INTEGER REFERENCES recipes(id)")
+            db.execSQL("ALTER TABLE recipe_parts ADD COLUMN sugar_g_l REAL")
+            db.execSQL("ALTER TABLE recipe_parts ADD COLUMN agar_g_l REAL")
+            createExtra(db)
+            db.execSQL("UPDATE cultures SET medium_recipe_id=(SELECT recipe_id FROM batches WHERE batches.id=cultures.medium_batch_id) WHERE medium_batch_id IS NOT NULL AND medium_recipe_id IS NULL")
+            db.execSQL("INSERT INTO culture_recipe_history(culture_id,recipe_id,applied_at,note) SELECT id,medium_recipe_id,created_at,'Перенесено из существующего учёта партий' FROM cultures WHERE medium_recipe_id IS NOT NULL")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_culture_direct_recipe ON cultures(medium_recipe_id)")
+        }
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
         pairs.forEach { (k, v) -> when(v) {
@@ -138,7 +150,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         buildList { while(c.moveToNext()) add(PlantRecord(c.getLong(0),c.getString(1),c.getString(2))) }
     }
     fun addPlant(name: String, notes: String = "") {
-        writableDatabase.insertOrThrow("plants", null, cv("name" to checkText(name,120), "description" to notes.take(1000)))
+        val clean=checkText(name,120)
+        val exists=readableDatabase.rawQuery("SELECT 1 FROM plants WHERE lower(trim(name))=lower(?) LIMIT 1",arrayOf(clean)).use { it.moveToFirst() }
+        require(!exists) { "Это растение уже есть в каталоге. Выбери его из списка" }
+        writableDatabase.insertOrThrow("plants", null, cv("name" to clean, "description" to notes.take(1000)))
     }
     fun mothers(): List<MotherRecord> = readableDatabase.rawQuery("SELECT m.id,m.code,m.plant_id,p.name,m.origin,m.status FROM mother_plants m JOIN plants p ON p.id=m.plant_id ORDER BY m.id DESC",null).use { c ->
         buildList { while(c.moveToNext()) add(MotherRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getString(4),c.getString(5))) }
@@ -150,8 +165,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             update("mother_plants",cv("code" to "MAT-%05d".format(Locale.US,id)),"id=?",arrayOf(id.toString()))
         }
     }
-    fun cultures(): List<CultureRecord> = readableDatabase.rawQuery("SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes,c.origin_state,c.quantity_kind FROM cultures c JOIN plants p ON p.id=c.plant_id ORDER BY c.id DESC",null).use { c ->
-        buildList { while(c.moveToNext()) add(CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),c.getString(13),c.getString(14))) }
+    fun cultures(): List<CultureRecord> = readableDatabase.rawQuery("SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes,c.origin_state,c.quantity_kind,c.medium_recipe_id FROM cultures c JOIN plants p ON p.id=c.plant_id ORDER BY c.id DESC",null).use { c ->
+        buildList { while(c.moveToNext()) add(CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),c.getString(13),c.getString(14),c.optLong(15))) }
     }
     fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(CulturePhoto(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4))) }
@@ -211,6 +226,31 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     }
     fun addCulture(plantId: Long, quantity: Int, motherId: Long?, batchId: Long?, location: String, notes: String, quantityKind: String = "Не уточнено") {
         writableDatabase.tx { createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,batchId,motherId,notes,quantityKind=quantityKind) }
+    }
+    /** Simple intake: one container, optional mother and recipe; all three measurements are independent. */
+    fun addCultureQuick(plantId:Long,motherId:Long?,recipeId:Long?,explants:Int?,shoots:Int?,plantsCount:Int?,location:String,notes:String):Long {
+        val counts=listOf(explants,shoots,plantsCount)
+        require(counts.all{it==null || it in 0..1000000}) { "Проверь числа объектов" }
+        require(counts.any{it!=null && it>0}) { "Укажи хотя бы один положительный показатель" }
+        val quantity=when { (plantsCount?:0)>0->plantsCount!!; (shoots?:0)>0->shoots!!; else->explants!! }
+        val kind=when { (plantsCount?:0)>0->"Растения"; (shoots?:0)>0->"Побеги"; else->"Экспланты" }
+        var resultId=0L
+        writableDatabase.tx {
+            if(recipeId!=null) {
+                val r=recipes().firstOrNull{it.id==recipeId}?:error("Рецептура не найдена")
+                require(r.status=="Утверждена") { "Выбирай только готовые рецептуры" }
+                require(r.plantId==null || r.plantId==plantId) { "Эта рецептура предназначена для другого растения" }
+            }
+            val id=createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,null,motherId,notes,quantityKind=kind)
+            update("cultures",cv("medium_recipe_id" to recipeId),"id=?",arrayOf(id.toString()))
+            if(recipeId!=null) {
+                insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to recipeId,"applied_at" to System.currentTimeMillis(),"note" to "Выбрана при создании"))
+                event(this,id,"Назначение среды","Рецептура ${recipes().first{it.id==recipeId}.name} · версия ${recipes().first{it.id==recipeId}.version}",quantity,quantity,null)
+            }
+            insertOrThrow("culture_measurements",null,cv("culture_id" to id,"recipe_id" to recipeId,"observed_at" to System.currentTimeMillis(),"explants" to explants,"shoots" to shoots,"plants" to plantsCount,"notes" to "Показатели при создании"))
+            resultId=id
+        }
+        return resultId
     }
     fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String) {
         require(status in LabTerms.statuses || status == LabTerms.TRANSFERRED) { "Некорректный статус" }
@@ -662,11 +702,12 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         /** Tables are restored in parent-first order; all foreign key constraints stay enabled. */
         val BACKUP_ORDER_V4=listOf("plants","mother_plants","recipes","recipe_parts","recipe_imports","batches","cultures","culture_photos","events","lineage","assessments","tasks","materials","material_moves","equipment","incidents","experiments","experiment_cultures","sales")
         val BACKUP_ORDER_V5=BACKUP_ORDER_V4+listOf("lab_operations","operation_changes","culture_links","incident_links","incident_followups","operation_losses")
-        val BACKUP_ORDER=BACKUP_ORDER_V5+listOf("ingredient_catalog")
+        val BACKUP_ORDER_V6=BACKUP_ORDER_V5+listOf("ingredient_catalog")
+        val BACKUP_ORDER=BACKUP_ORDER_V6+listOf("culture_measurements","culture_recipe_history")
     }
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",6).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",7).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         BACKUP_ORDER.forEach{table->
             val arr=JSONArray()
@@ -693,10 +734,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..6) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..7) { "Неизвестная версия резервной копии" }
         val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;else->BACKUP_ORDER}
+        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;else->BACKUP_ORDER}
         importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
@@ -723,6 +764,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             if(fromVersion<6) {
                 // Imported older backups have no ingredient catalog. Restore safe names without doses.
                 createExtra(this)
+            }
+            if(fromVersion<7) {
+                execSQL("UPDATE cultures SET medium_recipe_id=(SELECT recipe_id FROM batches WHERE batches.id=cultures.medium_batch_id) WHERE medium_batch_id IS NOT NULL AND medium_recipe_id IS NULL")
+                execSQL("INSERT INTO culture_recipe_history(culture_id,recipe_id,applied_at,note) SELECT id,medium_recipe_id,created_at,'Перенесено из резервной копии' FROM cultures WHERE medium_recipe_id IS NOT NULL")
             }
             if(fromVersion==4) {
                 execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")

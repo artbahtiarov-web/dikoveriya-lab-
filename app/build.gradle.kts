@@ -10,8 +10,8 @@ android {
         applicationId = "ru.dikoveriya.lab"
         minSdk = 26
         targetSdk = 35
-        versionCode = 50000 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "0.5.0-dev"
+        versionCode = 60000 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
+        versionName = "0.6.0-dev"
     }
     signingConfigs {
         if (file("signing/dikoveriya.p12").isFile) {

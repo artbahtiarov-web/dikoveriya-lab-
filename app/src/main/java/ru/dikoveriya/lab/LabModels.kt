@@ -27,7 +27,7 @@ data class CultureRecord(
     val id: Long, val code: String, val plantId: Long, val plantName: String,
     val quantity: Int, val status: String, val passage: Int, val stage: String,
     val location: String, val batchId: Long?, val motherId: Long?, val createdAt: Long,
-    val notes: String, val originState: String = "Не установлено", val quantityKind: String = "Не уточнено"
+    val notes: String, val originState: String = "Не установлено", val quantityKind: String = "Не уточнено", val recipeId: Long? = null
 )
 data class CulturePhoto(val id: Long, val cultureId: Long, val filename: String, val caption: String, val addedAt: Long)
 data class LabEvent(val id: Long, val cultureId: Long, val kind: String, val note: String, val time: Long, val before: Int?, val after: Int?, val recordedAt: Long = time)

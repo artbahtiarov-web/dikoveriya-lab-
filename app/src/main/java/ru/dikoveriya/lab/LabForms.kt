@@ -61,6 +61,7 @@ fun CultureDialog(
     c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,lossesTotal:Int,
     onClose:()->Unit,onChange:(Int,String,String,Long?,String)->Unit,
     onObserve:(String,Int?,Int?,Int?,Int?)->Unit,
+    onGrowth:()->Unit,
     onOperations:()->Unit,onSale:(Int,Double,String)->Unit,onQr:()->Unit,onPhoto:(String)->Unit
 ){
     var mode by remember(c.id){mutableStateOf("История")}
@@ -86,10 +87,14 @@ fun CultureDialog(
         Text(c.code,style=MaterialTheme.typography.bodyMedium)
     }},text={
         Column(Modifier.fillMaxWidth().heightIn(max=530.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            Text("${c.status} · ${c.stage} · ${c.quantity} · ${c.quantityKind}")
+            Text("${c.status} · ${c.stage} · учётное количество ${c.quantity} (${c.quantityKind})")
             if(c.location.isNotEmpty())Text("Место: ${c.location}",style=MaterialTheme.typography.bodySmall)
-            PickOne("Действие",listOf("История","Что произошло?","Осмотр","Изменить","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
+            PickOne("Действие",listOf("История","Рост и результаты","Что произошло?","Осмотр","Изменить","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
             when(mode){
+                "Рост и результаты" -> {
+                    Text("Отдельные счётчики эксплантов, побегов, растений и заражений; дата и рецептура каждого измерения сохраняются.",style=MaterialTheme.typography.bodySmall)
+                    Button(onClick=onGrowth,modifier=Modifier.fillMaxWidth()){Text("Открыть журнал роста")}
+                }
                 "Что произошло?" -> {
                     Text("Пересадка, разделение, объединение, потери, происшествия и исправления ведутся через единый журнал операций.",style=MaterialTheme.typography.bodySmall)
                     Button(onClick=onOperations,modifier=Modifier.fillMaxWidth()){Text("Выбрать действие")}
@@ -103,7 +108,7 @@ fun CultureDialog(
                     if(lossesTotal>0)Text("Зафиксированные потери: $lossesTotal",style=MaterialTheme.typography.bodySmall)
                     Text("Создан: ${formatDate(c.createdAt)}",style=MaterialTheme.typography.bodySmall)
                     Text("Номер пассажа: ${c.passage}",style=MaterialTheme.typography.bodySmall)
-                    Text("Партия среды: ${batches.firstOrNull{it.id==c.batchId}?.code?:"не указана"}",style=MaterialTheme.typography.bodySmall)
+                    Text("Партия приготовления (если велась): ${batches.firstOrNull{it.id==c.batchId}?.code?:"не указана"}",style=MaterialTheme.typography.bodySmall)
                     if(events.isEmpty())Text("Событий нет")
                     events.forEach{e->
                         HorizontalDivider()

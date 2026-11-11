@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
@@ -43,6 +44,9 @@ fun DikoveriyaApp() {
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
     var recipeId by remember { mutableStateOf<Long?>(null) }
+    var advancedRecipeId by remember { mutableStateOf<Long?>(null) }
+    var preselectedRecipeId by remember { mutableStateOf<Long?>(null) }
+    var performanceCultureId by remember { mutableStateOf<Long?>(null) }
     var batchId by remember { mutableStateOf<Long?>(null) }
     var materialId by remember { mutableStateOf<Long?>(null) }
     var experimentId by remember { mutableStateOf<Long?>(null) }
@@ -72,6 +76,8 @@ fun DikoveriyaApp() {
     val experiments=remember(refresh){db.experiments()}
     val sales=remember(refresh){db.sales()}
     val metrics=remember(refresh){db.recipeMetrics()}
+    val cultivarResults=remember(refresh){db.plantResults()}
+    val mediumResults=remember(refresh){db.mediumResults()}
     val running=cultures.filter{it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
     val attention=running.count{it.status!=LabTerms.IN_CULTURE}
     val dueTasks=tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
@@ -125,13 +131,9 @@ fun DikoveriyaApp() {
         }
     }
 
-    MaterialTheme(colorScheme=lightColorScheme(
-        primary=Color(0xFF455E50), onPrimary=Color.White,
-        background=Color(0xFFF5F6F2), surface=Color(0xFFFCFDF9),
-        surfaceVariant=Color(0xFFE6EAE2), onSurface=Color(0xFF24322A)
-    )) {
-        Scaffold(bottomBar={
-            NavigationBar {
+    DikoveriyaTheme {
+        Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
+            NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=2.dp) {
                 listOf("Главная","Растения","Работа","Аналитика","Ещё").forEachIndexed{index, name->
                     val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;3->Icons.Outlined.BarChart;else->Icons.Outlined.Menu}
                     NavigationBarItem(selected=tab==name,onClick={if(name=="Главная")tabHistory.clear() else if(tab!=name)tabHistory.add(tab);tab=name;subsection=""},icon={Icon(icon,contentDescription=null)},label={Text(name,maxLines=1)})
@@ -141,6 +143,9 @@ fun DikoveriyaApp() {
             LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 item {
                     Row(verticalAlignment=Alignment.CenterVertically){
+                        Icon(painterResource(R.drawable.ic_dikoveriya_logo),contentDescription=null,
+                            tint=Color.Unspecified,modifier=Modifier.size(40.dp))
+                        Spacer(Modifier.width(11.dp))
                         Column(Modifier.weight(1f)) {
                             Text("ДИКОВЕРИЯ LAB",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelLarge)
                             Text(if(subsection.isNotEmpty())subsection else when(tab){"Главная"->"Моя лаборатория";else->tab},style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
@@ -212,9 +217,18 @@ fun DikoveriyaApp() {
                         item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
                         item { Text("Активных: ${running.size} · на контроле: $attention · завершённых: ${cultures.size-running.size}") }
                         item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
-                        item { SectionTitle("Эффективность питательных сред") }
+                        item { SectionTitle("Результаты по сортам") }
+                        items(cultivarResults,key={"results-${it.plantId}"}) { r ->
+                            SmallCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}") {}
+                        }
+                        item { SectionTitle("Рост по рецептурам") }
+                        item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
+                        items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
+                            SmallCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}") {}
+                        }
+                        item { SectionTitle("Эффективность питательных сред (прежний журнал)") }
                         item { Text("Только по зарегистрированным измерениям. Без повторностей сравнение предварительное.",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall) }
-                        if(metrics.isEmpty()) item { Text("Пока нет измерений, связанных с партиями сред. Открой контейнер → Осмотр → Записать показатели.") }
+                        if(metrics.isEmpty()) item { Text("Нет измерений из прежнего журнала партий. Новый журнал находится в карточке контейнера → Рост и результаты.") }
                         items(metrics,key={"metric-${it.recipe}"}){m->
                             val ratio=if(m.input>0)m.healthy.toDouble()/m.input else null
                             SmallCard(m.recipe,"Наблюдений: ${m.count} · выход: ${ratio?.let{RecipeCalculator.formatAmount(it)}?:"—"}× · отмечено заражений: ${m.infected} · средний срок: ${RecipeCalculator.formatAmount(m.averageDays)} дн.") {}
@@ -237,8 +251,8 @@ fun DikoveriyaApp() {
                             when(subsection){
                                 "Питательные среды" -> {
                                     item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                        Button(onClick={dialog="newRecipe"}){Text("+ Рецептура")}
-                                        OutlinedButton(onClick={dialog="batchChooser"}){Text("Приготовить")}
+                                        Button(onClick={dialog="newRecipe"}){Text("+ Новая среда")}
+                                        OutlinedButton(onClick={dialog="batchChooser"}){Text("Учесть партию (необязательно)")}
                                     } }
                                     item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                         OutlinedButton(onClick={importRecipes.launch(arrayOf("text/csv","text/plain","application/octet-stream"))}){Text("Импорт CSV")}
@@ -251,7 +265,7 @@ fun DikoveriyaApp() {
                                     if(showIngredients) items(ingredients,key={"ingredient-${it.id}"}) { ing ->
                                         SmallCard(ing.name,"${ing.category} · ${ing.unit}") { dialog="ingredientInfo:${ing.id}" }
                                     }
-                                    item { SectionTitle("Рецептуры") }
+                                    item { SectionTitle("Готовые питательные среды") }
                                     item { PickOne("Растение",listOf("Все растения")+plants.map{it.name},plantRecipeFilter,{plantRecipeFilter=it}) }
                                     item { PickOne("Назначение",listOf("Любое назначение")+LabTerms.purposes,purposeRecipeFilter,{purposeRecipeFilter=it}) }
                                     items(recipes.filter { r ->
@@ -313,11 +327,13 @@ fun DikoveriyaApp() {
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
-                "newCulture" -> AddCultureDialog(plants,mothers,batches,onClose={dialog=""},onSave={p,q,m,b,place,note,kind->if(act{db.addCulture(p,q,m,b,place,note,kind)})dialog=""})
+                "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,onClose={dialog="";preselectedRecipeId=null},
+                    onSaved={id->dialog="";preselectedRecipeId=null;refresh++;cultureId=id},onChanged={refresh++})
                 "newIngredient" -> AddIngredientDialog(onClose={dialog=""},onSave={name,category,unit,notes->
                     if(act{db.addIngredient(name,category,unit,notes)})dialog=""
                 })
-                "newRecipe" -> AddRecipeDialog(plants,onClose={dialog=""},onSave={name,purpose,p,note->if(act{db.createRecipe(name,purpose,p,note)})dialog=""})
+                "newRecipe" -> QuickMediumDialog(db,onClose={dialog=""},onSaved={id->dialog="";refresh++;recipeId=id},
+                    onUseExisting={id->dialog="";recipeId=id})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
                 "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c->if(act{db.addMaterial(n,u,q,m,c)})dialog=""})
@@ -353,6 +369,7 @@ fun DikoveriyaApp() {
                 CultureDialog(c,db.events(id),db.photos(id),context.filesDir,db.ancestors(id),batches,db.confirmedLosses(id),onClose={cultureId=null},
                     onChange={q,st,loc,b,n->if(act{db.updateCulture(id,q,st,loc,b,n)})cultureId=null},
                     onObserve={n,start,healthy,infected,days->if(act{db.addObservation(id,n,start,healthy,infected,days)})cultureId=null},
+                    onGrowth={performanceCultureId=id;cultureId=null},
                     onOperations={actionCultureId=id;cultureId=null},
                     onSale={q,total,n->if(act{db.sale(id,q,total,n)})cultureId=null},
                     onQr={qrCode=c.code;saveQr.launch("${c.code}.png")},
@@ -371,13 +388,21 @@ fun DikoveriyaApp() {
                 )
             }}
             recipeId?.let{id->recipes.firstOrNull{it.id==id}?.let{r->
-                RecipeDialog(r,db.recipeParts(id),ingredients,onClose={recipeId=null},
+                EasyRecipeDialog(db,r,plants.firstOrNull{it.id==r.plantId}?.name,onClose={recipeId=null},
+                    onUse={target->recipeId=null;preselectedRecipeId=target;dialog="newCulture"},
+                    onAdvanced={advancedRecipeId=id;recipeId=null})
+            }}
+            advancedRecipeId?.let{id->recipes.firstOrNull{it.id==id}?.let{r->
+                RecipeDialog(r,db.recipeParts(id),ingredients,onClose={advancedRecipeId=null},
                     onAdd={name,amount,unit,sugar,agar,stock->act{db.addRecipePart(id,name,amount,unit,sugar,agar,stock)}},
                     onRemove={part->act{db.removeRecipePart(part)}},
                     onActivate={act{db.activateRecipe(id)}},
-                    onRevise={if(act{db.reviseRecipe(id)})recipeId=null},
-                    onPrepare={volume,ph,sterilization,note,actual->if(act{db.prepareBatch(id,volume,ph,sterilization,note,actual)})recipeId=null}
+                    onRevise={if(act{db.reviseRecipe(id)})advancedRecipeId=null},
+                    onPrepare={volume,ph,sterilization,note,actual->if(act{db.prepareBatch(id,volume,ph,sterilization,note,actual)})advancedRecipeId=null}
                 )
+            }}
+            performanceCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
+                GrowthDialog(db,c,onClose={performanceCultureId=null},onChanged={refresh++})
             }}
             batchId?.let{id->batches.firstOrNull{it.id==id}?.let{b->
                 BatchDialog(b,db.batchSnapshot(id),onClose={batchId=null},onReject={reason->if(act{db.rejectBatch(id,reason)})batchId=null})
@@ -398,7 +423,9 @@ fun DikoveriyaApp() {
 
 @Composable
 private fun InfoCard(label:String,value:String,modifier:Modifier=Modifier){
-    ElevatedCard(modifier=modifier){Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+    Card(modifier=modifier,shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
         Text(value,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
         Text(label,style=MaterialTheme.typography.bodySmall)
     }}
