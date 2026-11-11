@@ -37,6 +37,7 @@ fun DikoveriyaApp() {
     var subsection by remember { mutableStateOf("") }
     var dialog by remember { mutableStateOf("") }
     var cultureId by remember { mutableStateOf<Long?>(null) }
+    var actionCultureId by remember { mutableStateOf<Long?>(null) }
     var recipeId by remember { mutableStateOf<Long?>(null) }
     var batchId by remember { mutableStateOf<Long?>(null) }
     var materialId by remember { mutableStateOf<Long?>(null) }
@@ -259,7 +260,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.3.0-dev · локальная база SQLite. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.4.0-dev · локальная база SQLite. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -271,7 +272,7 @@ fun DikoveriyaApp() {
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
-                "newCulture" -> AddCultureDialog(plants,mothers,batches,onClose={dialog=""},onSave={p,q,m,b,place,note->if(act{db.addCulture(p,q,m,b,place,note)})dialog=""})
+                "newCulture" -> AddCultureDialog(plants,mothers,batches,onClose={dialog=""},onSave={p,q,m,b,place,note,kind->if(act{db.addCulture(p,q,m,b,place,note,kind)})dialog=""})
                 "newRecipe" -> AddRecipeDialog(plants,onClose={dialog=""},onSave={name,purpose,p,note->if(act{db.createRecipe(name,purpose,p,note)})dialog=""})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
@@ -294,16 +295,28 @@ fun DikoveriyaApp() {
             }
             if(dialog.startsWith("incidentInfo:")){
                 val i=incidents.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
-                if(i!=null) DialogForm(i.title,close={dialog=""}){Text(i.note)}
+                if(i!=null && i.status=="Аннулирован") DialogForm(i.title,close={dialog=""}){Text("Происшествие аннулировано. История сохранена. "+i.note)}
+                else if(i!=null) IncidentReviewDialog(i,db.incidentCultures(i.id),db.incidentFollowups(i.id),onClose={dialog=""},onSave={status,note->if(act{db.updateIncident(i.id,status,note)})dialog=""})
             }
             cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                CultureDialog(c,db.events(id),db.photos(id),context.filesDir,db.ancestors(id),batches,onClose={cultureId=null},
+                CultureDialog(c,db.events(id),db.photos(id),context.filesDir,db.ancestors(id),batches,db.confirmedLosses(id),onClose={cultureId=null},
                     onChange={q,st,loc,b,n->if(act{db.updateCulture(id,q,st,loc,b,n)})cultureId=null},
                     onObserve={n,start,healthy,infected,days->if(act{db.addObservation(id,n,start,healthy,infected,days)})cultureId=null},
-                    onTransfer={used,out,b,stage,n->if(act{db.transfer(id,used,out,b,stage,n)})cultureId=null},
+                    onOperations={actionCultureId=id;cultureId=null},
                     onSale={q,total,n->if(act{db.sale(id,q,total,n)})cultureId=null},
                     onQr={qrCode=c.code;saveQr.launch("${c.code}.png")},
                     onPhoto={note->pendingPhotoId=c.id;pendingPhotoNote=note;selectPhoto.launch("image/*")}
+                )
+            }}
+            actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
+                LabActionDialog(c,cultures,batches,db.operationsForCulture(id),onClose={actionCultureId=null},
+                    onSplit={parts,lost,note,date->if(act{db.splitCulture(id,parts,lost,note,date)})actionCultureId=null},
+                    onMerge={parts,out,b,stage,note,confirm,date->if(act{db.mergeCultures(parts,out,b,stage,note,confirm,date)})actionCultureId=null},
+                    onLoss={lost,reason,note,date->if(act{db.recordLoss(id,lost,reason,note,date)})actionCultureId=null},
+                    onCorrection={quantity,reason,date->if(act{db.correctQuantity(id,quantity,reason,date)})actionCultureId=null},
+                    onVoid={reason,date->if(act{db.voidCulture(id,reason,date)})actionCultureId=null},
+                    onIncident={title,notes,affected,response,date->if(act{db.reportIncident(title,notes,affected,response,date)})actionCultureId=null},
+                    onCancel={op,reason->if(act{db.cancelOperation(op,reason)})actionCultureId=null}
                 )
             }}
             recipeId?.let{id->recipes.firstOrNull{it.id==id}?.let{r->
@@ -341,5 +354,5 @@ private fun InfoCard(label:String,value:String,modifier:Modifier=Modifier){
 }
 @Composable
 private fun CultureCard(c:CultureRecord,onClick:()->Unit){
-    SmallCard(c.plantName,"${c.code} · ${c.status} · ${c.stage} · ${c.quantity} шт.${if(c.location.isNotBlank())" · ${c.location}" else ""}",onClick)
+    SmallCard(c.plantName,"${c.code} · ${c.status} · ${c.stage} · ${c.quantity} · ${c.quantityKind}${if(c.location.isNotBlank())" · ${c.location}" else ""}",onClick)
 }

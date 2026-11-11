@@ -9,12 +9,14 @@ object LabTerms {
     const val TRANSFERRED = "Пересажен"
     const val DISPOSED = "Утилизирован"
     const val SOLD = "Продан"
+    const val ANNULLED = "Аннулирован"
     const val IN_VITRO = "В пробирке"
     const val ADAPTATION = "Адаптация"
     const val GROWING = "Доращивание"
     const val MOTHER = "Маточник"
     const val READY = "Готово к продаже"
     val statuses = listOf(IN_CULTURE, CONTROL, QUARANTINE, DISPOSED)
+    val quantityKinds = listOf("Не уточнено", "Экспланты", "Побеги", "Растения")
     val stages = listOf(IN_VITRO, ADAPTATION, GROWING, MOTHER, READY)
     val purposes = listOf("Введение", "Размножение", "Укоренение", "Другое")
 }
@@ -25,10 +27,13 @@ data class CultureRecord(
     val id: Long, val code: String, val plantId: Long, val plantName: String,
     val quantity: Int, val status: String, val passage: Int, val stage: String,
     val location: String, val batchId: Long?, val motherId: Long?, val createdAt: Long,
-    val notes: String
+    val notes: String, val originState: String = "Не установлено", val quantityKind: String = "Не уточнено"
 )
 data class CulturePhoto(val id: Long, val cultureId: Long, val filename: String, val caption: String, val addedAt: Long)
-data class LabEvent(val id: Long, val cultureId: Long, val kind: String, val note: String, val time: Long, val before: Int?, val after: Int?)
+data class LabEvent(val id: Long, val cultureId: Long, val kind: String, val note: String, val time: Long, val before: Int?, val after: Int?, val recordedAt: Long = time)
+data class TransferDestination(val used: Int, val produced: Int, val stage: String, val batchId: Long?, val location: String?, val quantityKind: String = "Не уточнено")
+data class MergeInput(val cultureId: Long, val used: Int)
+data class OperationRecord(val id: String, val kind: String, val occurredAt: Long, val createdAt: Long, val status: String, val note: String)
 data class RecipeRecord(val id: Long, val family: String, val version: Int, val name: String, val purpose: String, val plantId: Long?, val status: String, val notes: String)
 data class RecipePart(val id: Long, val recipeId: Long, val name: String, val perLiter: Double, val unit: String, val includesSugar: Boolean, val includesAgar: Boolean, val stockMgPerMl: Double)
 data class BatchRecord(val id: Long, val code: String, val recipeId: Long, val recipeName: String, val version: Int, val volumeMl: Int, val preparedAt: Long, val status: String, val note: String)

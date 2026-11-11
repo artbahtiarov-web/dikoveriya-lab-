@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 4) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 5) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -22,8 +22,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE plants (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE mother_plants (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), origin TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Активен', notes TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE cultures (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), quantity INTEGER NOT NULL CHECK(quantity >= 0), status TEXT NOT NULL, passage INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, stage TEXT NOT NULL DEFAULT 'В пробирке', location TEXT NOT NULL DEFAULT '', medium_batch_id INTEGER REFERENCES batches(id), mother_id INTEGER REFERENCES mother_plants(id), notes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL DEFAULT 0)")
-        db.execSQL("CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), kind TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL, before_qty INTEGER, after_qty INTEGER, medium_batch_id INTEGER, event_group TEXT)")
+        db.execSQL("CREATE TABLE cultures (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, plant_id INTEGER NOT NULL REFERENCES plants(id), quantity INTEGER NOT NULL CHECK(quantity >= 0), status TEXT NOT NULL, passage INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, stage TEXT NOT NULL DEFAULT 'В пробирке', location TEXT NOT NULL DEFAULT '', medium_batch_id INTEGER REFERENCES batches(id), mother_id INTEGER REFERENCES mother_plants(id), notes TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL DEFAULT 0, origin_state TEXT NOT NULL DEFAULT 'Не установлено', quantity_kind TEXT NOT NULL DEFAULT 'Не уточнено')")
+        db.execSQL("CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), kind TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL, before_qty INTEGER, after_qty INTEGER, medium_batch_id INTEGER, event_group TEXT, occurred_at INTEGER)")
         createExtra(db)
         listOf("Alocasia Black Velvet Aurea", "Alocasia Dragon Scale Mint", "Philodendron Burle Marx Flame").forEach { n ->
             db.insertOrThrow("plants", null, cv("name" to n))
@@ -41,10 +41,18 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         db.execSQL("CREATE TABLE IF NOT EXISTS materials (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, unit TEXT NOT NULL, quantity REAL NOT NULL CHECK(quantity >= 0), min_quantity REAL NOT NULL DEFAULT 0, cost_per_unit REAL NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE IF NOT EXISTS material_moves (id INTEGER PRIMARY KEY AUTOINCREMENT, material_id INTEGER NOT NULL REFERENCES materials(id), delta REAL NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE IF NOT EXISTS equipment (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, location TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'Исправно', next_check INTEGER, notes TEXT NOT NULL DEFAULT '')")
-        db.execSQL("CREATE TABLE IF NOT EXISTS incidents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'Открыт', culture_id INTEGER REFERENCES cultures(id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS incidents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'Открыт', culture_id INTEGER REFERENCES cultures(id), operation_id TEXT)")
         db.execSQL("CREATE TABLE IF NOT EXISTS experiments (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, hypothesis TEXT NOT NULL, started_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'Идёт')")
         db.execSQL("CREATE TABLE IF NOT EXISTS experiment_cultures (experiment_id INTEGER NOT NULL REFERENCES experiments(id), culture_id INTEGER NOT NULL REFERENCES cultures(id), group_name TEXT NOT NULL, PRIMARY KEY(experiment_id,culture_id))")
         db.execSQL("CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), quantity INTEGER NOT NULL CHECK(quantity > 0), price REAL NOT NULL CHECK(price >= 0), sold_at INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE IF NOT EXISTS lab_operations (id TEXT PRIMARY KEY, kind TEXT NOT NULL, occurred_at INTEGER NOT NULL, recorded_at INTEGER NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Проведена', reversal_of TEXT REFERENCES lab_operations(id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS operation_changes (operation_id TEXT NOT NULL REFERENCES lab_operations(id), culture_id INTEGER NOT NULL REFERENCES cultures(id), before_qty INTEGER, after_qty INTEGER NOT NULL CHECK(after_qty >= 0), before_status TEXT, after_status TEXT NOT NULL, created INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(operation_id,culture_id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS culture_links (parent_culture_id INTEGER NOT NULL REFERENCES cultures(id), child_culture_id INTEGER NOT NULL REFERENCES cultures(id), used_qty INTEGER NOT NULL CHECK(used_qty > 0), result_qty INTEGER NOT NULL CHECK(result_qty > 0), event_group TEXT NOT NULL, cancelled INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(parent_culture_id,child_culture_id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS incident_links (incident_id INTEGER NOT NULL REFERENCES incidents(id), culture_id INTEGER NOT NULL REFERENCES cultures(id), action TEXT NOT NULL DEFAULT 'Осмотр', PRIMARY KEY(incident_id,culture_id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS incident_followups (id INTEGER PRIMARY KEY AUTOINCREMENT, incident_id INTEGER NOT NULL REFERENCES incidents(id), status TEXT NOT NULL, note TEXT NOT NULL, occurred_at INTEGER NOT NULL, recorded_at INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS operation_losses (id INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL REFERENCES lab_operations(id), culture_id INTEGER NOT NULL REFERENCES cultures(id), quantity INTEGER NOT NULL CHECK(quantity > 0), reason TEXT NOT NULL)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_links_child ON culture_links(child_culture_id,cancelled)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_op_changes_culture ON operation_changes(culture_id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_culture_plant ON cultures(plant_id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_culture_batch ON cultures(medium_batch_id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_culture ON events(culture_id,created_at)")
@@ -73,6 +81,21 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             db.execSQL("UPDATE cultures SET status=? WHERE status=?", arrayOf(LabTerms.DISPOSED, "РЈС‚РёР»РёР·РёСЂРѕРІР°РЅ"))
         }
         if (oldVersion < 4) createExtra(db)
+        if (oldVersion < 5) {
+            db.execSQL("ALTER TABLE cultures ADD COLUMN origin_state TEXT NOT NULL DEFAULT 'Не установлено'")
+            db.execSQL("ALTER TABLE cultures ADD COLUMN quantity_kind TEXT NOT NULL DEFAULT 'Не уточнено'")
+            db.execSQL("ALTER TABLE events ADD COLUMN occurred_at INTEGER")
+            val incidentHasOperation = db.rawQuery("PRAGMA table_info(incidents)",null).use { cursor ->
+                var found=false
+                while(cursor.moveToNext()) if(cursor.getString(1)=="operation_id")found=true
+                found
+            }
+            if(!incidentHasOperation)db.execSQL("ALTER TABLE incidents ADD COLUMN operation_id TEXT")
+            db.execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")
+            createExtra(db)
+            db.execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
+        }
+
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
         pairs.forEach { (k, v) -> when(v) {
@@ -94,8 +117,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         beginTransaction()
         try { action(); setTransactionSuccessful() } finally { endTransaction() }
     }
-    private fun event(db: SQLiteDatabase, id: Long, type: String, note: String, before: Int? = null, after: Int? = null, batch: Long? = null, group: String? = null) {
-        db.insertOrThrow("events", null, cv("culture_id" to id, "kind" to type, "note" to note, "created_at" to System.currentTimeMillis(), "before_qty" to before, "after_qty" to after, "medium_batch_id" to batch, "event_group" to group))
+    private fun event(db: SQLiteDatabase, id: Long, type: String, note: String, before: Int? = null, after: Int? = null, batch: Long? = null, group: String? = null, occurredAt: Long = System.currentTimeMillis()) {
+        db.insertOrThrow("events", null, cv("culture_id" to id, "kind" to type, "note" to note, "created_at" to System.currentTimeMillis(), "before_qty" to before, "after_qty" to after, "medium_batch_id" to batch, "event_group" to group, "occurred_at" to occurredAt))
     }
     private fun Cursor.optLong(index: Int): Long? = if (isNull(index)) null else getLong(index)
     fun plants(): List<PlantRecord> = readableDatabase.rawQuery("SELECT id,name,description FROM plants ORDER BY name COLLATE NOCASE", null).use { c ->
@@ -114,8 +137,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             update("mother_plants",cv("code" to "MAT-%05d".format(Locale.US,id)),"id=?",arrayOf(id.toString()))
         }
     }
-    fun cultures(): List<CultureRecord> = readableDatabase.rawQuery("SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes FROM cultures c JOIN plants p ON p.id=c.plant_id ORDER BY c.id DESC",null).use { c ->
-        buildList { while(c.moveToNext()) add(CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12))) }
+    fun cultures(): List<CultureRecord> = readableDatabase.rawQuery("SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes,c.origin_state,c.quantity_kind FROM cultures c JOIN plants p ON p.id=c.plant_id ORDER BY c.id DESC",null).use { c ->
+        buildList { while(c.moveToNext()) add(CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),c.getString(13),c.getString(14))) }
     }
     fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(CulturePhoto(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4))) }
@@ -143,11 +166,14 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
         } catch(e: Exception) { tmp.delete();final.delete();throw e }
     }
-    fun events(cultureId: Long): List<LabEvent> = readableDatabase.rawQuery("SELECT id,culture_id,kind,note,created_at,before_qty,after_qty FROM events WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
-        buildList { while(c.moveToNext()) add(LabEvent(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4),if(c.isNull(5))null else c.getInt(5),if(c.isNull(6))null else c.getInt(6))) }
+    fun events(cultureId: Long): List<LabEvent> = readableDatabase.rawQuery("SELECT id,culture_id,kind,note,COALESCE(occurred_at,created_at),before_qty,after_qty,created_at FROM events WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
+        buildList { while(c.moveToNext()) add(LabEvent(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4),if(c.isNull(5))null else c.getInt(5),if(c.isNull(6))null else c.getInt(6),c.getLong(7))) }
     }
-    fun ancestors(cultureId: Long): List<Pair<String,String>> = readableDatabase.rawQuery("WITH RECURSIVE chain(depth,parent_id,used_qty,resulting_qty) AS (SELECT 1,parent_culture_id,used_qty,resulting_qty FROM lineage WHERE child_culture_id=? UNION ALL SELECT chain.depth+1,l.parent_culture_id,l.used_qty,l.resulting_qty FROM lineage l JOIN chain ON l.child_culture_id=chain.parent_id WHERE chain.depth < 100) SELECT p.code, chain.used_qty || ' → ' || chain.resulting_qty FROM chain JOIN cultures p ON p.id=chain.parent_id ORDER BY chain.depth", arrayOf(cultureId.toString())).use { c ->
+    fun ancestors(cultureId: Long): List<Pair<String,String>> = readableDatabase.rawQuery("WITH RECURSIVE chain(depth,parent_id,used_qty,result_qty) AS (SELECT 1,parent_culture_id,used_qty,result_qty FROM culture_links WHERE child_culture_id=? AND cancelled=0 UNION ALL SELECT chain.depth+1,l.parent_culture_id,l.used_qty,l.result_qty FROM culture_links l JOIN chain ON l.child_culture_id=chain.parent_id WHERE chain.depth < 100 AND l.cancelled=0) SELECT p.code, chain.used_qty || ' → ' || chain.result_qty FROM chain JOIN cultures p ON p.id=chain.parent_id ORDER BY chain.depth,p.code", arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(c.getString(0) to c.getString(1)) }
+    }
+    fun descendants(cultureId: Long): List<String> = readableDatabase.rawQuery("SELECT child.code FROM culture_links links JOIN cultures child ON child.id=links.child_culture_id WHERE links.parent_culture_id=? AND links.cancelled=0 ORDER BY child.id DESC",arrayOf(cultureId.toString())).use { c ->
+        buildList { while(c.moveToNext()) add(c.getString(0)) }
     }
     private fun verifyBatch(id: Long?) {
         if (id == null) return
@@ -159,18 +185,19 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val m = mothers().firstOrNull { it.id == motherId } ?: error("Маточник не найден")
         require(m.plantId == plantId) { "Маточник принадлежит другому растению" }
     }
-    private fun createCultureInDb(db: SQLiteDatabase, plantId: Long, quantity: Int, status: String, passage: Int, stage: String, location: String, batchId: Long?, motherId: Long?, notes: String): Long {
+    private fun createCultureInDb(db: SQLiteDatabase, plantId: Long, quantity: Int, status: String, passage: Int, stage: String, location: String, batchId: Long?, motherId: Long?, notes: String, group: String? = null, occurredAt: Long = System.currentTimeMillis(), quantityKind: String = "Не уточнено"): Long {
         require(quantity > 0 && quantity <= 1000000) { "Количество должно быть от 1 до 1 000 000" }
+        require(quantityKind in LabTerms.quantityKinds) { "Выбери тип учёта количества" }
         verifyBatch(batchId)
         verifyMother(plantId,motherId)
         require(passage >= 0) { "Некорректный номер пассажа" }
-        val id=db.insertOrThrow("cultures",null,cv("code" to "TMP-${UUID.randomUUID()}","plant_id" to plantId,"quantity" to quantity,"status" to status,"passage" to passage,"created_at" to System.currentTimeMillis(),"stage" to stage,"location" to location,"medium_batch_id" to batchId,"mother_id" to motherId,"notes" to notes,"updated_at" to System.currentTimeMillis()))
+        val id=db.insertOrThrow("cultures",null,cv("code" to "TMP-${UUID.randomUUID()}","plant_id" to plantId,"quantity" to quantity,"status" to status,"passage" to passage,"created_at" to occurredAt,"stage" to stage,"location" to location,"medium_batch_id" to batchId,"mother_id" to motherId,"notes" to notes,"updated_at" to System.currentTimeMillis(),"origin_state" to if(motherId!=null)"По маточнику" else "Не установлено","quantity_kind" to quantityKind))
         db.update("cultures",cv("code" to "LAB-%06d".format(Locale.US,id)),"id=?",arrayOf(id.toString()))
-        event(db,id,"Создание","Добавлено объектов: $quantity. $notes",null,quantity,batchId)
+        event(db,id,"Создание","Добавлено объектов: $quantity. $notes",null,quantity,batchId,group,occurredAt)
         return id
     }
-    fun addCulture(plantId: Long, quantity: Int, motherId: Long?, batchId: Long?, location: String, notes: String) {
-        writableDatabase.tx { createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,batchId,motherId,notes) }
+    fun addCulture(plantId: Long, quantity: Int, motherId: Long?, batchId: Long?, location: String, notes: String, quantityKind: String = "Не уточнено") {
+        writableDatabase.tx { createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,batchId,motherId,notes,quantityKind=quantityKind) }
     }
     fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String) {
         require(status in LabTerms.statuses || status == LabTerms.TRANSFERRED) { "Некорректный статус" }
@@ -178,10 +205,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val db=writableDatabase
         db.tx {
             val c=cultures().firstOrNull { it.id==id } ?: error("Контейнер не найден")
-            require(c.status != LabTerms.DISPOSED && c.status != LabTerms.SOLD && c.status != LabTerms.TRANSFERRED) { "Закрытый контейнер нельзя менять" }
-            require(quantity>=0 && quantity<=1000000) { "Некорректное количество" }
+            require(c.status !in listOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.TRANSFERRED,LabTerms.ANNULLED)) { "Закрытый контейнер нельзя менять" }
+            require(c.quantity>0) { "Закрытый контейнер нельзя редактировать" }
+            require(quantity==c.quantity) { "Количество изменяется через «Потери» или «Исправить ошибку» — так сохранится правильная история" }
+            require(status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Для списания выбери «Потери»" }
             if(batchId!=c.batchId) verifyBatch(batchId)
-            require(if(status==LabTerms.DISPOSED) quantity==0 else quantity>0) { "Для утилизации количество должно быть 0; для активного контейнера — больше 0" }
             update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
             event(this,id,if(status==LabTerms.DISPOSED)"Утилизация" else "Изменение","${c.status} → $status; ${c.quantity} → $quantity; место: ${c.location} → $location; среда: ${c.batchId ?: "нет"} → ${batchId ?: "нет"}; причина: $reason",c.quantity,quantity,batchId)
         }
@@ -190,6 +218,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val db=writableDatabase
         db.tx {
             val c=cultures().firstOrNull { it.id==cultureId } ?: error("Контейнер не найден")
+            require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Нельзя проводить осмотр закрытого контейнера" }
             event(this,cultureId,"Осмотр",checkText(note,2000),c.quantity,c.quantity,c.batchId)
             if(starting!=null && healthy!=null && contaminated!=null && days!=null) {
                 require(starting>0 && healthy>=0 && contaminated>=0 && days>0 && days<=2000) { "Проверь числовые данные наблюдения" }
@@ -197,24 +226,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
         }
     }
+    /** Compatibility entrypoint: all new transfers use the same audited operation engine. */
     fun transfer(sourceId: Long, usedQty: Int, outputQty: Int, batchId: Long?, stage: String, notes: String) {
-        require(stage in LabTerms.stages) { "Некорректный этап" }
-        require(usedQty>0 && outputQty>0) { "Укажи положительное количество" }
-        val memo=checkText(notes,2000)
-        val db=writableDatabase
-        db.tx {
-            val s=cultures().firstOrNull { it.id==sourceId } ?: error("Исходный контейнер не найден")
-            require(s.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Исходный контейнер закрыт" }
-            require(usedQty<=s.quantity) { "Нельзя перенести больше исходного количества" }
-            val left=s.quantity-usedQty
-            update("cultures",cv("quantity" to left,"status" to if(left==0)LabTerms.TRANSFERRED else s.status,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(sourceId.toString()))
-            val newPassage=if(stage==LabTerms.IN_VITRO) s.passage+1 else s.passage
-            val child=createCultureInDb(this,s.plantId,outputQty,LabTerms.IN_CULTURE,newPassage,stage,s.location,batchId,s.motherId,memo)
-            val group=UUID.randomUUID().toString()
-            insertOrThrow("lineage",null,cv("parent_culture_id" to sourceId,"child_culture_id" to child,"used_qty" to usedQty,"resulting_qty" to outputQty,"event_group" to group))
-            event(this,sourceId,"Перенос","Использовано: $usedQty; получено: $outputQty; новый: LAB-%06d. $memo".format(Locale.US,child),s.quantity,left,s.batchId,group)
-            event(this,child,"Происхождение","Из ${s.code}; взято: $usedQty; получено: $outputQty. $memo",null,outputQty,batchId,group)
-        }
+        val kind=cultures().firstOrNull{it.id==sourceId}?.quantityKind?:"Не уточнено"
+        splitCulture(sourceId,listOf(TransferDestination(usedQty,outputQty,stage,batchId,null,kind)),0,notes)
     }
     fun sale(cultureId: Long, quantity: Int, total: Double, notes: String) {
         require(quantity>0 && total>=0 && total.isFinite()) { "Некорректные данные продажи" }
@@ -401,10 +416,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         buildList{while(c.moveToNext()) add(IncidentRecord(c.getLong(0),c.getString(1),c.getString(2),c.getLong(3),c.getString(4)))}
     }
     fun addIncident(title: String, note: String, cultureId: Long?) {
-        writableDatabase.tx {
-            insertOrThrow("incidents",null,cv("title" to checkText(title,150),"note" to checkText(note,2000),"culture_id" to cultureId,"created_at" to System.currentTimeMillis()))
-            if(cultureId!=null) event(this,cultureId,"Инцидент","$title: $note")
-        }
+        reportIncident(title,note,listOfNotNull(cultureId),"Наблюдение")
     }
     fun experiments(): List<ExperimentRecord> = readableDatabase.rawQuery("SELECT id,title,hypothesis,started_at,state FROM experiments ORDER BY id DESC",null).use{c->
         buildList{while(c.moveToNext()) add(ExperimentRecord(c.getLong(0),c.getString(1),c.getString(2),c.getLong(3),c.getString(4)))}
@@ -423,13 +435,224 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         buildList{while(c.moveToNext()) add(MediumMetric(c.getString(0),c.getInt(1),c.getInt(2),c.getInt(3),c.getInt(4),c.getDouble(5)))}
     }
     fun countByStatus(): Map<String,Int> = cultures().groupingBy{it.status}.eachCount()
+    /** Each operation is atomic, independently identifiable, and traceable to its sources. */
+    private fun newOperation(db: SQLiteDatabase, kind: String, note: String, occurredAt: Long): String {
+        val now=System.currentTimeMillis()
+        require(occurredAt in 946684800000L..(now+300000L)) { "Проверь дату операции: нельзя записывать события из будущего" }
+        val id=UUID.randomUUID().toString()
+        db.insertOrThrow("lab_operations",null,cv("id" to id,"kind" to kind,"occurred_at" to occurredAt,"recorded_at" to now,"note" to note.trim().take(2000).ifEmpty{"Плановая операция"},"status" to "Проведена"))
+        return id
+    }
+    private fun changeSnapshot(db: SQLiteDatabase, group: String, cultureId: Long, before: CultureRecord?, afterQty: Int, afterStatus: String) {
+        db.insertOrThrow("operation_changes",null,cv("operation_id" to group,"culture_id" to cultureId,"before_qty" to before?.quantity,"after_qty" to afterQty,"before_status" to before?.status,"after_status" to afterStatus,"created" to if(before==null)1 else 0))
+    }
+    private fun changeCount(db: SQLiteDatabase, source: CultureRecord, quantity: Int, newStatus: String, kind: String, note: String, group: String, whenAt: Long) {
+        require(quantity>=0 && quantity<=1000000) { "Недопустимое количество" }
+        db.update("cultures",cv("quantity" to quantity,"status" to newStatus,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(source.id.toString()))
+        changeSnapshot(db,group,source.id,source,quantity,newStatus)
+        event(db,source.id,kind,note,source.quantity,quantity,source.batchId,group,whenAt)
+    }
+    fun confirmedLosses(cultureId: Long): Int = readableDatabase.rawQuery("SELECT COALESCE(SUM(l.quantity),0) FROM operation_losses l JOIN lab_operations o ON o.id=l.operation_id WHERE l.culture_id=? AND o.status='Проведена'",arrayOf(cultureId.toString())).use{it.moveToFirst();it.getInt(0)}
+    fun operationsForCulture(cultureId: Long): List<OperationRecord> = readableDatabase.rawQuery(
+        "SELECT o.id,o.kind,o.occurred_at,o.recorded_at,o.status,o.note FROM lab_operations o JOIN operation_changes ch ON ch.operation_id=o.id WHERE ch.culture_id=? ORDER BY o.recorded_at DESC,o.rowid DESC",
+        arrayOf(cultureId.toString())
+    ).use { c -> buildList { while(c.moveToNext()) add(OperationRecord(c.getString(0),c.getString(1),c.getLong(2),c.getLong(3),c.getString(4),c.getString(5))) } }
+    /** One source, many daughter containers. Input material, resulting material and losses are kept separate. */
+    fun splitCulture(sourceId: Long, destinations: List<TransferDestination>, lost: Int, note: String, occurredAt: Long = System.currentTimeMillis()) {
+        require(destinations.isNotEmpty() && destinations.size<=25) { "Укажи от 1 до 25 новых контейнеров" }
+        require(lost>=0) { "Потери не могут быть отрицательными" }
+        require(destinations.all{it.used in 1..1000000 && it.produced in 1..1000000 && it.stage in LabTerms.stages}) { "Проверь количества и этап для каждого нового контейнера" }
+        val taken=destinations.sumOf { it.used.toLong() } + lost.toLong()
+        writableDatabase.tx {
+            val source=cultures().firstOrNull{it.id==sourceId}?:error("Исходный контейнер не найден")
+            require(source.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Нельзя пересаживать закрытый контейнер" }
+            require(occurredAt>=source.createdAt) { "Дата пересадки раньше создания исходного контейнера" }
+            val rest=LabOperationRules.remainingAfterSplit(source.quantity,destinations.map{it.used},destinations.map{it.produced},lost)
+            destinations.forEach{verifyBatch(it.batchId)}
+            val group=newOperation(this,"Разделение и пересадка",note,occurredAt)
+            if(lost>0)insertOrThrow("operation_losses",null,cv("operation_id" to group,"culture_id" to sourceId,"quantity" to lost,"reason" to "В ходе пересадки"))
+            changeCount(this,source,rest,if(rest==0)LabTerms.TRANSFERRED else source.status,"Пересадка", "Изъято ${taken-lost}; потери $lost; осталось $rest. $note",group,occurredAt)
+            destinations.forEach{part->
+                val nextPassage=source.passage+if(part.stage==LabTerms.IN_VITRO)1 else 0
+                val child=createCultureInDb(this,source.plantId,part.produced,LabTerms.IN_CULTURE,nextPassage,part.stage,part.location?:source.location,part.batchId,source.motherId,note,group,occurredAt,part.quantityKind)
+                update("cultures",cv("origin_state" to source.originState),"id=?",arrayOf(child.toString()))
+                insertOrThrow("culture_links",null,cv("parent_culture_id" to sourceId,"child_culture_id" to child,"used_qty" to part.used,"result_qty" to part.produced,"event_group" to group))
+                changeSnapshot(this,group,child,null,part.produced,LabTerms.IN_CULTURE)
+                event(this,child,"Происхождение","Из ${source.code}; исходных объектов ${part.used}, получено ${part.produced}. $note",null,part.produced,part.batchId,group,occurredAt)
+            }
+        }
+    }
+    /** Combining sources is never silently presented as a verified clonal line. */
+    fun mergeCultures(inputs: List<MergeInput>, produced: Int, batchId: Long?, stage: String, note: String, confirmMixedOrigins: Boolean, occurredAt: Long = System.currentTimeMillis()) {
+        require(inputs.size in 2..25 && inputs.map{it.cultureId}.distinct().size==inputs.size) { "Для объединения выбери 2–25 разных исходных контейнеров" }
+        require(inputs.all{it.used>0} && produced in 1..1000000 && stage in LabTerms.stages) { "Проверь количество и этап" }
+        writableDatabase.tx {
+            val all=cultures().associateBy{it.id}
+            val sources=inputs.map{row->
+                val c=all[row.cultureId] ?: error("Контейнер ${row.cultureId} не найден")
+                require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE) && row.used<=c.quantity) { "Источник ${c.code} закрыт или материала недостаточно" }
+                c
+            }
+            require(sources.map{it.plantId}.distinct().size==1) { "Нельзя объединять разные виды или сорта растений в одну линию" }
+            require(sources.map{it.quantityKind}.distinct().size==1) { "Для объединения источников приведи учёт к одной категории: экспланты, побеги или растения" }
+            require(occurredAt>=sources.maxOf{it.createdAt}) { "Дата объединения раньше даты создания одного из источников" }
+            val remains=LabOperationRules.remainingAfterMerge(sources.map{it.quantity},inputs.map{it.used},produced)
+            verifyBatch(batchId)
+            val certain=sources.map{it.motherId}.distinct().size==1 && sources.first().motherId!=null && sources.all{it.originState=="По маточнику"}
+            require(certain || confirmMixedOrigins) { "Происхождение неоднородно или неизвестно. Подтверди смешение с сохранением предупреждения" }
+            val origin=if(certain)"По маточнику" else "Смешанное / неподтверждённое"
+            val group=newOperation(this,"Объединение культур",note,occurredAt)
+            val parent=sources.first()
+            val child=createCultureInDb(this,parent.plantId,produced,LabTerms.IN_CULTURE,sources.maxOf{it.passage}+if(stage==LabTerms.IN_VITRO)1 else 0,stage,parent.location,batchId,if(certain)parent.motherId else null,note,group,occurredAt,parent.quantityKind)
+            update("cultures",cv("origin_state" to origin),"id=?",arrayOf(child.toString()))
+            changeSnapshot(this,group,child,null,produced,LabTerms.IN_CULTURE)
+            sources.forEachIndexed{index,c->
+                val consumed=inputs[index].used
+                val rest=remains[index]
+                changeCount(this,c,rest,if(rest==0)LabTerms.TRANSFERRED else c.status,"Объединение","В ${parent.plantName}: использовано $consumed для нового контейнера; ${if(!certain)"происхождение смешанное. " else ""}$note",group,occurredAt)
+                insertOrThrow("culture_links",null,cv("parent_culture_id" to c.id,"child_culture_id" to child,"used_qty" to consumed,"result_qty" to produced,"event_group" to group))
+            }
+            event(this,child,"Происхождение","Объединены источники: ${sources.joinToString { it.code }}. Маркировка: $origin. $note",null,produced,batchId,group,occurredAt)
+        }
+    }
+    fun recordLoss(cultureId: Long, count: Int, reason: String, notes: String, occurredAt: Long = System.currentTimeMillis()) {
+        require(count>0) { "Укажи количество потерянных объектов" }
+        val cause=checkText(reason,120)
+        val explanation=checkText(notes,2000)
+        writableDatabase.tx {
+            val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
+            require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Контейнер уже закрыт" }
+            require(occurredAt>=c.createdAt) { "Дата потерь раньше создания контейнера" }
+            val rest=LabOperationRules.remainingAfterLoss(c.quantity,count)
+            val group=newOperation(this,"Потери", "$cause. $explanation",occurredAt)
+            insertOrThrow("operation_losses",null,cv("operation_id" to group,"culture_id" to cultureId,"quantity" to count,"reason" to cause))
+            changeCount(this,c,rest,if(rest==0)LabTerms.DISPOSED else c.status,"Потери","Потеряно: $count; причина: $cause. $explanation",group,occurredAt)
+        }
+    }
+    /** A correction is not a biological gain/loss; it is always explicitly distinguished in analytics. */
+    fun correctQuantity(cultureId: Long, quantity: Int, reason: String, occurredAt: Long = System.currentTimeMillis()) {
+        checkText(reason,2000)
+        require(quantity in 1..1000000) { "Для исправления укажи положительное количество. Для потерь или ошибочного создания есть отдельное действие" }
+        writableDatabase.tx {
+            val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
+            require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Закрытый контейнер нельзя изменить напрямую; проверь возможность отмены операции" }
+            require(quantity!=c.quantity) { "Количество не изменилось" }
+            require(occurredAt>=c.createdAt) { "Дата исправления раньше создания контейнера" }
+            val group=newOperation(this,"Исправление учёта",reason,occurredAt)
+            changeCount(this,c,quantity,c.status,"Исправление учёта","Было записано ${c.quantity}; правильное количество $quantity. Причина: $reason",group,occurredAt)
+        }
+    }
+    /** Void an accidentally created standalone container. If it has descendants, cancel its latest operation instead. */
+    fun voidCulture(cultureId: Long, reason: String, occurredAt: Long = System.currentTimeMillis()) {
+        checkText(reason,2000)
+        writableDatabase.tx {
+            val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
+            require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Контейнер уже закрыт" }
+            val parents=rawQuery("SELECT COUNT(*) FROM culture_links WHERE child_culture_id=? AND cancelled=0",arrayOf(cultureId.toString())).use{it.moveToFirst();it.getInt(0)}
+            val kids=rawQuery("SELECT COUNT(*) FROM culture_links WHERE parent_culture_id=? AND cancelled=0",arrayOf(cultureId.toString())).use{it.moveToFirst();it.getInt(0)}
+            val related=listOf("sales","assessments","culture_photos","experiment_cultures","tasks","incident_links")
+                .sumOf{table->rawQuery("SELECT COUNT(*) FROM $table WHERE culture_id=?",arrayOf(cultureId.toString())).use{it.moveToFirst();it.getInt(0)}}
+            val audited=rawQuery("SELECT COUNT(*) FROM operation_changes oc JOIN lab_operations op ON op.id=oc.operation_id WHERE oc.culture_id=? AND op.status='Проведена'",arrayOf(cultureId.toString())).use{it.moveToFirst();it.getInt(0)}
+            require(parents==0 && kids==0 && related==0 && audited==0) { "У контейнера есть связанные операции или данные. Не аннулируй запись: сохрани историю и зарегистрируй исправление" }
+            require(occurredAt>=c.createdAt) { "Дата аннулирования раньше даты создания контейнера" }
+            val group=newOperation(this,"Ошибочное создание",reason,occurredAt)
+            changeCount(this,c,0,LabTerms.ANNULLED,"Аннулирование","Ошибочно созданный контейнер. $reason",group,occurredAt)
+        }
+    }
+    /** A lab incident is one event affecting any number of existing containers. No plants are silently lost. */
+    fun reportIncident(title: String, description: String, affectedIds: List<Long>, response: String, occurredAt: Long = System.currentTimeMillis()) {
+        require(affectedIds.distinct().size==affectedIds.size && affectedIds.size<=1000) { "Нельзя повторять контейнеры или выбрать больше 1000" }
+        require(response in listOf("Наблюдение","На контроле","Карантин")) { "Неизвестная мера реагирования" }
+        writableDatabase.tx {
+            val group=newOperation(this,"Авария", "$title. $description",occurredAt)
+            val incident=insertOrThrow("incidents",null,cv("title" to checkText(title,120),"note" to checkText(description,2000),"created_at" to occurredAt,"state" to "Открыт","culture_id" to affectedIds.singleOrNull(),"operation_id" to group))
+            val all=cultures().associateBy{it.id}
+            affectedIds.forEach{id->
+                val c=all[id] ?: error("Контейнер $id не найден")
+                require(occurredAt>=c.createdAt) { "Дата происшествия раньше создания контейнера ${c.code}" }
+                val newStatus=when {
+                    c.status !in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE) -> c.status
+                    response=="Карантин" -> LabTerms.QUARANTINE
+                    response=="На контроле" -> if(c.status==LabTerms.QUARANTINE)c.status else LabTerms.CONTROL
+                    else -> c.status
+                }
+                insertOrThrow("incident_links",null,cv("incident_id" to incident,"culture_id" to id,"action" to response))
+                if(newStatus!=c.status){
+                    changeCount(this,c,c.quantity,newStatus,"Авария","${title.trim()}. Реакция: $response. $description",group,occurredAt)
+                }else{
+                    changeSnapshot(this,group,c.id,c,c.quantity,c.status)
+                    event(this,c.id,"Авария","${title.trim()}. Реакция: $response. $description",c.quantity,c.quantity,c.batchId,group,occurredAt)
+                }
+            }
+        }
+    }
+    fun incidentCultures(incidentId: Long): List<String> = readableDatabase.rawQuery(
+        "SELECT c.code || ' · ' || p.name || ' (' || l.action || ')' FROM incident_links l JOIN cultures c ON c.id=l.culture_id JOIN plants p ON p.id=c.plant_id WHERE l.incident_id=? ORDER BY c.code",
+        arrayOf(incidentId.toString())
+    ).use{cursor->buildList{while(cursor.moveToNext())add(cursor.getString(0))}}
+    fun incidentFollowups(incidentId: Long): List<String> = readableDatabase.rawQuery(
+        "SELECT occurred_at,status,note FROM incident_followups WHERE incident_id=? ORDER BY id DESC",arrayOf(incidentId.toString())
+    ).use{cursor->buildList{while(cursor.moveToNext())add("${java.text.SimpleDateFormat("dd.MM.yyyy HH:mm",Locale("ru")).format(java.util.Date(cursor.getLong(0)))} · ${cursor.getString(1)}: ${cursor.getString(2)}")}}
+    fun updateIncident(incidentId: Long, newStatus: String, note: String, occurredAt: Long = System.currentTimeMillis()) {
+        require(newStatus in listOf("Открыт","На контроле","Завершён","Аннулирован")) { "Недопустимое состояние происшествия" }
+        val details=checkText(note,2000)
+        writableDatabase.tx {
+            val found=rawQuery("SELECT state FROM incidents WHERE id=?",arrayOf(incidentId.toString())).use{c->require(c.moveToFirst()){"Происшествие не найдено"};c.getString(0)}
+            require(found!="Аннулирован") { "Аннулированное происшествие нельзя изменять" }
+            newOperation(this,"Разбор происшествия","Происшествие $incidentId: $details",occurredAt)
+            update("incidents",cv("state" to newStatus),"id=?",arrayOf(incidentId.toString()))
+            insertOrThrow("incident_followups",null,cv("incident_id" to incidentId,"status" to newStatus,"note" to details,"occurred_at" to occurredAt,"recorded_at" to System.currentTimeMillis()))
+        }
+    }
+
+    /** Conservative reversal: every touched culture must have no later event. Nothing is deleted. */
+    fun cancelOperation(originalId: String, reason: String) {
+        checkText(reason,2000)
+        writableDatabase.tx {
+            val original=rawQuery("SELECT kind,status FROM lab_operations WHERE id=?",arrayOf(originalId)).use{c->require(c.moveToFirst()){"Операция не найдена"};c.getString(0) to c.getString(1)}
+            require(original.second=="Проведена") { "Операция уже отменена" }
+            if(original.first=="Авария"){
+                val followups=rawQuery("SELECT COUNT(*) FROM incident_followups f JOIN incidents i ON i.id=f.incident_id WHERE i.operation_id=?",arrayOf(originalId)).use{it.moveToFirst();it.getInt(0)}
+                require(followups==0) { "По происшествию уже зарегистрированы дальнейшие решения; автоматическая отмена заблокирована" }
+            }
+            require(original.first in setOf("Разделение и пересадка","Объединение культур","Потери","Исправление учёта","Ошибочное создание","Авария")) { "Автоматическая отмена этого вида операции недоступна" }
+            data class Change(val cultureId: Long,val beforeQty: Int?,val afterQty:Int,val beforeStatus:String?,val afterStatus:String,val created:Boolean)
+            val changes=rawQuery("SELECT culture_id,before_qty,after_qty,before_status,after_status,created FROM operation_changes WHERE operation_id=?",arrayOf(originalId)).use{c->buildList{
+                while(c.moveToNext())add(Change(c.getLong(0),if(c.isNull(1))null else c.getInt(1),c.getInt(2),if(c.isNull(3))null else c.getString(3),c.getString(4),c.getInt(5)==1))
+            }}
+            require(changes.isNotEmpty() || original.first=="Авария") { "Нет данных для безопасной отмены" }
+            val current=cultures().associateBy{it.id}
+            changes.forEach{entry->
+                val c=current[entry.cultureId]?:error("Контейнер не найден")
+                require(c.quantity==entry.afterQty && c.status==entry.afterStatus) { "${c.code} изменился после операции. Автоматическая отмена запрещена" }
+                val max=rawQuery("SELECT MAX(id) FROM events WHERE culture_id=? AND event_group=?",arrayOf(c.id.toString(),originalId)).use{it.moveToFirst();if(it.isNull(0))0L else it.getLong(0)}
+                require(max>0) { "Для ${c.code} отсутствует запись исходной операции" }
+                val later=rawQuery("SELECT COUNT(*) FROM events WHERE culture_id=? AND id>?",arrayOf(c.id.toString(),max.toString())).use{it.moveToFirst();it.getInt(0)}
+                require(later==0) { "После операции с ${c.code} были другие действия. Сначала проверь их последствия" }
+            }
+            val group=newOperation(this,"Отмена операции","Отмена $originalId. $reason",System.currentTimeMillis())
+            update("lab_operations",cv("status" to "Отменена","reversed_by" to group),"id=?",arrayOf(originalId))
+            changes.forEach{ch->
+                val c=current.getValue(ch.cultureId)
+                val restoreQty=if(ch.created)0 else requireNotNull(ch.beforeQty)
+                val restoreStatus=if(ch.created)LabTerms.ANNULLED else requireNotNull(ch.beforeStatus)
+                update("cultures",cv("quantity" to restoreQty,"status" to restoreStatus,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(ch.cultureId.toString()))
+                changeSnapshot(this,group,c.id,c,restoreQty,restoreStatus)
+                event(this,ch.cultureId,"Отмена операции","Отменена ${original.first}: $reason. Старые записи сохранены",c.quantity,restoreQty,c.batchId,group)
+            }
+            update("culture_links",cv("cancelled" to 1),"event_group=?",arrayOf(originalId))
+            if(original.first=="Авария") update("incidents",cv("state" to "Аннулирован"),"operation_id=?",arrayOf(originalId))
+        }
+    }
+
     companion object {
         /** Tables are restored in parent-first order; all foreign key constraints stay enabled. */
-        val BACKUP_ORDER=listOf("plants","mother_plants","recipes","recipe_parts","recipe_imports","batches","cultures","culture_photos","events","lineage","assessments","tasks","materials","material_moves","equipment","incidents","experiments","experiment_cultures","sales")
+        val BACKUP_ORDER_V4=listOf("plants","mother_plants","recipes","recipe_parts","recipe_imports","batches","cultures","culture_photos","events","lineage","assessments","tasks","materials","material_moves","equipment","incidents","experiments","experiment_cultures","sales")
+        val BACKUP_ORDER=BACKUP_ORDER_V4+listOf("lab_operations","operation_changes","culture_links","incident_links","incident_followups","operation_losses")
     }
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",4).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",5).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         BACKUP_ORDER.forEach{table->
             val arr=JSONArray()
@@ -456,12 +679,14 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema")==4) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..5) { "Неизвестная версия резервной копии" }
+        val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        BACKUP_ORDER.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
+        val importOrder=if(fromVersion==4) BACKUP_ORDER_V4 else BACKUP_ORDER
+        importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
-            BACKUP_ORDER.forEach{table->
+            importOrder.forEach{table->
                 val arr=tables.getJSONArray(table)
                 require(arr.length()<=100000) { "Слишком много записей: $table" }
                 for(i in 0 until arr.length()) {
@@ -480,6 +705,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                     }
                     insertOrThrow(table,null,values)
                 }
+            }
+            if(fromVersion==4) {
+                execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")
+                execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
             }
             rawQuery("PRAGMA foreign_key_check",null).use{c->require(!c.moveToFirst()){"Повреждены связи резервной копии"}}
         }

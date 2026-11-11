@@ -36,17 +36,19 @@ fun AddMotherDialog(plants:List<PlantRecord>,onClose:()->Unit,onSave:(Long,Strin
     }
 }
 @Composable
-fun AddCultureDialog(plants:List<PlantRecord>,mothers:List<MotherRecord>,batches:List<BatchRecord>,onClose:()->Unit,onSave:(Long,Int,Long?,Long?,String,String)->Unit){
+fun AddCultureDialog(plants:List<PlantRecord>,mothers:List<MotherRecord>,batches:List<BatchRecord>,onClose:()->Unit,onSave:(Long,Int,Long?,Long?,String,String,String)->Unit){
     var plantId by remember{mutableStateOf(plants.firstOrNull()?.id)}
     var qty by remember{mutableStateOf("1")}
     var motherId by remember{mutableStateOf<Long?>(null)}
     var batchId by remember{mutableStateOf<Long?>(null)}
     var place by remember{mutableStateOf("")};var note by remember{mutableStateOf("")}
+    var quantityKind by remember{mutableStateOf("Не уточнено")}
     val availableMothers=mothers.filter{it.plantId==plantId}
     val availableBatches=batches.filter{it.status=="Готова"}
-    DialogForm("Новый контейнер",onClose,saveText="Создать",onSave={if(plantId!=null) onSave(plantId!!,qty.toIntOrNull()?:0,motherId,batchId,place,note)}){
+    DialogForm("Новый контейнер",onClose,saveText="Создать",onSave={if(plantId!=null) onSave(plantId!!,qty.toIntOrNull()?:0,motherId,batchId,place,note,quantityKind)}){
         PickOne("Растение",plants.map{it.name},plants.firstOrNull{it.id==plantId}?.name.orEmpty(),{s->plantId=plants.firstOrNull{it.name==s}?.id;motherId=null})
         Field("Количество объектов",qty,{qty=it.filter{c->c.isDigit()}},numeric=true)
+        PickOne("Что считаем",LabTerms.quantityKinds,quantityKind,{quantityKind=it},"Экспланты, побеги и растения — разные единицы наблюдения. Это поможет правильно оценивать результативность размножения.")
         PickOne("Маточник",listOf("Не указан")+availableMothers.map{"${it.code} · ${it.origin}"},availableMothers.firstOrNull{it.id==motherId}?.let{"${it.code} · ${it.origin}"}?:"Не указан",{s->motherId=availableMothers.firstOrNull{"${it.code} · ${it.origin}"==s}?.id},"Маточник — исходное растение. Если происхождение неизвестно, можно оставить поле пустым; система не будет его придумывать.")
         PickOne("Партия среды",listOf("Не указана")+availableBatches.map{"${it.code} · ${it.recipeName}"},availableBatches.firstOrNull{it.id==batchId}?.let{"${it.code} · ${it.recipeName}"}?:"Не указана",{s->batchId=availableBatches.firstOrNull{"${it.code} · ${it.recipeName}"==s}?.id})
         Field("Место (стеллаж, полка)",place,{place=it})
@@ -56,10 +58,10 @@ fun AddCultureDialog(plants:List<PlantRecord>,mothers:List<MotherRecord>,batches
 }
 @Composable
 fun CultureDialog(
-    c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,
+    c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,lossesTotal:Int,
     onClose:()->Unit,onChange:(Int,String,String,Long?,String)->Unit,
     onObserve:(String,Int?,Int?,Int?,Int?)->Unit,
-    onTransfer:(Int,Int,Long?,String,String)->Unit,onSale:(Int,Double,String)->Unit,onQr:()->Unit,onPhoto:(String)->Unit
+    onOperations:()->Unit,onSale:(Int,Double,String)->Unit,onQr:()->Unit,onPhoto:(String)->Unit
 ){
     var mode by remember(c.id){mutableStateOf("История")}
     var count by remember(c.id){mutableStateOf(c.quantity.toString())}
@@ -77,22 +79,28 @@ fun CultureDialog(
     var infectedQty by remember(c.id){mutableStateOf("0")}
     var days by remember(c.id){mutableStateOf("")}
     var photoNote by remember(c.id){mutableStateOf("")}
-    val closed=c.status in listOf(LabTerms.DISPOSED,LabTerms.TRANSFERRED,LabTerms.SOLD)
+    val closed=c.status in listOf(LabTerms.DISPOSED,LabTerms.TRANSFERRED,LabTerms.SOLD,LabTerms.ANNULLED)
     val liveBatches=batches.filter{it.status=="Готова"}
     AlertDialog(onDismissRequest=onClose,title={Column{
         Text(c.plantName,style=MaterialTheme.typography.titleLarge)
         Text(c.code,style=MaterialTheme.typography.bodyMedium)
     }},text={
         Column(Modifier.fillMaxWidth().heightIn(max=530.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            Text("${c.status} · ${c.stage} · ${c.quantity} шт.")
+            Text("${c.status} · ${c.stage} · ${c.quantity} · ${c.quantityKind}")
             if(c.location.isNotEmpty())Text("Место: ${c.location}",style=MaterialTheme.typography.bodySmall)
-            PickOne("Действие",listOf("История","Осмотр","Изменить","Пересадка","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
+            PickOne("Действие",listOf("История","Что произошло?","Осмотр","Изменить","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
             when(mode){
+                "Что произошло?" -> {
+                    Text("Пересадка, разделение, объединение, потери, происшествия и исправления ведутся через единый журнал операций.",style=MaterialTheme.typography.bodySmall)
+                    Button(onClick=onOperations,modifier=Modifier.fillMaxWidth()){Text("Выбрать действие")}
+                }
                 "История" -> {
                     if(ancestors.isNotEmpty()){
                         Text("Исходный контейнер",fontWeight=FontWeight.SemiBold)
                         ancestors.forEach{Text("${it.first} · исходное/полученное количество: ${it.second}",style=MaterialTheme.typography.bodySmall)}
                     }
+                    Text("Происхождение: ${c.originState}",style=MaterialTheme.typography.bodySmall)
+                    if(lossesTotal>0)Text("Зафиксированные потери: $lossesTotal",style=MaterialTheme.typography.bodySmall)
                     Text("Создан: ${formatDate(c.createdAt)}",style=MaterialTheme.typography.bodySmall)
                     Text("Номер пассажа: ${c.passage}",style=MaterialTheme.typography.bodySmall)
                     Text("Партия среды: ${batches.firstOrNull{it.id==c.batchId}?.code?:"не указана"}",style=MaterialTheme.typography.bodySmall)
@@ -100,6 +108,7 @@ fun CultureDialog(
                     events.forEach{e->
                         HorizontalDivider()
                         Text("${formatDate(e.time)} · ${e.kind}",fontWeight=FontWeight.Medium,style=MaterialTheme.typography.bodySmall)
+                        if(kotlin.math.abs(e.recordedAt-e.time)>60000)Text("Внесено в журнал: ${formatDate(e.recordedAt)}",style=MaterialTheme.typography.bodySmall)
                         Text(e.note,style=MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -118,24 +127,12 @@ fun CultureDialog(
                 "Изменить" -> {
                     if(closed)Text("Закрытый контейнер нельзя редактировать. История остаётся доступной.")
                     else {
-                        Field("Количество",count,{count=it.filter(Char::isDigit)},numeric=true)
-                        PickOne("Состояние",LabTerms.statuses,status,{status=it;if(it==LabTerms.DISPOSED)count="0"},"Карантин — изоляция; На контроле — культура требует наблюдения; Утилизирован — окончательное закрытие с сохранением истории.")
+                        Text("Количество: ${c.quantity}. Для учёта потерь или исправления числа открой «Что произошло?»",style=MaterialTheme.typography.bodySmall)
+                        PickOne("Состояние",listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE),status,{status=it},"Карантин — изоляция; На контроле — требуется наблюдение. Полное списание выполняется через «Потери».")
                         Field("Место",place,{place=it})
                         PickOne("Партия питательной среды",listOf("Не указана")+liveBatches.map{it.code},liveBatches.firstOrNull{it.id==batchId}?.code?:"Не указана",{s->batchId=liveBatches.firstOrNull{it.code==s}?.id})
                         Field("Почему меняешь запись?",note,{note=it},single=false)
-                        if(status==LabTerms.DISPOSED)Text("Внимание: будет зафиксировано окончательное списание контейнера.",color=MaterialTheme.colorScheme.error)
-                    }
-                }
-                "Пересадка" -> {
-                    if(closed)Text("Закрытый контейнер нельзя пересаживать")
-                    else {
-                        Field("Сколько берём из исходного контейнера",useQty,{useQty=it.filter(Char::isDigit)},numeric=true)
-                        Field("Сколько получилось после разделения",outQty,{outQty=it.filter(Char::isDigit)},numeric=true)
-                        HelpIcon("Два количества","Первое — сколько исходных объектов изъято. Второе — сколько отдельных пригодных объектов получено. Это важно для расчёта реального размножения.")
-                        PickOne("Следующий этап",LabTerms.stages,stage,{stage=it})
-                        PickOne("Новая партия среды",listOf("Не указана")+liveBatches.map{"${it.code} · ${it.recipeName}"},liveBatches.firstOrNull{it.id==batchId}?.let{"${it.code} · ${it.recipeName}"}?:"Не указана",{s->batchId=liveBatches.firstOrNull{"${it.code} · ${it.recipeName}"==s}?.id})
-                        Field("Описание операции",note,{note=it},single=false)
-                        Text("Программа создаст новый контейнер, а исходный сохранит в истории.",style=MaterialTheme.typography.bodySmall)
+                        HelpIcon("Количество и потери","Реальные потери, технические исправления и пересадки учитываются как разные события, чтобы сохранить достоверные результаты лаборатории.")
                     }
                 }
                 "Продажа" -> {
@@ -179,7 +176,6 @@ fun CultureDialog(
                 onObserve(note,if(hasMetrics)inputQty.toIntOrNull()?:0 else null,if(hasMetrics)healthyQty.toIntOrNull()?:-1 else null,if(hasMetrics)infectedQty.toIntOrNull()?:-1 else null,if(hasMetrics)days.toIntOrNull()?:0 else null)
             }){Text("Сохранить осмотр")}
             "Изменить" -> if(!closed)TextButton(onClick={onChange(count.toIntOrNull()?:-1,status,place,batchId,note)}){Text("Применить")}
-            "Пересадка" -> if(!closed)TextButton(onClick={onTransfer(useQty.toIntOrNull()?:0,outQty.toIntOrNull()?:0,batchId,stage,note)}){Text("Пересадить")}
             "Продажа" -> if(!closed && c.stage!=LabTerms.IN_VITRO)TextButton(onClick={onSale(saleQty.toIntOrNull()?:0,salePrice.replace(',','.').toDoubleOrNull()?:-1.0,note)}){Text("Оформить")}
             "Фото" -> TextButton(onClick={onPhoto(photoNote)}){Text("Добавить фото")}
             "Этикетка" -> TextButton(onClick=onQr){Text("Сохранить PNG")}
