@@ -43,7 +43,9 @@ jobs:
           test -f qa/check_v050.py || { echo "::error::Missing baseline validator"; exit 1; }
           python3 qa/check_v050.py
 
-      - name: Run unit tests and build unsigned debug APK
+      - name: Run unit tests and build debug APK with Android's temporary test certificate
+        env:
+          LAB_PR_DEBUG_BUILD: 'true'
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug --stacktrace
 
       - name: Upload PR debug APK for inspection
