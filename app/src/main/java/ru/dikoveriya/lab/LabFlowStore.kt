@@ -165,10 +165,15 @@ fun LabDatabase.plantResults(): List<CultivarResult> {
     }
 }
 
+/** Counts follow-up numeric observations, not intake baselines or text-only notes. */
 fun LabDatabase.mediumResults(): List<MediumResult> {
     val db=readableDatabase
     return db.rawQuery("""
-        SELECT r.id,r.name || ' · v' || r.version,COUNT(DISTINCT cm.culture_id),COUNT(cm.id),
+        SELECT r.id,r.name || ' · v' || r.version,COUNT(DISTINCT cm.culture_id),
+               COUNT(CASE WHEN cm.notes <> 'Показатели при создании'
+                 AND (cm.explants IS NOT NULL OR cm.shoots IS NOT NULL
+                      OR cm.plants IS NOT NULL OR cm.contaminated IS NOT NULL)
+                 THEN cm.id END),
                COALESCE(SUM(CASE WHEN cm.shoots IS NOT NULL AND cm.id=(
                    SELECT x.id FROM culture_measurements x WHERE x.culture_id=cm.culture_id AND x.recipe_id=cm.recipe_id
                      AND x.shoots IS NOT NULL ORDER BY x.observed_at DESC,x.id DESC LIMIT 1
