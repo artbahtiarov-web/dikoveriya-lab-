@@ -15,25 +15,43 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Apply complete source update, if uploaded
+      - name: Install v0.5 update from uploaded archive
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f dikoveriya-lab-update.zip ]; then
-            unzip -q -o dikoveriya-lab-update.zip -d .
-            rm -f dikoveriya-lab-update.zip
-            # Update files from the currently checked-out main branch; fail if expected structure changed.
+          # Accept both archive names used in the release instructions.
+          archive=''
+          if [ -f dikoveriya-lab-update-v050.zip ]; then
+            archive='dikoveriya-lab-update-v050.zip'
+          elif [ -f dikoveriya-lab-update.zip ]; then
+            archive='dikoveriya-lab-update.zip'
+          fi
+          if [ -n "$archive" ]; then
+            echo "Applying update from $archive"
+            unzip -tq "$archive"
+            # The archive is a PATCH, not the complete Android project.
+            unzip -oq "$archive" -d .
+            test -f apply_v050.py || { echo '::error::Archive lacks apply_v050.py'; exit 1; }
+            test -f qa/check_v050.py || { echo '::error::Archive lacks qa/check_v050.py'; exit 1; }
             python3 apply_v050.py
-            rm -f apply_v050.py
+            python3 qa/check_v050.py
+            rm -f apply_v050.py "$archive"
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add -A
             if ! git diff --cached --quiet; then
-              git commit -m 'Install Dikoveriya LAB v0.5 components and navigation'
+              git commit -m 'Apply Dikoveriya LAB v0.5 navigation and recipes update'
               if ! git push origin HEAD:main; then
-                echo '::warning::Unable to write extracted sources to main; APK will still build from the extracted files for this run.'
+                echo '::warning::Cannot commit to main. APK will still build using the patched files in this run.'
               fi
             fi
+          else
+            # For already-installed sources, accept an existing validated v0.5 tree.
+            if [ ! -f qa/check_v050.py ]; then
+              echo '::error::No v0.5 update archive or installed v0.5 source found. Upload dikoveriya-lab-update-v050.zip to repository root.'
+              exit 1
+            fi
+            python3 qa/check_v050.py
           fi
 
       - name: Set up Java 17
@@ -106,7 +124,10 @@ jobs:
           fi
 
       - name: Validate v0.5 schema and resources
-        run: python3 qa/check_v050.py
+        run: |
+          set -euo pipefail
+          test -f qa/check_v050.py || { echo '::error::v0.5 patch not applied: qa/check_v050.py is missing'; exit 1; }
+          python3 qa/check_v050.py
 
       - name: Unit tests and build APK
         run: gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace
