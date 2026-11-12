@@ -288,3 +288,18 @@ fun Lab07ObservationPlot(samples:List<GrowthSample>,field:String) {
             style=MaterialTheme.typography.bodySmall)
     }
 }
+
+/** Static information panel: unlike a button this must not suggest a tap action. */
+@Composable
+fun Lab07ReadOnlyCard(title:String,caption:String) {
+    OutlinedCard(modifier=Modifier.fillMaxWidth(),
+        shape=RoundedCornerShape(16.dp),
+        border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),
+        colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+            Text(title,style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest)
+            Text(caption,style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
