@@ -160,13 +160,13 @@ fun QuickMediumDialog(db:LabDatabase,onClose:()->Unit,onSaved:(Long)->Unit,onUse
 }
 
 @Composable
-fun QuickCultureDialog(db:LabDatabase,initialRecipeId:Long?,onClose:()->Unit,onSaved:(Long)->Unit,onChanged:()->Unit) {
+fun QuickCultureDialog(db:LabDatabase,initialRecipeId:Long?,initialPlantId:Long? = null,onClose:()->Unit,onSaved:(Long)->Unit,onChanged:()->Unit) {
     var revision by remember { mutableIntStateOf(0) }
     val plants=remember(revision){db.plants()}
     val mothers=remember(revision){db.mothers()}
     val recipes=remember(revision){db.recipes().filter{it.status=="Утверждена"}}
     var mode by remember { mutableStateOf("container") }
-    var plantId by remember { mutableStateOf(plants.firstOrNull()?.id) }
+    var plantId by remember { mutableStateOf(initialPlantId ?: plants.firstOrNull()?.id) }
     var motherId by remember { mutableStateOf<Long?>(null) }
     var recipeId by remember { mutableStateOf(initialRecipeId) }
     var explants by remember { mutableStateOf("") }
