@@ -36,12 +36,16 @@ fun Lab072BulkDialog(
         "move"->targetId!=null && reason.isNotBlank()
         "control"->reason.isNotBlank() && title.isNotBlank() && dueValid
         "task"->title.isNotBlank() && endOfDay072(due)!=null
+        "medium"->recipeId!=null && reason.isNotBlank()
+        "note"->reason.isNotBlank()
         else->false
     }
     val heading=when(action){
         "group"->"Создать производственную группу"
         "move"->"Указать место хранения"
         "control"->"Назначить проверку"
+        "medium"->"Сменить среду у выбранных"
+        "note"->"Общая заметка для контейнеров"
         else->"Поставить задачи"
     }
     AlertDialog(onDismissRequest=onClose,title={Text(heading)},
@@ -85,6 +89,20 @@ fun Lab072BulkDialog(
                     Text("Критичность проблемы и просроченность — разные признаки. Без даты не создаётся задача со случайным сроком.",
                         style=MaterialTheme.typography.bodySmall)
                 }
+                "medium"->{
+                    Text("Разрешена только утверждённая рецептура для выбранных растений. Старые партии будут отсоединены, а каждая смена попадёт в журнал.",
+                        style=MaterialTheme.typography.bodySmall)
+                    val approved=recipes.filter{it.status=="Утверждена"}
+                    PickOne("Новая рецептура",listOf("Выбрать")+approved.map{it.name+" · v"+it.version},
+                        approved.firstOrNull{it.id==recipeId}?.let{it.name+" · v"+it.version}?:"Выбрать",
+                        {label->recipeId=approved.firstOrNull{it.name+" · v"+it.version==label}?.id})
+                    Field("Почему изменена среда",reason,{reason=it},single=false)
+                }
+                "note"->{
+                    Text("Одна текстовая заметка будет привязана к каждому контейнеру. Это не заменяет отдельные количественные измерения.",
+                        style=MaterialTheme.typography.bodySmall)
+                    Field("Что наблюдалось в группе",reason,{reason=it},single=false)
+                }
                 "task"->{
                     Field("Что нужно сделать",title,{title=it},single=false)
                     Field("Срок, дд.мм.гггг",due,{due=it})
@@ -110,6 +128,8 @@ fun Lab072BulkDialog(
                         endOfDay072(due),title,priority)
                     "task"->db.createTasksBulk072(ids,title,requireNotNull(endOfDay072(due)),
                         priority,kind,recipeId)
+                    "medium"->db.changeMediumBulk072(ids,requireNotNull(recipeId),reason)
+                    "note"->db.recordGroupNote072(ids,reason)
                 }
                 onSaved()
             }catch(e:Exception){onError(e.message?:"Ошибка записи")}
