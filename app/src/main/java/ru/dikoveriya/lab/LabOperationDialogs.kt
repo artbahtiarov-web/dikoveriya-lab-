@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -27,29 +28,30 @@ fun LabActionDialog(
     onClarify: (String,Int,String,Long) -> Unit,
     onVoid: (String,Long) -> Unit,
     onIncident: (String,String,List<Long>,String,Long) -> Unit,
-    onCancel: (String,String) -> Unit
+    onCancel: (String,String) -> Unit,
+    initialMode: String = ""
 ) {
     val isOpen=culture.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)
     val choices=if(isOpen) (if(culture.quantityKind=="Не уточнено")listOf("Уточнить единицу учёта") else emptyList())+
         listOf("Пересадка","Объединить","Потери","Происшествие","Исправить ошибку","Отменить действие","Ошибочная запись")
         else listOf("Отменить действие","Происшествие")
-    var mode by remember(culture.id){ mutableStateOf(choices.first()) }
-    var reason by remember(culture.id,mode){ mutableStateOf("") }
-    var happenedText by remember(culture.id,mode){ mutableStateOf(formatDate(System.currentTimeMillis())) }
-    var acknowledged by remember(culture.id,mode){ mutableStateOf(false) }
-    var sourceUsed by remember(culture.id,mode){ mutableStateOf(culture.quantity.toString()) }
-    var resultQty by remember(culture.id,mode){ mutableStateOf("1") }
-    var losses by remember(culture.id,mode){ mutableStateOf("0") }
-    var nextStage by remember(culture.id,mode){ mutableStateOf(culture.stage) }
-    var batchId by remember(culture.id,mode){ mutableStateOf<Long?>(null) }
-    var mergeRecipeId by remember(culture.id,mode){ mutableStateOf<Long?>(null) }
-    var confirmedKind by remember(culture.id,mode){ mutableStateOf("Экспланты") }
-    var place by remember(culture.id,mode){ mutableStateOf(culture.location) }
-    var lossReason by remember(culture.id,mode){ mutableStateOf("Заражение") }
-    var newQuantity by remember(culture.id,mode){ mutableStateOf(if(mode=="Уточнить единицу учёта") "" else culture.quantity.toString()) }
-    var incidentTitle by remember(culture.id,mode){ mutableStateOf("") }
-    var incidentAction by remember(culture.id,mode){ mutableStateOf("На контроле") }
-    var extraSearch by remember(culture.id,mode){ mutableStateOf("") }
+    var mode by rememberSaveable(culture.id,initialMode){ mutableStateOf(choices.firstOrNull{it==initialMode}?:choices.first()) }
+    var reason by rememberSaveable(culture.id,mode){ mutableStateOf("") }
+    var happenedText by rememberSaveable(culture.id,mode){ mutableStateOf(formatDate(System.currentTimeMillis())) }
+    var acknowledged by rememberSaveable(culture.id,mode){ mutableStateOf(false) }
+    var sourceUsed by rememberSaveable(culture.id,mode){ mutableStateOf(culture.quantity.toString()) }
+    var resultQty by rememberSaveable(culture.id,mode){ mutableStateOf("1") }
+    var losses by rememberSaveable(culture.id,mode){ mutableStateOf("0") }
+    var nextStage by rememberSaveable(culture.id,mode){ mutableStateOf(culture.stage) }
+    var batchId by rememberSaveable(culture.id,mode){ mutableStateOf<Long?>(null) }
+    var mergeRecipeId by rememberSaveable(culture.id,mode){ mutableStateOf<Long?>(null) }
+    var confirmedKind by rememberSaveable(culture.id,mode){ mutableStateOf("Экспланты") }
+    var place by rememberSaveable(culture.id,mode){ mutableStateOf(culture.location) }
+    var lossReason by rememberSaveable(culture.id,mode){ mutableStateOf("Заражение") }
+    var newQuantity by rememberSaveable(culture.id,mode){ mutableStateOf(if(mode=="Уточнить единицу учёта") "" else culture.quantity.toString()) }
+    var incidentTitle by rememberSaveable(culture.id,mode){ mutableStateOf("") }
+    var incidentAction by rememberSaveable(culture.id,mode){ mutableStateOf("На контроле") }
+    var extraSearch by rememberSaveable(culture.id,mode){ mutableStateOf("") }
     val additional=remember(culture.id,mode){ mutableStateMapOf<Long,String>() }
     val daughtersUsed=remember(culture.id,mode){ mutableStateListOf(culture.quantity.toString()) }
     val daughtersProduced=remember(culture.id,mode){ mutableStateListOf(culture.quantity.toString()) }
@@ -60,7 +62,7 @@ fun LabActionDialog(
     val daughtersKind=remember(culture.id,mode){ mutableStateListOf(culture.quantityKind) }
     val extraIncident=remember(culture.id,mode){ mutableStateListOf<Long>() }
     val validOps=operations.filter{it.status=="Проведена" && it.kind in setOf("Разделение и пересадка","Объединение культур","Потери","Исправление учёта","Ошибочное создание","Авария")}
-    var selectedOperation by remember(culture.id,mode){ mutableStateOf<String?>(validOps.firstOrNull()?.id) }
+    var selectedOperation by rememberSaveable(culture.id,mode){ mutableStateOf<String?>(validOps.firstOrNull()?.id) }
     fun timestamp():Long {
         val parser=SimpleDateFormat("dd.MM.yyyy HH:mm",Locale("ru")).apply{isLenient=false}
         return requireNotNull(parser.parse(happenedText.trim())) { "Укажи дату как 10.11.2026 16:30" }.time
