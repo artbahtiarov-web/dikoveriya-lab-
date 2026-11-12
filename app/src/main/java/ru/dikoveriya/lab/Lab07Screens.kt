@@ -39,9 +39,11 @@ fun Lab07RouteScreen(
         "work" -> {
             val groupId=if(route.startsWith("work:group:"))
                 route.substringAfterLast(':').toLongOrNull() else null
+            val plantId=if(route.startsWith("work:plant:"))
+                route.substringAfterLast(':').toLongOrNull() else null
             Lab072RegistryScreen(
-                mode=if(groupId!=null)"all" else route.substringAfter(':'),
-                initialGroupId=groupId,
+                mode=if(groupId!=null || plantId!=null)"all" else route.substringAfter(':'),
+                initialGroupId=groupId,initialPlantId=plantId,
                 db=db,revision=revision,plants=plants,recipes=recipes,
                 onBack=onBack,onNavigate=onNavigate,
                 onChanged=onChanged,onError=onError,modifier=modifier)
