@@ -21,6 +21,7 @@ object Lab07Navigation {
         return "work:$mode"
     }
     fun groupWork(id:Long):String="work:group:$id"
+    fun plantWork(id:Long):String="work:plant:$id"
     const val TASKS="tasks"
     const val GROUPS="groups"
     const val PLACES="places"
@@ -38,7 +39,7 @@ object Lab07Navigation {
     fun isKnown(route: String): Boolean {
         if(route in setOf(COLLECTION,TASKS,GROUPS,PLACES)) return true
         if(route in setOf("work:vitro","work:attention","work:growth","work:all")) return true
-        if(route.startsWith("work:group:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
+        if(route.startsWith("work:group:") || route.startsWith("work:plant:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
         return group in setOf("variety","container","growth","medium","operations","history") &&
