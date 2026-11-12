@@ -98,7 +98,14 @@ fun LabActionDialog(
     val needsAck=mode in listOf("Пересадка","Объединить","Потери","Происшествие","Отменить действие","Ошибочная запись","Уточнить единицу учёта")
     AlertDialog(onDismissRequest=onClose,title={Column{Text("Что произошло?");Text(culture.plantName+" · "+culture.code,style=MaterialTheme.typography.bodySmall)}},
         text={Column(Modifier.fillMaxWidth().heightIn(max=570.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            PickOne("Действие",choices,mode,{mode=it})
+            if(initialMode.isBlank()) {
+                PickOne("Тип операции",choices,mode,{mode=it})
+            } else {
+                Text("Операция: $mode",style=MaterialTheme.typography.titleMedium,
+                    color=MaterialTheme.colorScheme.primary)
+                Text("Всё, что нужно для этой операции, находится здесь. Другие действия доступны в карточке контейнера.",
+                    style=MaterialTheme.typography.bodySmall)
+            }
             if(culture.quantityKind=="Не уточнено" && mode in listOf("Пересадка","Объединить","Потери","Исправить ошибку")) Text("Для изменения количества сначала необходимо подтвердить единицу учёта контейнера. Сейчас она неизвестна; операция заблокирована, чтобы не списать другой тип биоматериала.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             when(mode){
                 "Уточнить единицу учёта" -> {
