@@ -46,7 +46,7 @@ fun LabActionDialog(
     var confirmedKind by remember(culture.id,mode){ mutableStateOf("Экспланты") }
     var place by remember(culture.id,mode){ mutableStateOf(culture.location) }
     var lossReason by remember(culture.id,mode){ mutableStateOf("Заражение") }
-    var newQuantity by remember(culture.id,mode){ mutableStateOf(culture.quantity.toString()) }
+    var newQuantity by remember(culture.id,mode){ mutableStateOf(if(mode=="Уточнить единицу учёта") "" else culture.quantity.toString()) }
     var incidentTitle by remember(culture.id,mode){ mutableStateOf("") }
     var incidentAction by remember(culture.id,mode){ mutableStateOf("На контроле") }
     var extraSearch by remember(culture.id,mode){ mutableStateOf("") }
