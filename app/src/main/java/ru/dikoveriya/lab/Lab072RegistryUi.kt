@@ -55,7 +55,7 @@ fun Lab072RegistryScreen(
         else->"Поиск по номеру, растению, линии, среде или месту"
     }
     var query by rememberSaveable(mode){mutableStateOf("")}
-    var plantId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
+    var plantId by rememberSaveable(mode){mutableStateOf(initialPlantId)}
     var recipeId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var locationId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var groupId by rememberSaveable(mode){mutableStateOf(initialGroupId)}
