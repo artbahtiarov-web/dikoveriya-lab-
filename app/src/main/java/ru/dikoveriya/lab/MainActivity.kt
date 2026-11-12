@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -45,10 +46,8 @@ fun DikoveriyaApp() {
     val stateHolder=rememberSaveableStateHolder()
     val currentRoute=Lab07Navigation.current(routeStack)
     fun openRoute(next:String) {
-        val base=if(routeStack.isEmpty() && tab=="Коллекция" && next!="collection") {
-            listOf(Lab07Navigation.COLLECTION)
-        } else routeStack
-        routeStack=Lab07Navigation.enter(base,next)
+        // The Collection tab itself is already a level: do not insert it twice.
+        routeStack=Lab07Navigation.enter(routeStack,next)
     }
     fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
     var subsection by rememberSaveable { mutableStateOf("") }
@@ -129,20 +128,23 @@ fun DikoveriyaApp() {
     val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
     val openSection: (String)->Unit = {if(tab!="Ещё")tabHistory=tabHistory+tab;tab="Ещё";routeStack=emptyList();subsection=it}
     val openCulture: (Long)->Unit = {openRoute(Lab07Navigation.container(it))}
-    // Android system Back gesture from either edge uses this handler. Dialogs own their Back events.
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && actionCultureId==null &&
-        recipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
+    // A single back policy is shared by toolbar and Android gestures.
+    fun goBack() {
         when {
             routeStack.isNotEmpty() -> backRoute()
             subsection.isNotEmpty() -> subsection=""
-            tabHistory.isNotEmpty() -> { tab=tabHistory.last();tabHistory=tabHistory.dropLast(1);subsection="" }
-            tab!="Главная" -> { tab="Главная"; subsection="" }
+            tabHistory.isNotEmpty() -> {tab=tabHistory.last();tabHistory=tabHistory.dropLast(1);subsection=""}
+            tab!="Главная" -> {tab="Главная";subsection=""}
             else -> {
                 val now=SystemClock.elapsedRealtime()
-                if(now-lastExitRequest<2200L) (context as? android.app.Activity)?.finish()
-                else { lastExitRequest=now; Toast.makeText(context,"Повтори жест «Назад» для выхода",Toast.LENGTH_SHORT).show() }
+                if(now-lastExitRequest<2200L)(context as? android.app.Activity)?.finish()
+                else {lastExitRequest=now;Toast.makeText(context,"Повтори жест «Назад» для выхода",Toast.LENGTH_SHORT).show()}
             }
         }
+    }
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && actionCultureId==null &&
+        recipeId==null && advancedRecipeId==null && performanceCultureId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
+        goBack()
     }
 
     DikoveriyaTheme {
@@ -174,10 +176,7 @@ fun DikoveriyaApp() {
                     Lab07RouteScreen(
                         route=route,db=db,revision=refresh,
                         plants=plants,cultures=cultures,recipes=recipes,
-                        onBack={
-                            if(routeStack.isNotEmpty())backRoute()
-                            else {tab="Главная";subsection=""}
-                        },
+                        onBack={goBack()},
                         onNavigate={openRoute(it)},
                         onNewContainer={dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
@@ -189,7 +188,8 @@ fun DikoveriyaApp() {
                     )
                 }
             } else {
-            LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
+            LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 item {
                     Row(verticalAlignment=Alignment.CenterVertically){
                         Icon(painterResource(R.drawable.ic_dikoveriya_logo),contentDescription=null,
@@ -354,6 +354,7 @@ fun DikoveriyaApp() {
                         }
                     }
                 }
+            }
             }
             }
             when(dialog){
