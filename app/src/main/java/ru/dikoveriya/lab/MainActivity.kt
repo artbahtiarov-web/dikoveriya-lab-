@@ -82,9 +82,10 @@ fun DikoveriyaApp() {
 
     val plants=remember(refresh){db.plants()}
     val mothers=remember(refresh){db.mothers()}
-    val cultures=remember(refresh,tab,currentRoute) {
-        if(tab=="Главная" && currentRoute==null)db.cultures(limit=5)
-        else db.cultures()
+    val cultures=remember(refresh,tab,currentRoute,actionCultureId,dialog,experimentId) {
+        if(tab=="Аналитика" || actionCultureId!=null || experimentId!=null ||
+            dialog in setOf("newIncident","newTask"))db.cultures()
+        else db.cultures(limit=5)
     }
     val recipes=remember(refresh){db.recipes()}
     val ingredients=remember(refresh){db.ingredients()}
@@ -386,7 +387,7 @@ fun DikoveriyaApp() {
                 if(i!=null && i.status=="Аннулирован") DialogForm(i.title,close={dialog=""}){Text("Происшествие аннулировано. История сохранена. "+i.note)}
                 else if(i!=null) IncidentReviewDialog(i,db.incidentCultures(i.id),db.incidentFollowups(i.id),onClose={dialog=""},onSave={status,note->if(act{db.updateIncident(i.id,status,note)})dialog=""})
             }
-            cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+            cultureId?.let{id->db.cultureById(id)?.let{culture->
                 val medium=recipes.firstOrNull{it.id==culture.recipeId}
                 Lab071PassportDialog(culture,medium?.let{"${it.name} v${it.version}"},
                     onClose={cultureId=null},
@@ -395,18 +396,18 @@ fun DikoveriyaApp() {
                             culture.recipeId,true)})cultureId=null
                     })
             }}
-            saleCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+            saleCultureId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071SaleDialog(culture,onClose={saleCultureId=null},
                     onSave={qty,total,note->
                         if(act{db.sale(id,qty,total,note)})saleCultureId=null
                     })
             }}
-            photoCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+            photoCultureId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071PhotosDialog(culture,db.photos(id),context.filesDir,
                     onClose={photoCultureId=null},
                     onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")})
             }}
-            labelCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+            labelCultureId?.let{id->db.cultureById(id)?.let{culture->
                 val medium=recipes.firstOrNull{it.id==culture.recipeId}
                 Lab071LabelDialog(culture,medium?.let{"${it.name} v${it.version}"},
                     onClose={labelCultureId=null},
@@ -419,13 +420,13 @@ fun DikoveriyaApp() {
                         catch(e:Exception){error=e.message?:"Не удалось передать этикетку"}
                     })
             }}
-            legacyAssessmentId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+            legacyAssessmentId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071LegacyAssessmentDialog(culture,onClose={legacyAssessmentId=null},
                     onSave={note,start,healthy,infected,days->
                         if(act{db.addObservation(id,note,start,healthy,infected,days)})legacyAssessmentId=null
                     })
             }}
-            actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
+            actionCultureId?.let{id->db.cultureById(id)?.let{c->
                 stateHolder.SaveableStateProvider("action:$id:$actionPreferredMode") {
                 LabActionDialog(c,cultures,batches,recipes,db.operationsForCulture(id),onClose={actionCultureId=null},initialMode=actionPreferredMode,
                     onSplit={parts,lost,note,date->if(act{db.splitCulture(id,parts,lost,note,date)})actionCultureId=null},
