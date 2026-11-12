@@ -58,8 +58,8 @@ fun AddCultureDialog(plants:List<PlantRecord>,mothers:List<MotherRecord>,batches
 }
 @Composable
 fun CultureDialog(
-    c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,lossesTotal:Int,
-    onClose:()->Unit,onChange:(Int,String,String,Long?,String)->Unit,
+    c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,recipes:List<RecipeRecord>,lossesTotal:Int,
+    onClose:()->Unit,onChange:(Int,String,String,Long?,String,Long?)->Unit,
     onObserve:(String,Int?,Int?,Int?,Int?)->Unit,
     onGrowth:()->Unit,
     onOperations:()->Unit,onSale:(Int,Double,String)->Unit,onQr:()->Unit,onPhoto:(String)->Unit
@@ -69,6 +69,7 @@ fun CultureDialog(
     var status by remember(c.id){mutableStateOf(c.status)}
     var place by remember(c.id){mutableStateOf(c.location)}
     var batchId by remember(c.id){mutableStateOf(c.batchId)}
+    var recipeId by remember(c.id){mutableStateOf(c.recipeId)}
     var note by remember(c.id){mutableStateOf("")}
     var useQty by remember(c.id){mutableStateOf(c.quantity.toString())}
     var outQty by remember(c.id){mutableStateOf(c.quantity.toString())}
@@ -82,6 +83,7 @@ fun CultureDialog(
     var photoNote by remember(c.id){mutableStateOf("")}
     val closed=c.status in listOf(LabTerms.DISPOSED,LabTerms.TRANSFERRED,LabTerms.SOLD,LabTerms.ANNULLED)
     val liveBatches=batches.filter{it.status=="Готова"}
+    val readyRecipes=recipes.filter{it.status=="Утверждена" && (it.plantId==null || it.plantId==c.plantId)}
     AlertDialog(onDismissRequest=onClose,title={Column{
         Text(c.plantName,style=MaterialTheme.typography.titleLarge)
         Text(c.code,style=MaterialTheme.typography.bodyMedium)
@@ -135,7 +137,19 @@ fun CultureDialog(
                         Text("Количество: ${c.quantity}. Для учёта потерь или исправления числа открой «Что произошло?»",style=MaterialTheme.typography.bodySmall)
                         PickOne("Состояние",listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE),status,{status=it},"Карантин — изоляция; На контроле — требуется наблюдение. Полное списание выполняется через «Потери».")
                         Field("Место",place,{place=it})
-                        PickOne("Партия питательной среды",listOf("Не указана")+liveBatches.map{it.code},liveBatches.firstOrNull{it.id==batchId}?.code?:"Не указана",{s->batchId=liveBatches.firstOrNull{it.code==s}?.id})
+                        PickOne("Рецептура (версия)",listOf("Не указана")+readyRecipes.map{"${it.name} · v${it.version}"},
+                            readyRecipes.firstOrNull{it.id==recipeId}?.let{"${it.name} · v${it.version}"}?:"Не указана",
+                            {selected->
+                                recipeId=readyRecipes.firstOrNull{"${it.name} · v${it.version}"==selected}?.id
+                                if(batchId!=null && liveBatches.firstOrNull{it.id==batchId}?.recipeId!=recipeId)batchId=null
+                            })
+                        PickOne("Партия приготовления (необязательно)",listOf("Не указана")+liveBatches.map{it.code},
+                            liveBatches.firstOrNull{it.id==batchId}?.code?:"Не указана",
+                            {selected->
+                                val batch=liveBatches.firstOrNull{it.code==selected}
+                                batchId=batch?.id
+                                if(batch!=null)recipeId=batch.recipeId
+                            })
                         Field("Почему меняешь запись?",note,{note=it},single=false)
                         HelpIcon("Количество и потери","Реальные потери, технические исправления и пересадки учитываются как разные события, чтобы сохранить достоверные результаты лаборатории.")
                     }
@@ -180,7 +194,7 @@ fun CultureDialog(
                 val hasMetrics=listOf(inputQty,healthyQty,days).any{it.isNotBlank()}
                 onObserve(note,if(hasMetrics)inputQty.toIntOrNull()?:0 else null,if(hasMetrics)healthyQty.toIntOrNull()?:-1 else null,if(hasMetrics)infectedQty.toIntOrNull()?:-1 else null,if(hasMetrics)days.toIntOrNull()?:0 else null)
             }){Text("Сохранить осмотр")}
-            "Изменить" -> if(!closed)TextButton(onClick={onChange(count.toIntOrNull()?:-1,status,place,batchId,note)}){Text("Применить")}
+            "Изменить" -> if(!closed)TextButton(onClick={onChange(count.toIntOrNull()?:-1,status,place,batchId,note,recipeId)}){Text("Применить")}
             "Продажа" -> if(!closed && c.stage!=LabTerms.IN_VITRO)TextButton(onClick={onSale(saleQty.toIntOrNull()?:0,salePrice.replace(',','.').toDoubleOrNull()?:-1.0,note)}){Text("Оформить")}
             "Фото" -> TextButton(onClick={onPhoto(photoNote)}){Text("Добавить фото")}
             "Этикетка" -> TextButton(onClick=onQr){Text("Сохранить PNG")}
