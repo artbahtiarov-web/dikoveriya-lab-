@@ -203,6 +203,12 @@ fun Lab072RegistryScreen(
                     OutlinedButton(onClick={action="task"},enabled=selected.isNotEmpty(),
                         modifier=Modifier.weight(1f)){Text("Поставить задачу")}
                 }
+                Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                    OutlinedButton(onClick={action="medium"},enabled=selected.isNotEmpty(),
+                        modifier=Modifier.weight(1f)){Text("Сменить среду")}
+                    OutlinedButton(onClick={action="note"},enabled=selected.isNotEmpty(),
+                        modifier=Modifier.weight(1f)){Text("Общая заметка")}
+                }
             }
         }
         if(loading)item(key="loading"){CircularProgressIndicator()}
