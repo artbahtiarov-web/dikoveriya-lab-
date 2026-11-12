@@ -66,3 +66,14 @@
 - **Checks:** new `qa/test_batch_recipe_edit.py` source regression; PR CI must run Python checks, `:app:testDebugUnitTest`, and `:app:assembleDebug`. Local Android compilation and on-device tests not available. **Do not merge until CI success.**
 - **Risk:** legacy edit UI still offers batch rather than direct recipe; no Android instrumentation test of historical database migration. Future work should unify edit forms around recipe selection and explicit user confirmation of changes.
 - **Next:** inspect PR CI, fix errors in same PR; merge only after success and low-risk review, verify permanent signed release artifact. Then implement explicit historical quantity-kind clarification with an audit event.
+
+
+## 2026-11-12 UTC — комплексный пакет 0.6.1 / release candidate
+
+- **Main до пакета:** `bccc9e0f71aacdbc25d8dc87e691cedf125de606` после PR #11; PR CI #11 https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43178251548 — success.
+- **Ветка:** `release/0.6.1-integrated-lab-core-20261112`; предварительный HEAD `f00d555ff0596fb2871ad73f79a2d87d574da473`. Результат будет привязан к PR и новому SHA после последующих исправлений.
+- **Изменено:** SQLite 7→8 аддитивно; таблица `culture_audit`, before/after trigger и связь с операцией; явные `baseline` / `observation`; единая хронология `events`+`assessments`+`culture_measurements`; подтверждение неизвестного типа учёта вручную с указанием фактического количества; сохранение nullable измерений; версии рецептур при пересадке/объединении независимо от партии; атомарная смена среды с аудитом; правки копирования сахарозы/агара в новую версию; редактирование контейнера по direct recipe; v4–v8 JSON/ZIP восстановление; атомарный экспорт и проверка целостности; ограничение продаж растениями; исправление отмены через реально существующее поле `reversal_of`. Кандидат `0.6.1-rc1`.
+- **Тесты:** добавлен `qa/test_lab_core_v8.py` (реальный SQLite DDL/trigger, rollback, null/zero, FK); обновлены существующие исходные регрессионные тесты. **PR CI и Kotlin compilation пока не подтверждены**; не заявлять, что версия принята.
+- **Риски:** физическая миграция пользовательской v7 БД, восстановления архивов v4–v8 и UX на Android не проверены реальными данными/устройством. Риск несовместимости SQLite/Compose остаётся до успешного CI. Пока не объединять в `main`.
+- **Ссылки:** пакет: https://github.com/artbahtiarov-web/dikoveriya-lab-/tree/release/0.6.1-integrated-lab-core-20261112 ; критерии: `docs/RELEASE_0_6_1.md`.
+- **Следующий конкретный шаг:** открыть PR 0.6.1, дождаться и разобрать CI (Python, `:app:testDebugUnitTest`, `:app:assembleDebug`), исправить ошибки В ЭТОМ PR. После зелёного CI провести миграцию и восстановление на старых БД; лишь после безопасной приёмки менять `0.6.1-rc1` на `0.6.1` и объединять, затем проверять подписанную release-сборку и артефакт.
