@@ -34,7 +34,7 @@ fun Lab07RouteScreen(
     modifier:Modifier=Modifier
 ) {
     val id=route.substringAfter(':',"").toLongOrNull()
-    val culture=cultures.firstOrNull{it.id==id}
+    val culture=remember(id,revision){id?.let{db.cultureById(it)}}
     when(route.substringBefore(':')) {
         "work" -> {
             val groupId=if(route.startsWith("work:group:"))
