@@ -40,7 +40,7 @@ fun Lab07RouteScreen(
             if(plant!=null) Lab07VarietyScreen(plant,cultures,onBack,onNavigate,onNewContainer,modifier)
             else Lab07MissingScreen(onBack,modifier)
         }
-        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,onBack,onNavigate,onEdit,modifier)
+        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,modifier)
                        else Lab07MissingScreen(onBack,modifier)
         "growth" -> if(culture!=null) Lab07GrowthScreen(culture,db,revision,onBack,onChanged,onError,modifier)
                     else Lab07MissingScreen(onBack,modifier)
@@ -188,10 +188,10 @@ private fun Lab07VarietyScreen(
 
 @Composable
 private fun Lab07ContainerScreen(
-    culture:CultureRecord,db:LabDatabase,
+    culture:CultureRecord,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,onEdit:(Long)->Unit,modifier:Modifier
 ) {
-    val last=remember(culture.id,culture.quantity,culture.status) { db.unifiedJournal(culture.id).firstOrNull() }
+    val last=remember(culture.id,revision) { db.unifiedJournal(culture.id).firstOrNull() }
     LazyColumn(modifier=modifier,state=rememberLazyListState(),contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(15.dp)) {
         item(key="header") {
@@ -316,7 +316,7 @@ private fun Lab07GrowthScreen(
                 .joinToString(" · ")
             OutlinedCard(Modifier.fillMaxWidth(),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                    Text(formatDate(sample.date),style=MaterialTheme.typography.titleMedium)
+                    Text((if(sample.kind=="baseline")"Исходное измерение" else "Наблюдение") + " · " + formatDate(sample.date),style=MaterialTheme.typography.titleMedium)
                     Text(details.ifBlank{"Замер не заполнен"},style=MaterialTheme.typography.bodySmall)
                 }
             }
