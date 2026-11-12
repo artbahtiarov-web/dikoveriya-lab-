@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,12 +39,23 @@ fun DikoveriyaApp() {
     val context=androidx.compose.ui.platform.LocalContext.current
     val db=remember{LabDatabase(context.applicationContext)}
     var refresh by remember { mutableIntStateOf(0) }
-    var tab by remember { mutableStateOf("Главная") }
-    val tabHistory=remember{mutableStateListOf<String>()}
-    var subsection by remember { mutableStateOf("") }
-    var dialog by remember { mutableStateOf("") }
+    var tab by rememberSaveable { mutableStateOf("Главная") }
+    var tabHistory by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var routeStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val stateHolder=rememberSaveableStateHolder()
+    val currentRoute=Lab07Navigation.current(routeStack)
+    fun openRoute(next:String) {
+        val base=if(routeStack.isEmpty() && tab=="Коллекция" && next!="collection") {
+            listOf(Lab07Navigation.COLLECTION)
+        } else routeStack
+        routeStack=Lab07Navigation.enter(base,next)
+    }
+    fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
+    var subsection by rememberSaveable { mutableStateOf("") }
+    var dialog by rememberSaveable { mutableStateOf("") }
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
+    var actionPreferredMode by rememberSaveable { mutableStateOf("") }
     var recipeId by remember { mutableStateOf<Long?>(null) }
     var advancedRecipeId by remember { mutableStateOf<Long?>(null) }
     var preselectedRecipeId by remember { mutableStateOf<Long?>(null) }
@@ -55,11 +68,11 @@ fun DikoveriyaApp() {
     var pendingPhotoNote by remember { mutableStateOf("") }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var search by remember { mutableStateOf("") }
-    var statusFilter by remember { mutableStateOf("Все") }
+    var search by rememberSaveable { mutableStateOf("") }
+    var statusFilter by rememberSaveable { mutableStateOf("Все") }
     var showIngredients by remember { mutableStateOf(false) }
-    var plantRecipeFilter by remember { mutableStateOf("Все растения") }
-    var purposeRecipeFilter by remember { mutableStateOf("Любое назначение") }
+    var plantRecipeFilter by rememberSaveable { mutableStateOf("Все растения") }
+    var purposeRecipeFilter by rememberSaveable { mutableStateOf("Любое назначение") }
     var lastExitRequest by remember { mutableLongStateOf(0L) }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
@@ -110,18 +123,19 @@ fun DikoveriyaApp() {
         if(result.contents!=null) {
             val code=LabQr.getCode(result.contents)
             val c=cultures.firstOrNull{it.code==code}
-            if(c!=null) { tab="Работа";cultureId=c.id } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
+            if(c!=null) { tab="Работа";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(c.id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
         }
     }
     val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
-    val openSection: (String)->Unit = {if(tab!="Ещё")tabHistory.add(tab);tab="Ещё";subsection=it}
-    val openCulture: (Long)->Unit = {cultureId=it}
+    val openSection: (String)->Unit = {if(tab!="Ещё")tabHistory=tabHistory+tab;tab="Ещё";routeStack=emptyList();subsection=it}
+    val openCulture: (Long)->Unit = {openRoute(Lab07Navigation.container(it))}
     // Android system Back gesture from either edge uses this handler. Dialogs own their Back events.
     BackHandler(enabled=dialog.isEmpty() && cultureId==null && actionCultureId==null &&
         recipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         when {
+            routeStack.isNotEmpty() -> backRoute()
             subsection.isNotEmpty() -> subsection=""
-            tabHistory.isNotEmpty() -> { tab=tabHistory.removeAt(tabHistory.lastIndex); subsection="" }
+            tabHistory.isNotEmpty() -> { tab=tabHistory.last();tabHistory=tabHistory.dropLast(1);subsection="" }
             tab!="Главная" -> { tab="Главная"; subsection="" }
             else -> {
                 val now=SystemClock.elapsedRealtime()
@@ -133,13 +147,48 @@ fun DikoveriyaApp() {
 
     DikoveriyaTheme {
         Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
-            NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=2.dp) {
-                listOf("Главная","Растения","Работа","Аналитика","Ещё").forEachIndexed{index, name->
+            NavigationBar(containerColor=Lab07Palette.DeepForest,tonalElevation=0.dp) {
+                listOf("Главная","Коллекция","Работа","Аналитика","Ещё").forEachIndexed{index, name->
                     val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;3->Icons.Outlined.BarChart;else->Icons.Outlined.Menu}
-                    NavigationBarItem(selected=tab==name,onClick={if(name=="Главная")tabHistory.clear() else if(tab!=name)tabHistory.add(tab);tab=name;subsection=""},icon={Icon(icon,contentDescription=null)},label={Text(name,maxLines=1)})
+                    NavigationBarItem(
+                        selected=tab==name,
+                        onClick={
+                            if(name=="Главная")tabHistory=emptyList() else if(tab!=name)tabHistory=tabHistory+tab
+                            tab=name;subsection="";routeStack=emptyList()
+                        },
+                        icon={Icon(icon,contentDescription=null)},
+                        label={Text(when(name){"Коллекция"->"Сорта";"Работа"->"Учёт";else->name},maxLines=1)},
+                        colors=NavigationBarItemDefaults.colors(
+                            selectedIconColor=Lab07Palette.Brass,
+                            selectedTextColor=Lab07Palette.Champagne,
+                            indicatorColor=Lab07Palette.Forest,
+                            unselectedIconColor=Color(0xFFCCD4C8),
+                            unselectedTextColor=Color(0xFFCCD4C8))
+                    )
                 }
             }
         }){ padding ->
+            if(currentRoute!=null || tab=="Коллекция") {
+                val route=currentRoute ?: Lab07Navigation.COLLECTION
+                stateHolder.SaveableStateProvider(route) {
+                    Lab07RouteScreen(
+                        route=route,db=db,revision=refresh,
+                        plants=plants,cultures=cultures,recipes=recipes,
+                        onBack={
+                            if(routeStack.isNotEmpty())backRoute()
+                            else {tab="Главная";subsection=""}
+                        },
+                        onNavigate={openRoute(it)},
+                        onNewContainer={dialog="newCulture"},
+                        onNewPlant={dialog="addPlant"},
+                        onEdit={cultureId=it},
+                        onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
+                        onChanged={refresh++},
+                        onError={error=it},
+                        modifier=Modifier.fillMaxSize().padding(padding)
+                    )
+                }
+            } else {
             LazyColumn(modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 item {
                     Row(verticalAlignment=Alignment.CenterVertically){
@@ -155,35 +204,17 @@ fun DikoveriyaApp() {
                 }
                 when(tab){
                     "Главная" -> {
-                        item {
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                InfoCard("В культуре",running.count{it.stage==LabTerms.IN_VITRO}.toString(),Modifier.weight(1f))
-                                InfoCard("На контроле",attention.toString(),Modifier.weight(1f))
-                            }
+                        item(key="botanical-home") {
+                            Lab07Dashboard(
+                                plants,cultures,tasks,
+                                onCollection={openRoute(Lab07Navigation.COLLECTION)},
+                                onContainer={openRoute(Lab07Navigation.container(it))},
+                                onNewContainer={dialog="newCulture"},
+                                onNewPlant={dialog="addPlant"},
+                                onMediums={openSection("Питательные среды")},
+                                onScan=scan
+                            )
                         }
-                        item {
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                InfoCard("На адаптации",running.count{it.stage==LabTerms.ADAPTATION}.toString(),Modifier.weight(1f))
-                                InfoCard("Задач сейчас",dueTasks.toString(),Modifier.weight(1f))
-                            }
-                        }
-                        item { SectionTitle("Быстрые действия") }
-                        item {
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                Button(onClick={dialog="newCulture"},modifier=Modifier.weight(1f)){Text("Новый контейнер")}
-                                OutlinedButton(onClick={openSection("Питательные среды")},modifier=Modifier.weight(1f)){Text("Приготовить среду")}
-                            }
-                        }
-                        item {
-                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                OutlinedButton(onClick={dialog="addPlant"},modifier=Modifier.weight(1f)){Text("Новое растение")}
-                                OutlinedButton(onClick=scan,modifier=Modifier.weight(1f)){Text("Сканировать")}
-                            }
-                        }
-                        item { SectionTitle("Последние контейнеры") }
-                        if(cultures.isEmpty()) item{Text("Пока нет контейнеров. Добавь первый.")}
-                        items(cultures.take(8),key={"home-${it.id}"}){c->CultureCard(c){openCulture(c.id)}}
-                        if(dueTasks>0){item{TextEntryRow("Есть задачи, требующие внимания: $dueTasks"){openSection("Задачи")}}}
                     }
                     "Растения" -> {
                         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
@@ -324,11 +355,12 @@ fun DikoveriyaApp() {
                     }
                 }
             }
+            }
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
                 "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,onClose={dialog="";preselectedRecipeId=null},
-                    onSaved={id->dialog="";preselectedRecipeId=null;refresh++;cultureId=id},onChanged={refresh++})
+                    onSaved={id->dialog="";preselectedRecipeId=null;refresh++;openRoute(Lab07Navigation.container(id))},onChanged={refresh++})
                 "newIngredient" -> AddIngredientDialog(onClose={dialog=""},onSave={name,category,unit,notes->
                     if(act{db.addIngredient(name,category,unit,notes)})dialog=""
                 })
@@ -377,7 +409,8 @@ fun DikoveriyaApp() {
                 )
             }}
             actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                LabActionDialog(c,cultures,batches,recipes,db.operationsForCulture(id),onClose={actionCultureId=null},
+                stateHolder.SaveableStateProvider("action:$id") {
+                LabActionDialog(c,cultures,batches,recipes,db.operationsForCulture(id),onClose={actionCultureId=null},initialMode=actionPreferredMode,
                     onSplit={parts,lost,note,date->if(act{db.splitCulture(id,parts,lost,note,date)})actionCultureId=null},
                     onMerge={parts,out,b,stage,note,confirm,date,recipe->if(act{db.mergeCultures(parts,out,b,stage,note,confirm,date,recipe)})actionCultureId=null},
                     onLoss={lost,reason,note,date->if(act{db.recordLoss(id,lost,reason,note,date)})actionCultureId=null},
@@ -387,6 +420,7 @@ fun DikoveriyaApp() {
                     onIncident={title,notes,affected,response,date->if(act{db.reportIncident(title,notes,affected,response,date)})actionCultureId=null},
                     onCancel={op,reason->if(act{db.cancelOperation(op,reason)})actionCultureId=null}
                 )
+                }
             }}
             recipeId?.let{id->recipes.firstOrNull{it.id==id}?.let{r->
                 EasyRecipeDialog(db,r,plants.firstOrNull{it.id==r.plantId}?.name,onClose={recipeId=null},
