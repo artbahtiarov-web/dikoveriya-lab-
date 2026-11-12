@@ -66,6 +66,7 @@ fun LabActionDialog(
     AlertDialog(onDismissRequest=onClose,title={Column{Text("Что произошло?");Text(culture.plantName+" · "+culture.code,style=MaterialTheme.typography.bodySmall)}},
         text={Column(Modifier.fillMaxWidth().heightIn(max=570.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             PickOne("Действие",choices,mode,{mode=it})
+            if(culture.quantityKind=="Не уточнено" && mode in listOf("Пересадка","Объединить","Потери","Исправить ошибку")) Text("Для изменения количества сначала необходимо подтвердить единицу учёта контейнера. Сейчас она неизвестна; операция заблокирована, чтобы не списать другой тип биоматериала.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             when(mode){
                 "Пересадка" -> {
                     Text("Перенос материала в один или несколько новых контейнеров",fontWeight=FontWeight.Medium)
@@ -148,7 +149,7 @@ fun LabActionDialog(
                 Checkbox(checked=acknowledged,onCheckedChange={acknowledged=it})
                 Text("Подтверждаю, что указанные данные верны",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=12.dp))
             }
-        }},confirmButton={TextButton(enabled=((mode!="Пересадка" && mode!="Объединить") || culture.quantityKind!="Не уточнено")&&(!needsAck||acknowledged)&&(!requiresNote||reason.isNotBlank())&&(mode!="Происшествие"||incidentTitle.isNotBlank())&&(mode=="Отменить действие"||validDate!=null)&&(mode!="Отменить действие"||selectedOperation!=null),onClick={
+        }},confirmButton={TextButton(enabled=((mode !in listOf("Пересадка","Объединить","Потери","Исправить ошибку")) || culture.quantityKind!="Не уточнено")&&(!needsAck||acknowledged)&&(!requiresNote||reason.isNotBlank())&&(mode!="Происшествие"||incidentTitle.isNotBlank())&&(mode=="Отменить действие"||validDate!=null)&&(mode!="Отменить действие"||selectedOperation!=null),onClick={
             when(mode){
                 "Пересадка" -> onSplit(daughtersUsed.indices.map{i->TransferDestination(daughtersUsed[i].toIntOrNull()?:0,daughtersProduced[i].toIntOrNull()?:0,daughtersStage[i],daughtersBatch[i],daughtersPlace[i],daughtersKind[i])},losses.toIntOrNull()?:0,reason,requireNotNull(validDate))
                 "Объединить" -> onMerge(listOf(MergeInput(culture.id,sourceUsed.toIntOrNull()?:0))+additional.map{MergeInput(it.key,it.value.toIntOrNull()?:0)},resultQty.toIntOrNull()?:0,batchId,nextStage,reason,acknowledged,requireNotNull(validDate))
