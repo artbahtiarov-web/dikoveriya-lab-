@@ -867,7 +867,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         try {
         BACKUP_ORDER.forEach{table->
             val arr=JSONArray()
-            db.rawQuery("SELECT * FROM $table",null).use{c->
+            // Self-referencing storage locations must restore parent rows before children.
+            val exportSql=if(table=="storage_locations")
+                "SELECT * FROM storage_locations ORDER BY id" else "SELECT * FROM $table"
+            db.rawQuery(exportSql,null).use{c->
                 while(c.moveToNext()) {
                     val row=JSONObject()
                     for(i in 0 until c.columnCount) {
