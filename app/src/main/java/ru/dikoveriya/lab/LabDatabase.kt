@@ -124,7 +124,12 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_culture_direct_recipe ON cultures(medium_recipe_id)")
         }
         if (oldVersion < 8) LabCoreV8.migrateFrom7(db)
-        if (oldVersion < 9) LabCoreV9.create(db)
+        if (oldVersion < 9) {
+            LabCoreV9.create(db)
+            // SQLiteOpenHelper wraps onUpgrade in its own transaction:
+            // any integrity failure rolls back instead of partially migrating.
+            LabCoreV9.validate(db)
+        }
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
         pairs.forEach { (k, v) -> when(v) {
