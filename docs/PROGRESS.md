@@ -77,3 +77,13 @@
 - **Риски:** физическая миграция пользовательской v7 БД, восстановления архивов v4–v8 и UX на Android не проверены реальными данными/устройством. Риск несовместимости SQLite/Compose остаётся до успешного CI. Пока не объединять в `main`.
 - **Ссылки:** пакет: https://github.com/artbahtiarov-web/dikoveriya-lab-/tree/release/0.6.1-integrated-lab-core-20261112 ; критерии: `docs/RELEASE_0_6_1.md`.
 - **Следующий конкретный шаг:** открыть PR 0.6.1, дождаться и разобрать CI (Python, `:app:testDebugUnitTest`, `:app:assembleDebug`), исправить ошибки В ЭТОМ PR. После зелёного CI провести миграцию и восстановление на старых БД; лишь после безопасной приёмки менять `0.6.1-rc1` на `0.6.1` и объединять, затем проверять подписанную release-сборку и артефакт.
+
+## 2026-11-12 08:57 UTC — 0.6.1 CI acceptability checkpoint (PR #12)
+
+- **HEAD tested:** `7d54253bf163ed4981e0823b3529f43ca30c9cba`.
+- **PR:** https://github.com/artbahtiarov-web/dikoveriya-lab-/pull/12 .
+- **CI:** https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43186872048 — **success** (23 Python/SQLite regression tests; Android `:app:testDebugUnitTest`, `:app:assembleDebug`, PR debug APK artifact `13929246936`). Before this result the first run failed two stale test assertions and they were corrected in the same PR.
+- **Last additions:** before/after audit shown in culture history, explicit human reentry of legacy material count, legacy-state snapshots distinguished from actual changes, SQLite v7-shaped migration/recovery test `qa/test_v8_upgrade_restore.py`.
+- **Remaining release checks:** `versionName` raised from `0.6.1-rc1` to `0.6.1` in a later commit; must reverify latest SHA's CI and, if merged, signed main release APK/certificate. Real-user v4–v8 ZIP archives and physical Android UX still not exercised; no claim that these were tested.
+- **Data-risk rule:** SQLite v8 migration is additive and old tables are preserved; old backups remain supported, but unknown real historical DB variants cannot be independently validated in this session. Only release if new PR CI is successful; record any residual limitation.
+- **Next:** check latest PR CI, selectively merge if safe, verify signed APK artifact and label accurately. Then Stage 2 navigation/UX; do not confuse 0.6.1 with 1.0.
