@@ -79,3 +79,51 @@ fun LabDatabase.unifiedJournal(cultureId: Long): List<JournalEntry> =
                 nullableInt(12),nullableInt(13),nullableInt(14),nullableLong(15)
             ))
         } }
+
+
+/** Human-readable before/after audit. Unknown older states remain unknown, not zero. */
+data class CultureAuditEntry(
+    val id: Long, val recordedAt: Long, val source: String, val operationId: String?,
+    val beforeQty: Int?, val afterQty: Int?,
+    val beforeKind: String?, val afterKind: String?,
+    val beforeStatus: String?, val afterStatus: String?,
+    val beforeBatch: Long?, val afterBatch: Long?,
+    val beforeRecipe: Long?, val afterRecipe: Long?,
+    val beforeStage: String?, val afterStage: String?,
+    val beforeLocation: String?, val afterLocation: String?
+) {
+    fun changes(): List<String> = buildList {
+        fun <T> describe(label: String, before: T?, after: T?) {
+            if (before!=after) add("$label: ${before ?: "не указано"} → ${after ?: "не указано"}")
+        }
+        describe("Количество", beforeQty, afterQty)
+        describe("Тип материала", beforeKind, afterKind)
+        describe("Состояние", beforeStatus, afterStatus)
+        describe("Партия", beforeBatch, afterBatch)
+        describe("Рецептура ID", beforeRecipe, afterRecipe)
+        describe("Этап", beforeStage, afterStage)
+        describe("Место", beforeLocation, afterLocation)
+        if(isEmpty()) add("Подтверждено исходное состояние на момент миграции или восстановления")
+    }
+}
+
+fun LabDatabase.auditTrail(cultureId: Long): List<CultureAuditEntry> =
+    readableDatabase.rawQuery("""
+        SELECT id,recorded_at,source,operation_id,
+               before_qty,after_qty,before_kind,after_kind,before_status,after_status,
+               before_batch_id,after_batch_id,before_recipe_id,after_recipe_id,
+               before_stage,after_stage,before_location,after_location
+        FROM culture_audit WHERE culture_id=? ORDER BY recorded_at DESC,id DESC
+    """.trimIndent(),arrayOf(cultureId.toString())).use { c ->
+        buildList {
+            fun int(i:Int):Int?=if(c.isNull(i))null else c.getInt(i)
+            fun long(i:Int):Long?=if(c.isNull(i))null else c.getLong(i)
+            fun str(i:Int):String?=if(c.isNull(i))null else c.getString(i)
+            while(c.moveToNext()) add(CultureAuditEntry(
+                c.getLong(0),c.getLong(1),c.getString(2),str(3),
+                int(4),int(5),str(6),str(7),str(8),str(9),
+                long(10),long(11),long(12),long(13),
+                str(14),str(15),str(16),str(17)
+            ))
+        }
+    }
