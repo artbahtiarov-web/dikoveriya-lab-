@@ -106,3 +106,13 @@
 - **Документ:** `docs/RELEASE_0_7_0.md`.
 - **Известный риск:** старые динамические multi-destination поля диалога операций ещё требуют runtime проверки сохранения; UI на физическом телефоне пока не тестировался.
 - **Следующее действие:** открыть PR, разобрать CI и устранить ошибки компиляции/тестов в PR; merge только при green и безопасной обратимости, затем проверка signed build/артефакта.
+
+
+## 2026-11-12 10:58 UTC — UI 0.7.0, проверка реальным эмулятором
+
+- **Ветка и PR:** `release/0.7.0-botanical-navigation`, https://github.com/artbahtiarov-web/dikoveriya-lab-/pull/15 .
+- **Android CI:** https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43204009450 — **success**, source/Python/SQLite/JUnit/Compose compile и debug APK.
+- **Android emulator:** https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43204009341 — **success**, instrumented `connectedDebugAndroidTest` для 360dp/150% и 430dp/160% шрифта, проверка KPIs, 4 живых плиток/кликов и границ. Снимки: артефакт 13937481050 (lab07-ui-360-430). 390dp описан только Preview, не запускался как отдельный инструментальный профиль.
+- **Ошибки и исправления в одном PR:** `pipefail` был недопустим в POSIX sh emulator-runner; исправлен. `mapSaver` и положение импортов в Kotlin вызывали ошибку компиляции; исправлены. Дополнительно добавлены Saver для списка дочерних контейнеров, вариантов среды, merge и инцидентов; финальный тест компиляции успешен.
+- **Версия:** после подтверждения instrumented UI в `app/build.gradle.kts` и source-test изменено `0.7.0-rc1` → `0.7.0`. Требуется финальное CI на последнем SHA, затем merge. Идёт безопасное UI-обновление без изменения SQLite v8, package name, signing.
+- **Риски/следующий шаг:** не объявлять полную физическую UX-приёмку или подписанный release APK до фактической проверки. Получить green CI на final SHA; merge PR, проверить signed release workflow и артефакт. 
