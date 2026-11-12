@@ -391,8 +391,8 @@ private fun Lab07MediumScreen(
         item(key="history-title"){SectionTitle("История рецептур · ${history.size}")}
         if(history.isEmpty()) item(key="empty"){Text("Назначения среды пока не зарегистрированы.")}
         items(history,key={"medium-${it.id}"}){entry->
-            SmallCard("${entry.name} · v${entry.version}",
-                "${formatDate(entry.date)} · ${entry.reason}"){}
+            Lab07ReadOnlyCard("${entry.name} · v${entry.version}",
+                "${formatDate(entry.date)} · ${entry.reason}")
         }
     }
 }
@@ -553,7 +553,7 @@ private fun Lab07HistoryScreen(
                 Text("${unlinked.size} снимков: создание, исходное состояние после миграции и отдельные исправления. Никакие неизвестные данные не восстановлены догадкой.",
                     style=MaterialTheme.typography.bodySmall)
                 unlinked.take(20).forEach{row->
-                    SmallCard("${formatDate(row.recordedAt)} · ${row.source}",row.changes().joinToString(" · ")){}
+                    Lab07ReadOnlyCard("${formatDate(row.recordedAt)} · ${row.source}",row.changes().joinToString(" · "))
                 }
             }
         }
