@@ -134,7 +134,7 @@ fun Lab071PrepareBatchDialog(db:LabDatabase,onClose:()->Unit,onSaved:()->Unit) {
     var sterilization by rememberSaveable{mutableStateOf("")}
     var note by rememberSaveable{mutableStateOf("")}
     val values=remember{mutableStateMapOf<String,String>()}
-    var error by remember{mutableStateOf<String?>(null)}
+    var errorMessage by remember{mutableStateOf<String?>(null)}
     val recipe=recipes.firstOrNull{it.id==selected}
     val calc=remember(selected,volume){
         if(selected==null || volume.toIntOrNull()==null)null
@@ -168,7 +168,7 @@ fun Lab071PrepareBatchDialog(db:LabDatabase,onClose:()->Unit,onSaved:()->Unit) {
                 Field("Измеренный pH (необязательно)",ph,{ph=it})
                 Field("Режим стерилизации",sterilization,{sterilization=it})
                 Field("Заметки",note,{note=it},single=false)
-                if(error!=null)Text(requireNotNull(error),
+                if(errorMessage!=null)Text(requireNotNull(errorMessage),
                     color=MaterialTheme.colorScheme.error,
                     style=MaterialTheme.typography.bodySmall)
             }
@@ -186,7 +186,7 @@ fun Lab071PrepareBatchDialog(db:LabDatabase,onClose:()->Unit,onSaved:()->Unit) {
                         db.prepareBatch(requireNotNull(selected),volume.toInt(),ph,
                             sterilization,note,actual)
                         onSaved()
-                    }catch(e:Exception){error=e.message?:"Не удалось записать партию"}
+                    }catch(e:Exception){errorMessage=e.message?:"Не удалось записать партию"}
                 }){Text("Сохранить партию")}
         },
         dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
