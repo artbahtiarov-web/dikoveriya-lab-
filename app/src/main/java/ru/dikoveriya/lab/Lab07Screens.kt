@@ -52,10 +52,10 @@ fun Lab07RouteScreen(
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
         "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
-        "collection" -> Lab07CollectionScreen(plants,cultures,onBack,onNavigate,onNewPlant,modifier)
+        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
-            if(plant!=null) Lab07VarietyScreen(plant,cultures,onBack,onNavigate,onNewContainer,modifier)
+            if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
             else Lab07MissingScreen(onBack,modifier)
         }
         "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,modifier)
@@ -100,130 +100,127 @@ private fun Lab07Filters(values:List<String>,selected:String,onSelect:(String)->
 
 @Composable
 private fun Lab07CollectionScreen(
-    plants:List<PlantRecord>,cultures:List<CultureRecord>,
-    onBack:()->Unit,onNavigate:(String)->Unit,onNewPlant:()->Unit,modifier:Modifier
-) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var order by rememberSaveable { mutableStateOf("По названию") }
-    var view by rememberSaveable { mutableStateOf("Сорта") }
-    var status by rememberSaveable { mutableStateOf("Все") }
-    val counted=plants.map{plant->plant to cultures.count{it.plantId==plant.id}}
-    val ordered=when(order) {
-        "Больше контейнеров" -> counted.sortedWith(compareByDescending<Pair<PlantRecord,Int>>{it.second}.thenBy{it.first.name})
-        else -> counted.sortedBy{it.first.name.lowercase()}
+    plants:List<PlantRecord>,db:LabDatabase,revision:Int,
+    onBack:()->Unit,onNavigate:(String)->Unit,
+    onNewPlant:()->Unit,modifier:Modifier
+){
+    var search by rememberSaveable{mutableStateOf("")}
+    var order by rememberSaveable{mutableStateOf("По названию")}
+    val counts=remember(revision){db.plantCounts072()}
+    val total=remember(revision){db.cultureCount072()}
+    val sorted=plants.filter{it.name.contains(search,true) ||
+        it.description.contains(search,true)}.let{found->
+        if(order=="Больше контейнеров")
+            found.sortedWith(compareByDescending<PlantRecord>{counts[it.id]?:0}
+                .thenBy{it.name})
+        else found.sortedBy{it.name.lowercase()}
     }
-    val filtered=ordered.filter{it.first.name.contains(query,true) || it.first.description.contains(query,true)}
-    val visibleCultures=cultures.filter{culture->
-        (query.isBlank() || listOf(culture.code,culture.plantName,culture.location)
-            .any{it.contains(query,true)}) &&
-        (status=="Все" || when(status) {
-            "Активные" -> culture.status in setOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)
-            "Контроль" -> culture.status in setOf(LabTerms.CONTROL,LabTerms.QUARANTINE)
-            "Архив" -> culture.status in setOf(LabTerms.DISPOSED,LabTerms.TRANSFERRED,LabTerms.SOLD,LabTerms.ANNULLED)
-            else -> true
-        })
-    }.sortedByDescending{it.createdAt}
-    LazyColumn(modifier=modifier,state=rememberLazyListState(),contentPadding=PaddingValues(16.dp),
-        verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item(key="header") {
-            Lab07ScreenHeader("ДИКОВЕРИЯ  /  КОЛЛЕКЦИЯ","Коллекция редкостей",
-                "Выбери сорт, чтобы увидеть все его контейнеры и маточные линии.",onBack)
+    LazyColumn(modifier=modifier,state=rememberLazyListState(),
+        contentPadding=PaddingValues(16.dp),
+        verticalArrangement=Arrangement.spacedBy(11.dp)){
+        item(key="header"){
+            Lab07ScreenHeader("ЛАБОРАТОРИЯ / КОЛЛЕКЦИЯ",
+                "Коллекция растений",
+                "Все сорта в одном месте. Любой контейнер можно найти напрямую.",onBack)
         }
-        item(key="chooser") {
-            Lab07Filters(listOf("Сорта","Контейнеры"),view,{view=it})
+        item(key="switch"){
+            Lab072Chips(listOf("Сорта","Все контейнеры"),"Сорта",
+                {if(it=="Все контейнеры")onNavigate(Lab07Navigation.work("all"))})
         }
-        item(key="hero") { Lab07BrandHero("Живой каталог",
-            "${plants.size} сортов · ${cultures.size} контейнеров","АТЛАС ИССЛЕДОВАТЕЛЯ") }
-        item(key="search") { Field(if(view=="Сорта")"Поиск сорта" else "Поиск номера, растения, места",query,{query=it}) }
-        if(view=="Сорта") item(key="order") {
-            Lab07Filters(listOf("По названию","Больше контейнеров"),order,{order=it})
-        } else item(key="status-filter") {
-            Lab07Filters(listOf("Все","Активные","Контроль","Архив"),status,{status=it})
+        item(key="hero"){
+            Lab07BrandHero("Живой каталог",
+                plants.size.toString()+" сортов · "+total+" контейнеров",
+                "ДИКОВЕРИЯ / КОЛЛЕКЦИЯ")
         }
-        if(view=="Сорта") item(key="new-plant") {
-            OutlinedButton(onClick=onNewPlant,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)) {
-                Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(7.dp));Text("Добавить сорт")
+        item(key="search"){Field("Найти растение",search,{search=it})}
+        item(key="order"){
+            Lab072Chips(listOf("По названию","Больше контейнеров"),order,{order=it})
+        }
+        item(key="new"){
+            OutlinedButton(onClick=onNewPlant,
+                modifier=Modifier.fillMaxWidth().heightIn(min=50.dp)){
+                Icon(Icons.Outlined.Add,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Добавить сорт")
             }
         }
-        if(view=="Сорта" && filtered.isEmpty()) item(key="empty") {
-            Text(if(plants.isEmpty())"В коллекции пока нет сортов." else "По запросу ничего не найдено.",
-                style=MaterialTheme.typography.bodyMedium)
+        item(key="count"){SectionTitle("Сорта · "+sorted.size)}
+        if(sorted.isEmpty())item(key="empty"){
+            Text("Сорта не найдены. Измени поиск или добавь новый.")
         }
-        if(view=="Сорта") items(filtered,key={"plant-${it.first.id}"}){entry->
-            val plant=entry.first
+        items(sorted,key={"plant-"+it.id}){plant->
             OutlinedCard(onClick={onNavigate(Lab07Navigation.variety(plant.id))},
-                modifier=Modifier.fillMaxWidth().heightIn(min=88.dp),
-                colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.surface),
-                shape=RoundedCornerShape(17.dp),
-                border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
-                Row(Modifier.fillMaxWidth().padding(15.dp),verticalAlignment=Alignment.CenterVertically) {
+                modifier=Modifier.fillMaxWidth().heightIn(min=83.dp),
+                colors=CardDefaults.outlinedCardColors(
+                    containerColor=MaterialTheme.colorScheme.surface),
+                border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){
+                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Icon(Icons.Outlined.LocalFlorist,null,tint=Lab07Palette.Forest,
-                        modifier=Modifier.size(30.dp))
-                    Spacer(Modifier.width(13.dp))
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Text(plant.name,style=MaterialTheme.typography.titleMedium,
-                            maxLines=3,overflow=TextOverflow.Ellipsis)
-                        Text("${entry.second} контейнеров  ·  Открыть сорт",
-                            style=MaterialTheme.typography.bodySmall,
-                            color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        modifier=Modifier.size(31.dp))
+                    Column(Modifier.weight(1f)){
+                        Text(plant.name,style=MaterialTheme.typography.titleMedium)
+                        Text((counts[plant.id]?:0).toString()+" контейнеров",
+                            color=MaterialTheme.colorScheme.onSurfaceVariant,
+                            style=MaterialTheme.typography.bodySmall)
                     }
-                    Icon(Icons.Outlined.ChevronRight,"Открыть сорт",tint=Lab07Palette.InkBrass)
+                    Icon(Icons.Outlined.ChevronRight,"Открыть сорт",
+                        tint=Lab07Palette.InkBrass)
                 }
             }
-        }
-        if(view=="Контейнеры" && visibleCultures.isEmpty()) item(key="empty-container") {
-            Text("Контейнеры не найдены. Измени фильтр или создай новый контейнер.")
-        }
-        if(view=="Контейнеры") items(visibleCultures,key={"all-${it.id}"}){culture->
-            Lab07CultureRow(culture){onNavigate(Lab07Navigation.container(culture.id))}
         }
     }
 }
 
 @Composable
 private fun Lab07VarietyScreen(
-    plant:PlantRecord,cultures:List<CultureRecord>,
-    onBack:()->Unit,onNavigate:(String)->Unit,onNewContainer:(Long?)->Unit,modifier:Modifier
-) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var status by rememberSaveable { mutableStateOf("Все") }
-    val related=cultures.filter{it.plantId==plant.id}
-    val shown=related.filter { culture ->
-        (culture.code.contains(query,true)||culture.location.contains(query,true)) &&
-        (status=="Все" || when(status) {
-            "Активные" -> culture.status in setOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)
-            "На контроле" -> culture.status in setOf(LabTerms.CONTROL,LabTerms.QUARANTINE)
-            "Архив" -> culture.status in setOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.TRANSFERRED,LabTerms.ANNULLED)
-            else -> true
-        })
-    }.sortedByDescending{it.createdAt}
-    LazyColumn(modifier=modifier,state=rememberLazyListState(),contentPadding=PaddingValues(16.dp),
-        verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item(key="header") {
-            Lab07ScreenHeader("КОЛЛЕКЦИЯ  /  СОРТ",plant.name,
-                plant.description.ifBlank{"Карточка сорта · учёт биологического материала"},onBack)
+    plant:PlantRecord,db:LabDatabase,revision:Int,
+    onBack:()->Unit,onNavigate:(String)->Unit,
+    onNewContainer:(Long?)->Unit,modifier:Modifier
+){
+    val filter=remember(plant.id){Lab072Query(mode="all",plantId=plant.id)}
+    val total=remember(plant.id,revision){db.countCultures072(filter)}
+    val first=remember(plant.id,revision){db.culturesPage072(filter,0,5)}
+    LazyColumn(modifier=modifier,state=rememberLazyListState(),
+        contentPadding=PaddingValues(16.dp),
+        verticalArrangement=Arrangement.spacedBy(12.dp)){
+        item(key="header"){
+            Lab07ScreenHeader("КОЛЛЕКЦИЯ / СОРТ",plant.name,
+                plant.description.ifBlank{"Сорт, маточники и все зарегистрированные контейнеры"},onBack)
         }
-        item(key="hero") {
-            Lab07BrandHero(plant.name,"${related.size} контейнеров · ${related.count{it.status==LabTerms.IN_CULTURE}} в культуре",
-                "БОТАНИЧЕСКИЙ АТЛАС")
+        item(key="hero"){
+            Lab07BrandHero(plant.name,
+                total.toString()+" контейнеров · найдено в лаборатории",
+                "ДИКОВЕРИЯ / СОРТ")
         }
-        item(key="new") {
-            Button(onClick={onNewContainer(plant.id)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
-                Icon(Icons.Outlined.AddCircleOutline,null);Spacer(Modifier.width(8.dp));Text("Создать контейнер")
+        item(key="new"){
+            Button(onClick={onNewContainer(plant.id)},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.AddCircleOutline,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Создать контейнер этого сорта")
             }
         }
-        item(key="search") { Field("Поиск номера или места",query,{query=it}) }
-        item(key="filters") {
-            Lab07Filters(listOf("Все","Активные","На контроле","Архив"),status,{status=it})
+        item(key="search"){
+            OutlinedButton(onClick={onNavigate(Lab07Navigation.plantWork(plant.id))},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.Search,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Все контейнеры сорта · "+total)
+            }
         }
-        item(key="count") {
-            Text("Контейнеры  ·  ${shown.size}",style=MaterialTheme.typography.titleMedium)
+        item(key="title"){SectionTitle("Последние контейнеры")}
+        if(first.isEmpty())item(key="empty"){
+            Text("Контейнеров пока нет. Создай первый или вернись в коллекцию.")
         }
-        if(shown.isEmpty()) item(key="empty") {
-            Text("Подходящих контейнеров нет.",style=MaterialTheme.typography.bodyMedium)
+        items(first,key={"recent-"+it.id}){c->
+            SmallCard(c.code,c.quantity.toString()+" "+c.kind+" · "+c.stage+
+                " · "+c.status){onNavigate(Lab07Navigation.container(c.id))}
         }
-        items(shown,key={"culture-${it.id}"}){culture->
-            Lab07CultureRow(culture){onNavigate(Lab07Navigation.container(culture.id))}
+        if(total>first.size)item(key="more"){
+            TextButton(onClick={onNavigate(Lab07Navigation.plantWork(plant.id))}){
+                Text("Показать остальные "+(total-first.size))
+            }
         }
     }
 }
