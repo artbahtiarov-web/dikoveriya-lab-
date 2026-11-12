@@ -70,6 +70,7 @@ fun LabActionDialog(
                 "Пересадка" -> {
                     Text("Перенос материала в один или несколько новых контейнеров",fontWeight=FontWeight.Medium)
                     HelpIcon("Количество при пересадке","Из исходного контейнера вынимается указанное количество объектов. После деления может получиться больше побегов или растений. Оба числа сохраняются отдельно. Потери в процессе тоже учитываются.")
+                    Text("Из исходного контейнера учитываются: ${culture.quantityKind}. Если тип не уточнён, операцию нельзя сохранить до уточнения учёта.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     daughtersUsed.indices.forEach{i->
                         HorizontalDivider()
                         Text("Новый контейнер ${i+1}",fontWeight=FontWeight.SemiBold)
@@ -91,8 +92,8 @@ fun LabActionDialog(
                     HelpIcon("Объединение","Вся история каждого источника сохранится. Если линии или маточники различаются, приложение пометит происхождение как смешанное и не будет считать новую культуру подтверждённым клоном.")
                     Field("Из текущего контейнера",sourceUsed,{sourceUsed=it.filter(Char::isDigit)},numeric=true)
                     Field("Поиск второго источника",extraSearch,{extraSearch=it})
-                    val options=allCultures.filter{it.id!=culture.id && it.plantId==culture.plantId && it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE) && (extraSearch.isBlank()||it.code.contains(extraSearch,true)||it.plantName.contains(extraSearch,true))}.take(40)
-                    if(options.isEmpty())Text("Нет доступных контейнеров того же растения.")
+                    val options=allCultures.filter{it.id!=culture.id && it.plantId==culture.plantId && culture.quantityKind!="Не уточнено" && it.quantityKind==culture.quantityKind && it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE) && (extraSearch.isBlank()||it.code.contains(extraSearch,true)||it.plantName.contains(extraSearch,true))}.take(40)
+                    if(options.isEmpty())Text("Нет доступных контейнеров того же растения с таким же типом учёта (${culture.quantityKind}).")
                     options.forEach{candidate->
                         Row {
                             Checkbox(checked=additional.containsKey(candidate.id),onCheckedChange={selected->if(selected)additional[candidate.id]=candidate.quantity.toString() else additional.remove(candidate.id)})
@@ -147,7 +148,7 @@ fun LabActionDialog(
                 Checkbox(checked=acknowledged,onCheckedChange={acknowledged=it})
                 Text("Подтверждаю, что указанные данные верны",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=12.dp))
             }
-        }},confirmButton={TextButton(enabled=(!needsAck||acknowledged)&&(!requiresNote||reason.isNotBlank())&&(mode!="Происшествие"||incidentTitle.isNotBlank())&&(mode=="Отменить действие"||validDate!=null)&&(mode!="Отменить действие"||selectedOperation!=null),onClick={
+        }},confirmButton={TextButton(enabled=((mode!="Пересадка" && mode!="Объединить") || culture.quantityKind!="Не уточнено")&&(!needsAck||acknowledged)&&(!requiresNote||reason.isNotBlank())&&(mode!="Происшествие"||incidentTitle.isNotBlank())&&(mode=="Отменить действие"||validDate!=null)&&(mode!="Отменить действие"||selectedOperation!=null),onClick={
             when(mode){
                 "Пересадка" -> onSplit(daughtersUsed.indices.map{i->TransferDestination(daughtersUsed[i].toIntOrNull()?:0,daughtersProduced[i].toIntOrNull()?:0,daughtersStage[i],daughtersBatch[i],daughtersPlace[i],daughtersKind[i])},losses.toIntOrNull()?:0,reason,requireNotNull(validDate))
                 "Объединить" -> onMerge(listOf(MergeInput(culture.id,sourceUsed.toIntOrNull()?:0))+additional.map{MergeInput(it.key,it.value.toIntOrNull()?:0)},resultQty.toIntOrNull()?:0,batchId,nextStage,reason,acknowledged,requireNotNull(validDate))
