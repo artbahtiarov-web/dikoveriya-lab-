@@ -172,6 +172,15 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun cultures(limit:Int=Int.MAX_VALUE): List<CultureRecord> = readableDatabase.rawQuery("SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes,c.origin_state,c.quantity_kind,c.medium_recipe_id FROM cultures c JOIN plants p ON p.id=c.plant_id ORDER BY c.id DESC LIMIT ?",arrayOf(limit.coerceIn(1,Int.MAX_VALUE).toString())).use { c ->
         buildList { while(c.moveToNext()) add(CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),c.getString(13),c.getString(14),c.optLong(15))) }
     }
+    /** Indexed lookup for operations; never load the full 10k-container collection for one transfer. */
+    fun cultureById(id:Long):CultureRecord?=readableDatabase.rawQuery(
+        "SELECT c.id,c.code,c.plant_id,p.name,c.quantity,c.status,c.passage,c.stage,c.location,c.medium_batch_id,c.mother_id,c.created_at,c.notes,c.origin_state,c.quantity_kind,c.medium_recipe_id FROM cultures c JOIN plants p ON p.id=c.plant_id WHERE c.id=? LIMIT 1",
+        arrayOf(id.toString())).use{c->
+        if(c.moveToFirst())CultureRecord(c.getLong(0),c.getString(1),c.getLong(2),
+            c.getString(3),c.getInt(4),c.getString(5),c.getInt(6),c.getString(7),
+            c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),
+            c.getString(13),c.getString(14),c.optLong(15))else null
+    }
     fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(CulturePhoto(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4))) }
     }
@@ -606,7 +615,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         require(destinations.all{it.used in 1..1000000 && it.produced in 1..1000000 && it.stage in LabTerms.stages}) { "Проверь количества и этап для каждого нового контейнера" }
         val taken=destinations.sumOf { it.used.toLong() } + lost.toLong()
         writableDatabase.tx {
-            val source=cultures().firstOrNull{it.id==sourceId}?:error("Исходный контейнер не найден")
+            val source=cultureById(sourceId)?:error("Исходный контейнер не найден")
             require(source.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Нельзя пересаживать закрытый контейнер" }
             require(source.quantityKind != "Не уточнено") { "Тип исходных объектов не указан. Пересадка по общему количеству небезопасна: уточни тип учёта контейнера" }
             require(occurredAt>=source.createdAt) { "Дата пересадки раньше создания исходного контейнера" }
@@ -615,14 +624,35 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             val group=newOperation(this,"Разделение и пересадка",note,occurredAt)
             if(lost>0)insertOrThrow("operation_losses",null,cv("operation_id" to group,"culture_id" to sourceId,"quantity" to lost,"reason" to "В ходе пересадки"))
             changeCount(this,source,rest,if(rest==0)LabTerms.TRANSFERRED else source.status,"Пересадка", "Изъято ${taken-lost}; потери $lost; осталось $rest. $note",group,occurredAt)
+            val createdChildren=mutableListOf<Long>()
             destinations.forEach{part->
                 val nextPassage=source.passage+if(part.stage==LabTerms.IN_VITRO)1 else 0
                 val child=createCultureInDb(this,source.plantId,part.produced,LabTerms.IN_CULTURE,nextPassage,part.stage,part.location?:source.location,part.batchId,source.motherId,note,group,occurredAt,part.quantityKind)
+                createdChildren.add(child)
                 assignDaughterRecipe(this,child,source.recipeId,part.batchId,occurredAt,part.recipeId)
                 update("cultures",cv("origin_state" to source.originState),"id=?",arrayOf(child.toString()))
                 insertOrThrow("culture_links",null,cv("parent_culture_id" to sourceId,"child_culture_id" to child,"used_qty" to part.used,"result_qty" to part.produced,"event_group" to group))
                 changeSnapshot(this,group,child,null,part.produced,LabTerms.IN_CULTURE)
                 event(this,child,"Происхождение","Из ${source.code}; исходных объектов ${part.used}, получено ${part.produced}. $note",null,part.produced,part.batchId,group,occurredAt)
+            }
+            // All daughters in this operation have a verified common parent.
+            // Group by the actual split event, not by guessed genetic provenance.
+            if(createdChildren.size>1) {
+                val productionId=insertOrThrow("production_groups",null,cv(
+                    "code" to "TEMP-"+UUID.randomUUID(),
+                    "title" to "Пересадка из "+source.code,
+                    "plant_id" to source.plantId,"mother_id" to source.motherId,
+                    "note" to "Операция "+group,"created_at" to occurredAt))
+                update("production_groups",
+                    cv("code" to "ГР-%06d".format(Locale.US,productionId)),
+                    "id=?",arrayOf(productionId.toString()))
+                createdChildren.forEach{child->
+                    insertOrThrow("culture_groups",null,cv("culture_id" to child,
+                        "group_id" to productionId,"linked_at" to occurredAt))
+                    insertOrThrow("group_history",null,cv("culture_id" to child,
+                        "new_group_id" to productionId,"recorded_at" to occurredAt,
+                        "reason" to "Общее происхождение: пересадка "+group))
+                }
             }
         }
     }
@@ -631,7 +661,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         require(inputs.size in 2..25 && inputs.map{it.cultureId}.distinct().size==inputs.size) { "Для объединения выбери 2–25 разных исходных контейнеров" }
         require(inputs.all{it.used>0} && produced in 1..1000000 && stage in LabTerms.stages) { "Проверь количество и этап" }
         writableDatabase.tx {
-            val all=cultures().associateBy{it.id}
+            val all=inputs.mapNotNull{cultureById(it.cultureId)}.associateBy{it.id}
             val sources=inputs.map{row->
                 val c=all[row.cultureId] ?: error("Контейнер ${row.cultureId} не найден")
                 require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE) && row.used<=c.quantity) { "Источник ${c.code} закрыт или материала недостаточно" }
