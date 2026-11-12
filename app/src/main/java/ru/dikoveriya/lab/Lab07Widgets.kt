@@ -268,7 +268,7 @@ fun Lab07ObservationPlot(samples:List<GrowthSample>,field:String) {
             val timeline=(maxT-minT).coerceAtLeast(1L).toFloat()
             val coords=points.mapIndexed{index,p->
                 val x=if(maxT==minT) left+width*index/(points.size-1)
-                      else left+width*((p.first-minT)/timeline)
+                      else left+width*((p.first-minT).toFloat()/timeline)
                 val y=top+height*(1f-(p.second-minY)/range)
                 Offset(x,y)
             }
