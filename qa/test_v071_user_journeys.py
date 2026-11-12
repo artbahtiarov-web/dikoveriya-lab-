@@ -80,7 +80,7 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertIn('Lab071LabelDialog',MAIN)
 
     def test_explicit_tap_targets_and_back(self):
-        self.assertIn('Modifier.heightIn(min=52.dp)',read("UiBasics.kt"))
+        self.assertIn('heightIn(min=52.dp)',read("UiBasics.kt"))
         self.assertIn('Icons.Outlined.ExpandMore',read("UiBasics.kt"))
         self.assertIn('routeStack.isNotEmpty() -> backRoute()',MAIN)
         self.assertEqual(MAIN.count('BackHandler('),1)
