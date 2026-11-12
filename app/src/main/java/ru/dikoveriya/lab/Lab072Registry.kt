@@ -173,3 +173,14 @@ fun LabDatabase.locations072():List<Lab072Location>=readableDatabase.rawQuery(
     while(c.moveToNext())add(Lab072Location(c.getLong(0),c.lab072Long(1),
         c.getString(2),c.getString(3),c.getString(4)))
 }}
+
+/** One grouped SQL count replaces the quadratic per-plant full-list scan. */
+fun LabDatabase.plantCounts072():Map<Long,Int> =
+    readableDatabase.rawQuery(
+        "SELECT plant_id,COUNT(*) FROM cultures GROUP BY plant_id",null
+    ).use{c->buildMap{while(c.moveToNext())put(c.getLong(0),c.getInt(1))}}
+
+fun LabDatabase.cultureCount072():Int =
+    readableDatabase.rawQuery("SELECT COUNT(*) FROM cultures",null).use{
+        if(it.moveToFirst())it.getInt(0)else 0
+    }
