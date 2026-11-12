@@ -318,7 +318,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         require(quantity>0 && total>=0 && total.isFinite()) { "Некорректные данные продажи" }
         writableDatabase.tx {
             val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
-            require(c.stage != LabTerms.IN_VITRO && c.status == LabTerms.IN_CULTURE) { "Продавать можно только живые растения вне стерильной культуры" }
+            require(c.stage != LabTerms.IN_VITRO && c.status == LabTerms.IN_CULTURE && c.quantityKind=="Растения") {
+                "Продавать можно только учтённые растения вне стерильной культуры"
+            }
             require(quantity<=c.quantity) { "Недостаточно растений" }
             val rest=c.quantity-quantity
             insertOrThrow("sales",null,cv("culture_id" to cultureId,"quantity" to quantity,"price" to total,"sold_at" to System.currentTimeMillis(),"note" to notes))
@@ -786,7 +788,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 require(later==0) { "После операции с ${c.code} были другие действия. Сначала проверь их последствия" }
             }
             val group=newOperation(this,"Отмена операции","Отмена $originalId. $reason",System.currentTimeMillis())
-            update("lab_operations",cv("status" to "Отменена","reversed_by" to group),"id=?",arrayOf(originalId))
+            update("lab_operations",cv("status" to "Отменена"),"id=?",arrayOf(originalId))
+            update("lab_operations",cv("reversal_of" to originalId),"id=?",arrayOf(group))
             changes.forEach{ch->
                 val c=current.getValue(ch.cultureId)
                 val restoreQty=if(ch.created)0 else requireNotNull(ch.beforeQty)
