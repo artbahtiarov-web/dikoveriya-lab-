@@ -36,7 +36,7 @@ class BotanicalNavigation07(unittest.TestCase):
         for tile in ("Рост","Среда","Операции","История"):
             self.assertIn('Lab07ActionTile("'+tile+'"',SCREEN)
         self.assertIn("Lab07Navigation.variety(plant.id)",SCREEN)
-        self.assertIn("Lab07Navigation.container(culture.id)",SCREEN)
+        self.assertIn("Lab07Navigation.container(row.id)",(SRC/"Lab072RegistryUi.kt").read_text(encoding="utf-8"))
 
     def test_filters_scroll_position_and_drafts_persist(self):
         self.assertIn("rememberSaveableStateHolder()",MAIN)
@@ -44,7 +44,11 @@ class BotanicalNavigation07(unittest.TestCase):
         self.assertIn('SaveableStateProvider("legacy:$tab:$subsection")',MAIN)
         self.assertIn("rememberLazyListState()",SCREEN)
         self.assertIn("rememberSaveable",SCREEN)
-        for label in ("Активные","На контроле","Архив","30 дней","90 дней"):
+        registry=(SRC/"Lab072RegistryUi.kt").read_text(encoding="utf-8")
+        for label in ("7 дней","30 дней","По побегам","По растениям"):
+            self.assertIn('"'+label+'"',registry)
+        self.assertIn("LabTerms.statuses",registry)
+        for label in ("30 дней","90 дней"):
             self.assertIn('"'+label+'"',SCREEN)
         self.assertIn("rememberSaveable(culture.id,mode)",OPS)
 
