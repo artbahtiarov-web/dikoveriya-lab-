@@ -13,7 +13,8 @@ data class MediumPartInput(
 
 data class GrowthSample(
     val id: Long, val cultureId: Long, val recipeId: Long?, val date: Long,
-    val explants: Int?, val shoots: Int?, val plants: Int?, val contaminated: Int?, val notes: String
+    val explants: Int?, val shoots: Int?, val plants: Int?, val contaminated: Int?, val notes: String,
+    val kind: String = "observation"
 )
 
 data class LinkedMedium(val id: Long, val name: String, val purpose: String, val version: Int)
@@ -100,11 +101,11 @@ fun LabDatabase.currentMedium(cultureId: Long): LinkedMedium? = readableDatabase
 ).use { c -> if(c.moveToFirst()) LinkedMedium(c.getLong(0),c.getString(1),c.getString(2),c.getInt(3)) else null }
 
 fun LabDatabase.growthSamples(cultureId: Long): List<GrowthSample> = readableDatabase.rawQuery(
-    "SELECT id,culture_id,recipe_id,observed_at,explants,shoots,plants,contaminated,notes FROM culture_measurements WHERE culture_id=? ORDER BY observed_at DESC,id DESC",
+    "SELECT id,culture_id,recipe_id,observed_at,explants,shoots,plants,contaminated,notes,record_kind FROM culture_measurements WHERE culture_id=? ORDER BY observed_at DESC,id DESC",
     arrayOf(cultureId.toString())
 ).use { c -> buildList { while(c.moveToNext()) add(GrowthSample(c.getLong(0),c.getLong(1),if(c.isNull(2))null else c.getLong(2),c.getLong(3),
     if(c.isNull(4))null else c.getInt(4),if(c.isNull(5))null else c.getInt(5),if(c.isNull(6))null else c.getInt(6),
-    if(c.isNull(7))null else c.getInt(7),c.getString(8))) } }
+    if(c.isNull(7))null else c.getInt(7),c.getString(8),c.getString(9))) } }
 
 fun LabDatabase.addGrowthSample(cultureId: Long, explants: Int?, shoots: Int?, plants: Int?, contaminated: Int?, notes: String) {
     require(listOf(explants, shoots, plants, contaminated).any { it != null } || notes.isNotBlank()) { "Укажи показатель или примечание" }
