@@ -388,7 +388,7 @@ private fun Lab07GrowthScreen(
         }
         item(key="timeline-title") { SectionTitle("История измерений · ${samples.size}") }
         if(samples.isEmpty()) item(key="empty") { Text("Пока нет измерений.") }
-        items(samples.take(50),key={"sample-${it.id}"}){sample->
+        items(samples,key={"sample-${it.id}"}){sample->
             val details=listOfNotNull(sample.explants?.let{"Эксплантов: $it"},
                 sample.shoots?.let{"Побегов: $it"},sample.plants?.let{"Растений: $it"},
                 sample.contaminated?.let{"Заражено: $it"},sample.notes.takeIf{it.isNotBlank()})
@@ -518,7 +518,7 @@ private fun Lab07OperationsScreen(
         }
         item(key="list-title") {SectionTitle("Проведённые операции · ${operations.size}")}
         if(operations.isEmpty()) item(key="empty"){Text("Операций пока нет.")}
-        items(operations.take(50),key={"operation-${it.id}"}){op->
+        items(operations,key={"operation-${it.id}"}){op->
             Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -625,15 +625,16 @@ private fun Lab07HistoryScreen(
                 }
             }
         }
-        item(key="audit-archival") {
+        if(category=="Все" && period=="Всё время" && query.isBlank()) {
             val unlinked=audit.filter{it.operationId==null}
-            if(unlinked.isNotEmpty()) {
-                SectionTitle("Аудит без связанной операции")
-                Text("${unlinked.size} снимков: создание, исходное состояние после миграции и отдельные исправления. Никакие неизвестные данные не восстановлены догадкой.",
+            if(unlinked.isNotEmpty())item(key="audit-archival") {
+                SectionTitle("Другие записи аудита")
+                Text("${unlinked.size} записей о создании, миграции и отдельных изменениях. Неизвестные прошлые состояния не восстановлены догадкой.",
                     style=MaterialTheme.typography.bodySmall)
-                unlinked.take(20).forEach{row->
-                    Lab07ReadOnlyCard("${formatDate(row.recordedAt)} · ${row.source}",row.changes().joinToString(" · "))
-                }
+            }
+            items(unlinked,key={"audit-${it.id}"}){row->
+                Lab07ReadOnlyCard("${formatDate(row.recordedAt)} · ${row.source}",
+                    row.changes().joinToString(" · "))
             }
         }
     }
