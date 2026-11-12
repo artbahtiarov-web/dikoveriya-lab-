@@ -40,6 +40,7 @@ fun Lab072RegistryScreen(
     plants:List<PlantRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
+    onExportLabels:(List<Long>)->Unit = {},
     modifier:Modifier=Modifier
 ) {
     val title=when(mode) {
@@ -209,6 +210,12 @@ fun Lab072RegistryScreen(
                         modifier=Modifier.weight(1f)){Text("Сменить среду")}
                     OutlinedButton(onClick={action="note"},enabled=selected.isNotEmpty(),
                         modifier=Modifier.weight(1f)){Text("Общая заметка")}
+                }
+                OutlinedButton(onClick={onExportLabels(selected)},enabled=selected.isNotEmpty(),
+                    modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                    Icon(Icons.Outlined.QrCode,null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Этикетки 40×12 мм · ZIP")
                 }
             }
         }
