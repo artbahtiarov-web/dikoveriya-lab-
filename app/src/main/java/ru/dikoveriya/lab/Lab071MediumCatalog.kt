@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Lab071MediumCatalog(
     plants:List<PlantRecord>,recipes:List<RecipeRecord>,batches:List<BatchRecord>,
-    ingredients:List<IngredientRecord>,revision:Int,
+    ingredients:List<IngredientEntry>,revision:Int,
     onCreate:()->Unit,onRecipe:(Long)->Unit,onNewBatch:()->Unit,
     onBatch:(Long)->Unit,onAddIngredient:()->Unit,onIngredient:(Long)->Unit,
     onImport:()->Unit,onExport:()->Unit,
