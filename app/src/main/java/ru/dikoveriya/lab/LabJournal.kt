@@ -13,7 +13,7 @@ data class JournalEntry(
     val beforeQty: Int?, val afterQty: Int?,
     val explants: Int?, val shoots: Int?, val plants: Int?, val contaminated: Int?,
     val legacyStarting: Int?, val legacyHealthy: Int?, val legacyDays: Int?,
-    val recipeId: Long?
+    val recipeId: Long?, val operationId: String? = null
 ) {
     fun summary(): String {
         val measures=when(source) {
@@ -40,13 +40,13 @@ data class JournalEntry(
 fun LabDatabase.unifiedJournal(cultureId: Long): List<JournalEntry> =
     readableDatabase.rawQuery("""
         SELECT source,source_id,kind,note,occurred_at,recorded_at,before_qty,after_qty,
-               explants,shoots,plants,contaminated,legacy_start,legacy_healthy,legacy_days,recipe_id
+               explants,shoots,plants,contaminated,legacy_start,legacy_healthy,legacy_days,recipe_id,operation_id
         FROM (
             SELECT 'event' source,e.id source_id,e.kind,e.note,
                    COALESCE(e.occurred_at,e.created_at) occurred_at,e.created_at recorded_at,
                    e.before_qty,e.after_qty,
                    NULL explants,NULL shoots,NULL plants,NULL contaminated,
-                   NULL legacy_start,NULL legacy_healthy,NULL legacy_days,NULL recipe_id
+                   NULL legacy_start,NULL legacy_healthy,NULL legacy_days,NULL recipe_id,e.event_group operation_id
             FROM events e WHERE e.culture_id=?
               AND NOT (e.kind='Осмотр' AND EXISTS (
                   SELECT 1 FROM assessments a WHERE a.culture_id=e.culture_id AND a.note=e.note
@@ -58,13 +58,13 @@ fun LabDatabase.unifiedJournal(cultureId: Long): List<JournalEntry> =
                         ELSE 'Наблюдение роста' END,
                    m.notes,m.observed_at,m.observed_at,NULL,NULL,
                    m.explants,m.shoots,m.plants,m.contaminated,
-                   NULL,NULL,NULL,m.recipe_id
+                   NULL,NULL,NULL,m.recipe_id,NULL operation_id
             FROM culture_measurements m WHERE m.culture_id=?
             UNION ALL
             SELECT 'legacy',a.id,'Осмотр (архив)',a.note,
                    a.observed_at,a.observed_at,NULL,NULL,
                    NULL,NULL,NULL,a.contaminated_qty,
-                   a.starting_qty,a.healthy_qty,a.observation_days,b.recipe_id
+                   a.starting_qty,a.healthy_qty,a.observation_days,b.recipe_id,NULL operation_id
             FROM assessments a LEFT JOIN batches b ON b.id=a.batch_id
             WHERE a.culture_id=?
         ) ORDER BY occurred_at DESC,recorded_at DESC,source_id DESC
@@ -76,7 +76,7 @@ fun LabDatabase.unifiedJournal(cultureId: Long): List<JournalEntry> =
                 c.getString(0),c.getLong(1),c.getString(2),c.getString(3),
                 c.getLong(4),c.getLong(5),nullableInt(6),nullableInt(7),
                 nullableInt(8),nullableInt(9),nullableInt(10),nullableInt(11),
-                nullableInt(12),nullableInt(13),nullableInt(14),nullableLong(15)
+                nullableInt(12),nullableInt(13),nullableInt(14),nullableLong(15),if(c.isNull(16))null else c.getString(16)
             ))
         } }
 
