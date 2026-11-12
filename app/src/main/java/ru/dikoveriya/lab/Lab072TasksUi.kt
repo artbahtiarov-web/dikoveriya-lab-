@@ -124,7 +124,10 @@ fun Lab072TasksScreen(
                             period=f.period;priority=f.priority;kind=f.kind
                             plantId=f.plantId;recipeId=f.recipeId
                             search=f.text;order=f.order
-                            fromText="";toText="";pages=1
+                            val opts=org.json.JSONObject(it.config)
+                            fromText=opts.optString("fromText","")
+                            toText=opts.optString("toText","")
+                            pages=1
                         }
                     })
             }
@@ -201,8 +204,12 @@ fun Lab072TasksScreen(
         title={Text("Сохранить фильтр задач")},
         text={Field("Название набора",viewName,{viewName=it})},
         confirmButton={Button(enabled=viewName.isNotBlank(),onClick={
-            update{db.saveView072("tasks",viewName,filter.json());
-                viewDialog=false;viewName=""}
+            update{
+                val stored=org.json.JSONObject(filter.json())
+                    .put("fromText",fromText).put("toText",toText).toString()
+                db.saveView072("tasks",viewName,stored)
+                viewDialog=false;viewName=""
+            }
         }){Text("Сохранить")}},
         dismissButton={TextButton(onClick={viewDialog=false}){Text("Отмена")}})
     if(createDialog)Lab072TaskForm(db,recipes,onClose={createDialog=false},
