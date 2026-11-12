@@ -33,10 +33,10 @@ checks={
  'recipe duplicate prevention': 'Такая среда уже существует' in store,
  'sugar / agar mass': 'sugar_g_l' in store and 'agar_g_l' in store and 'Сколько сахара внутри' in ui,
  'new workflow': 'QuickCultureDialog(db,preselectedRecipeId' in main and 'QuickMediumDialog(db' in main,
- 'growth': 'GrowthDialog(db,c' in main and 'addGrowthSample(' in store,
+ 'growth': 'Lab07GrowthScreen(' in read('app/src/main/java/ru/dikoveriya/lab/Lab07Screens.kt') and 'addGrowthSample(' in store,
  'plant results': 'plantResults()' in main and 'mediumResults()' in main,
  'approved design': 'DikoveriyaTheme' in main and 'Lab07Palette' in theme,
- 'single version': 'versionCode = 70000 +' in gradle,
+ 'single version': 'versionCode = 70100 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }
