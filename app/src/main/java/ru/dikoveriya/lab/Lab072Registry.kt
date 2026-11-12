@@ -159,7 +159,7 @@ fun LabDatabase.findCulture072(code:String):Long?=readableDatabase.rawQuery(
     "SELECT id FROM cultures WHERE code=? LIMIT 1",arrayOf(code)).use{
     if(it.moveToFirst())it.getLong(0)else null
 }
-fun LabDatabase.groups072():List<Lab072Group>=readableDatabase.rawQuery(
+fun LabDatabase.groups072(): List<Lab072Group> = readableDatabase.rawQuery(
     """SELECT g.id,g.code,g.title,p.name,g.plant_id,COUNT(cg.culture_id),g.created_at
     FROM production_groups g JOIN plants p ON p.id=g.plant_id
     LEFT JOIN culture_groups cg ON cg.group_id=g.id
@@ -167,7 +167,7 @@ fun LabDatabase.groups072():List<Lab072Group>=readableDatabase.rawQuery(
     while(c.moveToNext())add(Lab072Group(c.getLong(0),c.getString(1),
         c.getString(2),c.getString(3),c.getLong(4),c.getInt(5),c.getLong(6)))
 }}
-fun LabDatabase.locations072():List<Lab072Location>=readableDatabase.rawQuery(
+fun LabDatabase.locations072(): List<Lab072Location> = readableDatabase.rawQuery(
     "SELECT id,parent_id,level,label,full_path FROM storage_locations ORDER BY full_path COLLATE NOCASE",
     null).use{c->buildList{
     while(c.moveToNext())add(Lab072Location(c.getLong(0),c.lab072Long(1),
