@@ -10,8 +10,8 @@ android {
         applicationId = "ru.dikoveriya.lab"
         minSdk = 26
         targetSdk = 35
-        versionCode = 70100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "0.7.1"
+        versionCode = 70200 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
+        versionName = "0.7.2-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
