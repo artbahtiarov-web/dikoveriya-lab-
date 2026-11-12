@@ -29,6 +29,7 @@ fun Lab07RouteScreen(
     onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
+    onLegacyAssessment:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     modifier:Modifier=Modifier
 ) {
@@ -43,7 +44,7 @@ fun Lab07RouteScreen(
         }
         "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,modifier)
                        else Lab07MissingScreen(onBack,modifier)
-        "growth" -> if(culture!=null) Lab07GrowthScreen(culture,db,revision,onBack,onChanged,onError,modifier)
+        "growth" -> if(culture!=null) Lab07GrowthScreen(culture,db,revision,onBack,onChanged,onError,onLegacyAssessment,modifier)
                     else Lab07MissingScreen(onBack,modifier)
         "medium" -> if(culture!=null) Lab07MediumScreen(culture,db,revision,recipes,onBack,onChanged,onError,modifier)
                     else Lab07MissingScreen(onBack,modifier)
@@ -324,7 +325,8 @@ private fun Lab07ContainerScreen(
 @Composable
 private fun Lab07GrowthScreen(
     culture:CultureRecord,db:LabDatabase,revision:Int,onBack:()->Unit,
-    onChanged:()->Unit,onError:(String)->Unit,modifier:Modifier
+    onChanged:()->Unit,onError:(String)->Unit,onLegacyAssessment:(Long)->Unit,
+    modifier:Modifier
 ) {
     var explants by rememberSaveable { mutableStateOf("") }
     var shoots by rememberSaveable { mutableStateOf("") }
@@ -373,6 +375,16 @@ private fun Lab07GrowthScreen(
         } else item(key="closed") {
             Text("Контейнер закрыт. Добавление наблюдений недоступно, история сохранена.",
                 style=MaterialTheme.typography.bodyMedium)
+        }
+        if(!closed)item(key="legacy-assessment") {
+            OutlinedButton(onClick={onLegacyAssessment(culture.id)},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+                Icon(Icons.Outlined.FactCheck,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Расширенный осмотр · старый формат")
+            }
+            Text("Для совместимости с прежним журналом. Не используется для расчётов по известным единицам биоматериала.",
+                style=MaterialTheme.typography.bodySmall)
         }
         item(key="timeline-title") { SectionTitle("История измерений · ${samples.size}") }
         if(samples.isEmpty()) item(key="empty") { Text("Пока нет измерений.") }
