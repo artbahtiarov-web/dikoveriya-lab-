@@ -47,7 +47,8 @@ fun DikoveriyaApp() {
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
         "collection","variety"->"Коллекция"
-        "container","growth","medium","operations","history"->"Коллекция"
+        "container","growth","medium","operations","history","work","groups","places"->"Коллекция"
+        "tasks"->"Главная"
         else->if(tab=="Аналитика")"Ещё" else tab
     }
     fun openRoute(next:String) {
@@ -81,22 +82,29 @@ fun DikoveriyaApp() {
 
     val plants=remember(refresh){db.plants()}
     val mothers=remember(refresh){db.mothers()}
-    val cultures=remember(refresh){db.cultures()}
+    val cultures=remember(refresh,tab,currentRoute) {
+        if(tab=="Главная" && currentRoute==null)db.cultures(limit=5)
+        else db.cultures()
+    }
     val recipes=remember(refresh){db.recipes()}
     val ingredients=remember(refresh){db.ingredients()}
     val batches=remember(refresh){db.batches()}
-    val tasks=remember(refresh){db.tasks()}
+    val tasks=remember(refresh,tab,currentRoute) {
+        if(tab=="Главная" && currentRoute==null) emptyList<TaskRecord>()
+        else db.tasks()
+    }
+    val dashboardCounts=remember(refresh){db.dashboard072()}
     val materials=remember(refresh){db.materials()}
     val equipment=remember(refresh){db.equipment()}
     val incidents=remember(refresh){db.incidents()}
     val experiments=remember(refresh){db.experiments()}
     val sales=remember(refresh){db.sales()}
-    val metrics=remember(refresh){db.recipeMetrics()}
-    val cultivarResults=remember(refresh){db.plantResults()}
-    val mediumResults=remember(refresh){db.mediumResults()}
+    val metrics=remember(refresh,tab){if(tab=="Аналитика")db.recipeMetrics() else emptyList()}
+    val cultivarResults=remember(refresh,tab){if(tab=="Аналитика")db.plantResults() else emptyList()}
+    val mediumResults=remember(refresh,tab){if(tab=="Аналитика")db.mediumResults() else emptyList()}
     val running=cultures.filter{it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
     val attention=running.count{it.status!=LabTerms.IN_CULTURE}
-    val dueTasks=tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
+    val dueTasks=dashboardCounts.tasksDue
 
     val saveBackup=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
         if(uri!=null) act { context.contentResolver.openOutputStream(uri)?.use{LabBackup.save(context,db,it)} ?: throw IllegalStateException("Нет доступа к файлу") }
@@ -128,15 +136,22 @@ fun DikoveriyaApp() {
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
         if(result.contents!=null) {
             val code=LabQr.getCode(result.contents)
-            val c=cultures.firstOrNull{it.code==code}
-            if(c!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(c.id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
+            val id=db.findCulture072(code)
+            if(id!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
         }
     }
     val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
     val openSection: (String)->Unit = {section->
-        val target=when(section){"Питательные среды"->"Среды";"Аналитика"->"Аналитика";else->"Ещё"}
-        if(tab!=target)tabHistory=tabHistory+tab
-        tab=target;routeStack=emptyList();subsection=if(target=="Ещё")section else ""
+        when(section){
+            "Задачи"->openRoute(Lab07Navigation.TASKS)
+            "Группы контейнеров"->openRoute(Lab07Navigation.GROUPS)
+            "Места хранения"->openRoute(Lab07Navigation.PLACES)
+            else->{
+                val target=when(section){"Питательные среды"->"Среды";"Аналитика"->"Аналитика";else->"Ещё"}
+                if(tab!=target)tabHistory=tabHistory+tab
+                tab=target;routeStack=emptyList();subsection=if(target=="Ещё")section else ""
+            }
+        }
     }
     // A single back policy is shared by toolbar and Android gestures.
     fun goBack() {
@@ -242,7 +257,10 @@ fun DikoveriyaApp() {
                                 onNewContainer={preselectedPlantId=null;dialog="newCulture"},
                                 onNewPlant={dialog="addPlant"},
                                 onMediums={openSection("Питательные среды")},
-                                onScan=scan
+                                onScan=scan,
+                                counts=dashboardCounts,
+                                onMetric={key->if(key=="tasks")openRoute(Lab07Navigation.TASKS)
+                                    else openRoute(Lab07Navigation.work(key))}
                             )
                         }
                     }
@@ -274,7 +292,7 @@ fun DikoveriyaApp() {
                     }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
-                            items(listOf("Аналитика","Маточники","Задачи","Склад","Оборудование","Инциденты","Эксперименты","Продажи","Резервные копии","О программе")){label->
+                            items(listOf("Аналитика","Маточники","Задачи","Группы контейнеров","Места хранения","Склад","Оборудование","Инциденты","Эксперименты","Продажи","Резервные копии","О программе")){label->
                                 TextEntryRow(label){openSection(label)}
                                 HorizontalDivider()
                             }
@@ -286,16 +304,6 @@ fun DikoveriyaApp() {
                                     if(mothers.isEmpty())item{Text("Маточников пока нет.")}
                                     items(mothers,key={"mother-${it.id}"}){m->
                                         SmallCard(m.plantName,"${m.code} · ${m.origin} · ${m.status}"){dialog="motherInfo:${m.id}"}
-                                    }
-                                }
-                                "Задачи" -> {
-                                    item{Button(onClick={dialog="newTask"}){Text("+ Задача")}}
-                                    if(tasks.isEmpty())item{Text("Нет задач")}
-                                    items(tasks,key={"task-${it.id}"}){t->
-                                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                                            Checkbox(checked=t.done,onCheckedChange={act{db.setTaskDone(t.id,it)}})
-                                            Column{Text(t.title);Text(formatDate(t.dueAt),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                                        }
                                     }
                                 }
                                 "Склад" -> {
@@ -325,7 +333,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.7.1 · локальная база SQLite v8. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.7.2 · локальная база SQLite v9. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
