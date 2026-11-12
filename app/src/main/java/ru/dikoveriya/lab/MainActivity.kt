@@ -137,7 +137,7 @@ fun DikoveriyaApp() {
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
         if(result.contents!=null) {
             val code=LabQr.getCode(result.contents)
-            val id=db.findCulture072(code)
+            val id=code?.let{db.findCulture072(it)}
             if(id!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
         }
     }
