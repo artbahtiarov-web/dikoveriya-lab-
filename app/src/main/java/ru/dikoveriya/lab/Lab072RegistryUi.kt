@@ -36,7 +36,7 @@ internal fun endOfDay072(raw:String):Long?=calendarDay072(raw)?.plus(86400000L-1
 
 @Composable
 fun Lab072RegistryScreen(
-    mode:String,initialGroupId:Long?,db:LabDatabase,revision:Int,
+    mode:String,initialGroupId:Long?,initialPlantId:Long?=null,db:LabDatabase,revision:Int,
     plants:List<PlantRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
