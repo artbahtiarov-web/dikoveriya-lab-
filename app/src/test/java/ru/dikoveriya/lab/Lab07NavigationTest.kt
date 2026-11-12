@@ -58,4 +58,27 @@ class Lab07NavigationTest {
         assertEquals(Lab07Navigation.COLLECTION,Lab07Navigation.parentFor("variety:4",4))
         assertNull(Lab07Navigation.parentFor(Lab07Navigation.COLLECTION,null))
     }
+
+    @Test fun fourHomeCardsPushOneRouteAndBackReturnsExactlyToOverview(){
+        for(page in listOf(
+            Lab07Navigation.work("vitro"),
+            Lab07Navigation.work("attention"),
+            Lab07Navigation.work("growth"),
+            Lab07Navigation.TASKS
+        )){
+            val stack=Lab07Navigation.enter(emptyList(),page)
+            assertEquals(page,Lab07Navigation.current(stack))
+            assertEquals(emptyList<String>(),Lab07Navigation.back(stack))
+        }
+    }
+    @Test fun groupsAndPlantWorklistsRemainOneLevelDeep(){
+        val stack=Lab07Navigation.enter(
+            Lab07Navigation.enter(emptyList(),Lab07Navigation.GROUPS),
+            Lab07Navigation.groupWork(17))
+        assertEquals(Lab07Navigation.GROUPS,Lab07Navigation.current(Lab07Navigation.back(stack)))
+        assertTrue(Lab07Navigation.isKnown(Lab07Navigation.plantWork(27)))
+        assertFalse(Lab07Navigation.isKnown("work:plant:0"))
+        assertTrue(Lab07Navigation.isKnown(Lab07Navigation.PLACES))
+        assertFalse(Lab07Navigation.isKnown("work:unknown"))
+    }
 }
