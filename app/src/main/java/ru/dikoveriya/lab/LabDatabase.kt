@@ -548,9 +548,14 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     }
     private fun changeSnapshot(db: SQLiteDatabase, group: String, cultureId: Long, before: CultureRecord?, afterQty: Int, afterStatus: String) {
         db.insertOrThrow("operation_changes",null,cv("operation_id" to group,"culture_id" to cultureId,"before_qty" to before?.quantity,"after_qty" to afterQty,"before_status" to before?.status,"after_status" to afterStatus,"created" to if(before==null)1 else 0))
-        db.execSQL("""UPDATE culture_audit SET operation_id=?
-            WHERE id=(SELECT MAX(id) FROM culture_audit WHERE culture_id=? AND operation_id IS NULL)""",
-            arrayOf(group,cultureId,cultureId))
+        if(before!=null) {
+            // A newly created child already has its operation_id on the creation audit row.
+            // Never relabel an earlier migration/import snapshot as this operation.
+            db.execSQL("""UPDATE culture_audit SET operation_id=?
+                WHERE id=(SELECT MAX(id) FROM culture_audit
+                    WHERE culture_id=? AND operation_id IS NULL AND source='Изменение')""",
+                arrayOf(group,cultureId))
+        }
     }
     private fun changeCount(db: SQLiteDatabase, source: CultureRecord, quantity: Int, newStatus: String, kind: String, note: String, group: String, whenAt: Long) {
         require(quantity>=0 && quantity<=1000000) { "Недопустимое количество" }
