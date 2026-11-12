@@ -352,3 +352,60 @@ fun LabDatabase.createTasksBulk072(ids:List<Long>,title:String,dueAt:Long,
             "next_priority" to priority,"note" to "Массовое назначение"))
     }
 }
+
+/** Apply one explicitly selected approved recipe version to compatible containers.
+ * Does not change biological counts and never keeps a batch from a different recipe.
+ */
+fun LabDatabase.changeMediumBulk072(ids:List<Long>,recipeId:Long,reason:String):Unit=lab072Tx{
+    checkedIds072(ids)
+    val note=lab072Text(reason)
+    val recipe=rawQuery("SELECT name,version,status,plant_id FROM recipes WHERE id=?",
+        arrayOf(recipeId.toString())).use{c->
+        require(c.moveToFirst()){"Рецептура не найдена"}
+        require(c.getString(2)=="Утверждена"){"Разрешена только утверждённая версия рецептуры"}
+        Triple(c.getString(0)+" · v"+c.getInt(1),c.lab072Long(3),recipeId)
+    }
+    val now=System.currentTimeMillis()
+    val op=operation072("Смена среды","Рецептура: "+recipe.first+"; "+note,now)
+    ids.forEach{id->
+        val current=row072(id)
+        require(current.status in active072){"Нельзя менять среду у закрытого контейнера"}
+        val plantAndRecipe=rawQuery(
+            "SELECT plant_id,medium_recipe_id,medium_batch_id FROM cultures WHERE id=?",
+            arrayOf(id.toString())).use{c->
+            require(c.moveToFirst())
+            Triple(c.getLong(0),c.lab072Long(1),c.lab072Long(2))
+        }
+        require(recipe.second==null || recipe.second==plantAndRecipe.first){
+            "Рецептура предназначена другому сорту"
+        }
+        require(plantAndRecipe.second!=recipeId || plantAndRecipe.third!=null){
+            "У одного из контейнеров уже выбрана та же рецептура без партии"
+        }
+        val before=auditTop072(id)
+        update("cultures",lab072CV("medium_recipe_id" to recipeId,
+            "medium_batch_id" to null,"updated_at" to now),
+            "id=?",arrayOf(id.toString()))
+        insertOrThrow("culture_recipe_history",null,lab072CV(
+            "culture_id" to id,"recipe_id" to recipeId,
+            "applied_at" to now,"note" to "Массовая смена среды: "+note))
+        change072(op,current,current.status,before)
+        event072(id,"Смена среды","Рецептура: "+
+            (plantAndRecipe.second?.toString()?:"не указана")+
+            " → "+recipe.first+" · "+note,op,now)
+    }
+}
+
+/** A group note is NOT a numeric biological observation. Source explicitly says
+ * one batch statement was repeated for each selected container, with original IDs.
+ */
+fun LabDatabase.recordGroupNote072(ids:List<Long>,note:String):Unit=lab072Tx{
+    checkedIds072(ids)
+    val text=lab072Text(note,500)
+    val now=System.currentTimeMillis()
+    val op=operation072("Общая заметка","Для "+ids.size+" контейнеров: "+text,now)
+    ids.forEach{id->
+        row072(id)
+        event072(id,"Общая заметка",text+" [массовая запись, без числового измерения]",op,now)
+    }
+}
