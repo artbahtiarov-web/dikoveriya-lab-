@@ -209,15 +209,26 @@ data class Lab072TaskFilter(
     val dueFrom:Long?=null,val dueTo:Long?=null,
     val text:String="",val order:String="Ближайшие"
 )
-fun LabDatabase.tasksPage072(f:Lab072TaskFilter,offset:Int,limit:Int=40,
-    now:Long=System.currentTimeMillis()):List<Lab072Task>{
-    require(offset>=0 && limit in 1..100)
+private fun taskFilter072(f:Lab072TaskFilter,now:Long):Pair<String,Array<String>>{
     val w=mutableListOf<String>()
     val args=mutableListOf<String>()
     when(f.period){
         "Просрочено"->{w+="t.done=0 AND t.due_at<?";args+=now.toString()}
         "Ближайшие 7 дней"->{w+="t.done=0 AND t.due_at>=? AND t.due_at<=?"
             args+=now.toString();args+=(now+7*86400000L).toString()}
+        "Сегодня"->{
+            val start=java.util.Calendar.getInstance().apply{
+                timeInMillis=now
+                set(java.util.Calendar.HOUR_OF_DAY,0)
+                set(java.util.Calendar.MINUTE,0)
+                set(java.util.Calendar.SECOND,0)
+                set(java.util.Calendar.MILLISECOND,0)
+            }
+            val begin=start.timeInMillis
+            start.add(java.util.Calendar.DAY_OF_YEAR,1)
+            w+="t.done=0 AND t.due_at>=? AND t.due_at<?"
+            args+=begin.toString();args+=start.timeInMillis.toString()
+        }
         "Выполнено"->w+="t.done=1"
         "Открытые"->w+="t.done=0"
         else->Unit
@@ -233,6 +244,12 @@ fun LabDatabase.tasksPage072(f:Lab072TaskFilter,offset:Int,limit:Int=40,
         repeat(3){args+="%"+f.text.trim().take(100)+"%"}
     }
     val where=if(w.isEmpty())"" else " WHERE "+w.joinToString(" AND ")
+    return where to args.toTypedArray()
+}
+fun LabDatabase.tasksPage072(f:Lab072TaskFilter,offset:Int,limit:Int=40,
+    now:Long=System.currentTimeMillis()):List<Lab072Task>{
+    require(offset>=0 && limit in 1..100)
+    val (where,args)=taskFilter072(f,now)
     val sort=when(f.order){
         "Важные"->"""CASE COALESCE(m.priority,'Не задан')
             WHEN 'Срочный' THEN 0 WHEN 'Высокий' THEN 1 WHEN 'Обычный' THEN 2
@@ -248,7 +265,7 @@ fun LabDatabase.tasksPage072(f:Lab072TaskFilter,offset:Int,limit:Int=40,
         LEFT JOIN plants p ON p.id=c.plant_id
         LEFT JOIN recipes r ON r.id=COALESCE(m.recipe_id,c.medium_recipe_id)
         $where ORDER BY $sort LIMIT $limit OFFSET $offset""",
-        args.toTypedArray()).use{c->buildList{
+        args).use{c->buildList{
         while(c.moveToNext())add(Lab072Task(c.getLong(0),c.getString(1),
             c.lab072Long(2),c.getLong(3),c.getInt(4)==1,
             c.getString(5),c.getString(6),c.lab072String(7),c.lab072String(8),
@@ -256,18 +273,12 @@ fun LabDatabase.tasksPage072(f:Lab072TaskFilter,offset:Int,limit:Int=40,
     }}
 }
 fun LabDatabase.taskCount072(f:Lab072TaskFilter,now:Long=System.currentTimeMillis()):Int{
-    // For exact counts, keep a dedicated SQL COUNT rather than loading every task.
-    val active=when(f.period){"Просрочено"->"done=0 AND due_at<$now";else->""}
-    // Count uses the exact same query contract: batches are bounded and never cached.
-    var offset=0
-    var count=0
-    while(true){
-        val page=tasksPage072(f,offset,100,now)
-        count+=page.size
-        if(page.size<100)break
-        offset+=100
-    }
-    return count
+    val (where,args)=taskFilter072(f,now)
+    return readableDatabase.rawQuery("""SELECT COUNT(*) FROM tasks t
+        LEFT JOIN task_metadata m ON m.task_id=t.id
+        LEFT JOIN cultures c ON c.id=t.culture_id
+        LEFT JOIN plants p ON p.id=c.plant_id
+        $where""",args).use{c->if(c.moveToFirst())c.getInt(0)else 0}
 }
 
 fun LabDatabase.createTask072(title:String,dueAt:Long,priority:String,kind:String,
