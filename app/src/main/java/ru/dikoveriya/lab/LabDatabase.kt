@@ -262,8 +262,21 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             require(c.quantity>0) { "Закрытый контейнер нельзя редактировать" }
             require(quantity==c.quantity) { "Количество изменяется через «Потери» или «Исправить ошибку» — так сохранится правильная история" }
             require(status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Для списания выбери «Потери»" }
-            if(batchId!=c.batchId) verifyBatch(batchId)
-            update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
+            // Changing a preparation batch also changes the effective recipe. Clearing a batch
+            // does not imply removing the directly assigned recipe.
+            val changedBatch = batchId != c.batchId
+            val selectedRecipeId = if (changedBatch && batchId != null) {
+                verifyBatch(batchId)
+                batches().firstOrNull { it.id == batchId }?.recipeId
+                    ?: error("Партия среды не найдена")
+            } else null
+            update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,
+                "medium_recipe_id" to (selectedRecipeId ?: c.recipeId),
+                "updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
+            if (selectedRecipeId != null && selectedRecipeId != c.recipeId) {
+                insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to selectedRecipeId,
+                    "applied_at" to System.currentTimeMillis(),"note" to "Рецептура изменена при выборе партии приготовления"))
+            }
             event(this,id,if(status==LabTerms.DISPOSED)"Утилизация" else "Изменение","${c.status} → $status; ${c.quantity} → $quantity; место: ${c.location} → $location; среда: ${c.batchId ?: "нет"} → ${batchId ?: "нет"}; причина: $reason",c.quantity,quantity,batchId)
         }
     }
