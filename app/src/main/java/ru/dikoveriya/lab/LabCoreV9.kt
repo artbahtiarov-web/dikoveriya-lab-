@@ -11,7 +11,7 @@ internal object LabCoreV9 {
     val backupTables = listOf(
         "production_groups","culture_groups","group_history",
         "storage_locations","culture_storage","storage_movements",
-        "control_cases","control_case_history","task_metadata","task_history"
+        "control_cases","control_case_history","task_metadata","task_history","saved_views"
     )
 
     fun create(db: SQLiteDatabase) {
@@ -101,6 +101,14 @@ internal object LabCoreV9 {
             note TEXT NOT NULL DEFAULT ''
         )""".trimIndent())
 
+        db.execSQL("""CREATE TABLE IF NOT EXISTS saved_views (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            screen TEXT NOT NULL,
+            name TEXT NOT NULL,
+            config_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            UNIQUE(screen,name)
+        )""".trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_production_groups_plant ON production_groups(plant_id,id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_culture_groups_group ON culture_groups(group_id,culture_id)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_group_history_culture ON group_history(culture_id,recorded_at)")
