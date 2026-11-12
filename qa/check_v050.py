@@ -36,7 +36,7 @@ checks={
  'growth': 'GrowthDialog(db,c' in main and 'addGrowthSample(' in store,
  'plant results': 'plantResults()' in main and 'mediumResults()' in main,
  'approved design': 'DikoveriyaTheme' in main and '0xFFF7F6F2' in theme,
- 'single version': 'versionCode = 60000 +' in gradle,
+ 'single version': 'versionCode = 60100 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }
