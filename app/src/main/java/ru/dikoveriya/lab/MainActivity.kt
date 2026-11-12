@@ -45,6 +45,11 @@ fun DikoveriyaApp() {
     var routeStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val stateHolder=rememberSaveableStateHolder()
     val currentRoute=Lab07Navigation.current(routeStack)
+    val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
+        "collection","variety"->"Коллекция"
+        "container","growth","medium","operations","history"->"Работа"
+        else->tab
+    }
     fun openRoute(next:String) {
         // The Collection tab itself is already a level: do not insert it twice.
         routeStack=Lab07Navigation.enter(routeStack,next)
@@ -153,13 +158,13 @@ fun DikoveriyaApp() {
                 listOf("Главная","Коллекция","Работа","Аналитика","Ещё").forEachIndexed{index, name->
                     val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;3->Icons.Outlined.BarChart;else->Icons.Outlined.Menu}
                     NavigationBarItem(
-                        selected=tab==name,
+                        selected=activeNavigationTab==name,
                         onClick={
                             if(name=="Главная")tabHistory=emptyList() else if(tab!=name)tabHistory=tabHistory+tab
                             tab=name;subsection="";routeStack=emptyList()
                         },
                         icon={Icon(icon,contentDescription=null)},
-                        label={Text(when(name){"Коллекция"->"Сорта";"Работа"->"Учёт";else->name},maxLines=1)},
+                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Сорта";"Работа"->"Учёт";"Аналитика"->"Итоги";else->name},maxLines=1)},
                         colors=NavigationBarItemDefaults.colors(
                             selectedIconColor=Lab07Palette.Brass,
                             selectedTextColor=Lab07Palette.Champagne,
@@ -346,7 +351,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.4.0-dev · локальная база SQLite. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.7.0 · локальная база SQLite v8. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
