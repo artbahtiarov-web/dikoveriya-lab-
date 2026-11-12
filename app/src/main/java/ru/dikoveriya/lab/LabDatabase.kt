@@ -551,18 +551,35 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         arrayOf(cultureId.toString())
     ).use { c -> buildList { while(c.moveToNext()) add(OperationRecord(c.getString(0),c.getString(1),c.getLong(2),c.getLong(3),c.getString(4),c.getString(5))) } }
     /** Record the actual recipe on a daughter, without changing any parent's historical medium. */
-    private fun assignDaughterRecipe(db: SQLiteDatabase, childId: Long, inheritedRecipeId: Long?, selectedBatchId: Long?, occurredAt: Long) {
-        val recipeId = if (selectedBatchId != null) {
-            batches().firstOrNull { it.id == selectedBatchId }?.recipeId
-                ?: error("Партия среды не найдена")
-        } else inheritedRecipeId
-        if (recipeId == null) return
-        require(recipes().any { it.id == recipeId }) { "Рецептура дочернего контейнера не найдена" }
-        db.update("cultures", cv("medium_recipe_id" to recipeId), "id=?", arrayOf(childId.toString()))
-        db.insertOrThrow("culture_recipe_history", null, cv(
-            "culture_id" to childId, "recipe_id" to recipeId, "applied_at" to occurredAt,
-            "note" to if (selectedBatchId != null) "Рецептура из партии приготовления при операции" else "Унаследована при операции"
-        ))
+    private fun assignDaughterRecipe(db: SQLiteDatabase, childId: Long,
+            inheritedRecipeId: Long?, selectedBatchId: Long?, occurredAt: Long,
+            explicitRecipeId: Long? = null) {
+        val batchRecipeId = selectedBatchId?.let { batchId ->
+            batches().firstOrNull{it.id==batchId}?.recipeId ?: error("Партия среды не найдена")
+        }
+        require(explicitRecipeId==null || batchRecipeId==null || explicitRecipeId==batchRecipeId) {
+            "Выбранная партия приготовлена по другой версии рецептуры"
+        }
+        val recipeId = explicitRecipeId ?: batchRecipeId ?: inheritedRecipeId ?: return
+        val recipe=recipes().firstOrNull{it.id==recipeId}?:error("Рецептура дочернего контейнера не найдена")
+        val plantId=db.rawQuery("SELECT plant_id FROM cultures WHERE id=?",
+            arrayOf(childId.toString())).use { c ->
+            require(c.moveToFirst()){"Дочерний контейнер не найден"};c.getLong(0)
+        }
+        require(recipe.plantId==null || recipe.plantId==plantId) {
+            "Рецептура принадлежит другому виду или сорту"
+        }
+        if(explicitRecipeId!=null) require(recipe.status=="Утверждена") {
+            "Для новой среды выбери утверждённую версию"
+        }
+        db.update("cultures",cv("medium_recipe_id" to recipeId),"id=?",arrayOf(childId.toString()))
+        db.insertOrThrow("culture_recipe_history",null,cv(
+            "culture_id" to childId,"recipe_id" to recipeId,"applied_at" to occurredAt,
+            "note" to when {
+                explicitRecipeId!=null -> "Рецептура выбрана при операции"
+                selectedBatchId!=null -> "Рецептура из партии приготовления"
+                else -> "Унаследована при операции"
+            }))
     }
     /** One source, many daughter containers. Input material, resulting material and losses are kept separate. */
     fun splitCulture(sourceId: Long, destinations: List<TransferDestination>, lost: Int, note: String, occurredAt: Long = System.currentTimeMillis()) {
@@ -583,7 +600,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             destinations.forEach{part->
                 val nextPassage=source.passage+if(part.stage==LabTerms.IN_VITRO)1 else 0
                 val child=createCultureInDb(this,source.plantId,part.produced,LabTerms.IN_CULTURE,nextPassage,part.stage,part.location?:source.location,part.batchId,source.motherId,note,group,occurredAt,part.quantityKind)
-                assignDaughterRecipe(this,child,source.recipeId,part.batchId,occurredAt)
+                assignDaughterRecipe(this,child,source.recipeId,part.batchId,occurredAt,part.recipeId)
                 update("cultures",cv("origin_state" to source.originState),"id=?",arrayOf(child.toString()))
                 insertOrThrow("culture_links",null,cv("parent_culture_id" to sourceId,"child_culture_id" to child,"used_qty" to part.used,"result_qty" to part.produced,"event_group" to group))
                 changeSnapshot(this,group,child,null,part.produced,LabTerms.IN_CULTURE)
@@ -592,7 +609,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
     }
     /** Combining sources is never silently presented as a verified clonal line. */
-    fun mergeCultures(inputs: List<MergeInput>, produced: Int, batchId: Long?, stage: String, note: String, confirmMixedOrigins: Boolean, occurredAt: Long = System.currentTimeMillis()) {
+    fun mergeCultures(inputs: List<MergeInput>, produced: Int, batchId: Long?, stage: String, note: String, confirmMixedOrigins: Boolean, occurredAt: Long = System.currentTimeMillis(), recipeId: Long? = null) {
         require(inputs.size in 2..25 && inputs.map{it.cultureId}.distinct().size==inputs.size) { "Для объединения выбери 2–25 разных исходных контейнеров" }
         require(inputs.all{it.used>0} && produced in 1..1000000 && stage in LabTerms.stages) { "Проверь количество и этап" }
         writableDatabase.tx {
@@ -616,7 +633,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             val child=createCultureInDb(this,parent.plantId,produced,LabTerms.IN_CULTURE,sources.maxOf{it.passage}+if(stage==LabTerms.IN_VITRO)1 else 0,stage,parent.location,batchId,if(certain)parent.motherId else null,note,group,occurredAt,parent.quantityKind)
             // Different source recipes are not interchangeable: leave the result unassigned unless a batch identifies it.
             val sharedRecipeId=sources.map{it.recipeId}.distinct().singleOrNull()
-            assignDaughterRecipe(this,child,sharedRecipeId,batchId,occurredAt)
+            assignDaughterRecipe(this,child,sharedRecipeId,batchId,occurredAt,recipeId)
             update("cultures",cv("origin_state" to origin),"id=?",arrayOf(child.toString()))
             changeSnapshot(this,group,child,null,produced,LabTerms.IN_CULTURE)
             sources.forEachIndexed{index,c->
