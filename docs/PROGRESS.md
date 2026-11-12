@@ -66,3 +66,12 @@
 - **Checks:** new `qa/test_batch_recipe_edit.py` source regression; PR CI must run Python checks, `:app:testDebugUnitTest`, and `:app:assembleDebug`. Local Android compilation and on-device tests not available. **Do not merge until CI success.**
 - **Risk:** legacy edit UI still offers batch rather than direct recipe; no Android instrumentation test of historical database migration. Future work should unify edit forms around recipe selection and explicit user confirmation of changes.
 - **Next:** inspect PR CI, fix errors in same PR; merge only after success and low-risk review, verify permanent signed release artifact. Then implement explicit historical quantity-kind clarification with an audit event.
+
+## 2026-11-12 08:42 UTC — Stage 0, immutable release build
+
+- **Base main:** `bccc9e0f71aacdbc25d8dc87e691cedf125de606`; last signed release run [43182911466](https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43182911466) success. No open PR at start.
+- **Branch:** `chore/immutable-release-source-20261112`; code commit `2a8a3c431463e46f475ffa493cc38e94a6cdf295`.
+- **Change:** removed legacy ZIP extraction, Python patch execution, and automatic commit/push to main from release workflow. GitHub token permissions reduced from contents:write to contents:read. Release builds only the checked-out tracked source; baseline validation and full Python regression suite run before Gradle. Existing permanent signing restoration, certificate verification and signed artifact upload remain unchanged.
+- **Checks:** source-level workflow review; PR workflow must execute `:app:testDebugUnitTest` and `:app:assembleDebug`. Release validation cannot be claimed until after merge; no local Android SDK compilation. No Kotlin, SQLite, migrations, app ID or signing certificate changes.
+- **Risks:** release workflow behavior changes; verify existing baseline validator and Python suite on PR, then signed release build and artifact on main. Do not merge if PR CI fails.
+- **Next:** verify PR CI, merge only after green result, confirm signed release artifact; then implement auditable clarification of unknown historical quantity type before further quantity operations.
