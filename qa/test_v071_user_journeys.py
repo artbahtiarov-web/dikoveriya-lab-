@@ -33,8 +33,8 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertNotIn('listOf("Главная","Коллекция","Работа","Аналитика","Ещё")',MAIN)
         self.assertIn('"Аналитика","Маточники","Задачи"',MAIN)
         self.assertIn('Lab071MediumCatalog(',MAIN)
-        self.assertIn('var view by rememberSaveable',SCREENS)
-        self.assertIn('listOf("Сорта","Контейнеры")',SCREENS)
+        self.assertIn('Lab072Chips(listOf("Сорта","Все контейнеры")',SCREENS)
+        self.assertIn('Lab07Navigation.work("all")',SCREENS)
 
     def test_passport_and_operations_have_no_double_dropdown(self):
         self.assertNotIn('PickOne("Действие"',OLD)
