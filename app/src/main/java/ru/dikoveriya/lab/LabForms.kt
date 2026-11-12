@@ -89,7 +89,7 @@ fun CultureDialog(
         Column(Modifier.fillMaxWidth().heightIn(max=530.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             Text("${c.status} · ${c.stage} · учётное количество ${c.quantity} (${c.quantityKind})")
             if(c.location.isNotEmpty())Text("Место: ${c.location}",style=MaterialTheme.typography.bodySmall)
-            PickOne("Действие",listOf("История","Рост и результаты","Что произошло?","Осмотр","Изменить","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
+            PickOne("Действие",listOf("История","Рост и результаты","Что произошло?","Изменить","Продажа","Фото","Этикетка"),mode,{mode=it},"Открывает доступные действия с выбранным контейнером. Происхождение и история сохраняются автоматически.")
             when(mode){
                 "Рост и результаты" -> {
                     Text("Отдельные счётчики эксплантов, побегов, растений и заражений; дата и рецептура каждого измерения сохраняются.",style=MaterialTheme.typography.bodySmall)
