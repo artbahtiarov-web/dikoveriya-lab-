@@ -31,7 +31,7 @@ data class CultureRecord(
 )
 data class CulturePhoto(val id: Long, val cultureId: Long, val filename: String, val caption: String, val addedAt: Long)
 data class LabEvent(val id: Long, val cultureId: Long, val kind: String, val note: String, val time: Long, val before: Int?, val after: Int?, val recordedAt: Long = time)
-data class TransferDestination(val used: Int, val produced: Int, val stage: String, val batchId: Long?, val location: String?, val quantityKind: String = "Не уточнено")
+data class TransferDestination(val used: Int, val produced: Int, val stage: String, val batchId: Long?, val location: String?, val quantityKind: String = "Не уточнено", val recipeId: Long? = null)
 data class MergeInput(val cultureId: Long, val used: Int)
 data class OperationRecord(val id: String, val kind: String, val occurredAt: Long, val createdAt: Long, val status: String, val note: String)
 data class RecipeRecord(val id: Long, val family: String, val version: Int, val name: String, val purpose: String, val plantId: Long?, val status: String, val notes: String)
