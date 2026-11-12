@@ -11,6 +11,12 @@ import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import java.text.SimpleDateFormat
+import java.util.Locale
+
 // Save arbitrary-length destination rows and selected merge/incident sources across
 // Back navigation and configuration changes. ID 0 is reserved for a missing optional FK.
 private val lab07StringRows = listSaver<SnapshotStateList<String>,String>(
@@ -23,17 +29,12 @@ private val lab07OptionalIds = listSaver<SnapshotStateList<Long?>,Long>(
 private val lab07IdRows = listSaver<SnapshotStateList<Long>,Long>(
     save={it.toList()},restore={it.toMutableStateList()}
 )
-private val lab07MergeSelection = mapSaver<SnapshotStateMap<Long,String>,String>(
+private val lab07MergeSelection = mapSaver<SnapshotStateMap<Long,String>>(
     save={rows->rows.entries.associate{(id,value)->id.toString() to value}},
     restore={saved->mutableStateMapOf<Long,String>().apply{
-        saved.forEach{(id,value)->put(id.toLong(),value)}
+        saved.forEach{(id,value)->put(id.toLong(),value as String)}
     }}
 )
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 /** Scenario-first UI: technical passage numbers and database IDs stay out of sight. */
 @Composable
