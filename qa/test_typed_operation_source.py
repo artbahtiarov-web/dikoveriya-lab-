@@ -28,7 +28,7 @@ class TypedOperationSourceTests(unittest.TestCase):
     def test_merge_picker_filters_by_unit_and_both_actions_disable_unknown(self):
         self.assertIn('it.quantityKind==culture.quantityKind', UI)
         self.assertIn('culture.quantityKind!="Не уточнено"', UI)
-        self.assertIn('mode!="Пересадка" && mode!="Объединить"', UI)
+        self.assertIn('mode !in listOf("Пересадка","Объединить","Потери","Исправить ошибку")', UI)
 
     def test_no_schema_or_existing_measurements_are_rewritten(self):
         split = DB.split("fun splitCulture(", 1)[1].split("fun mergeCultures(", 1)[0]
