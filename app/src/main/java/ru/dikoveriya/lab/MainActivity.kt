@@ -366,7 +366,7 @@ fun DikoveriyaApp() {
                 else if(i!=null) IncidentReviewDialog(i,db.incidentCultures(i.id),db.incidentFollowups(i.id),onClose={dialog=""},onSave={status,note->if(act{db.updateIncident(i.id,status,note)})dialog=""})
             }
             cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                CultureDialog(c,db.events(id),db.photos(id),context.filesDir,db.ancestors(id),batches,recipes,db.confirmedLosses(id),onClose={cultureId=null},
+                CultureDialog(c,db.events(id),db.auditTrail(id),db.photos(id),context.filesDir,db.ancestors(id),batches,recipes,db.confirmedLosses(id),onClose={cultureId=null},
                     onChange={q,st,loc,b,n,recipe->if(act{db.updateCulture(id,q,st,loc,b,n,recipe,true)})cultureId=null},
                     onObserve={n,start,healthy,infected,days->if(act{db.addObservation(id,n,start,healthy,infected,days)})cultureId=null},
                     onGrowth={performanceCultureId=id;cultureId=null},
