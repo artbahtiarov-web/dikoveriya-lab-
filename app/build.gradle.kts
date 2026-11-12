@@ -11,7 +11,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 60100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "0.6.1-rc1"
+        versionName = "0.6.1"
     }
     signingConfigs {
         if (file("signing/dikoveriya.p12").isFile) {
