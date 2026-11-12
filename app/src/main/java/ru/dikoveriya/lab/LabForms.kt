@@ -58,7 +58,7 @@ fun AddCultureDialog(plants:List<PlantRecord>,mothers:List<MotherRecord>,batches
 }
 @Composable
 fun CultureDialog(
-    c:CultureRecord,events:List<LabEvent>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,recipes:List<RecipeRecord>,lossesTotal:Int,
+    c:CultureRecord,events:List<LabEvent>,audit:List<CultureAuditEntry>,photos:List<CulturePhoto>,filesDir:File,ancestors:List<Pair<String,String>>,batches:List<BatchRecord>,recipes:List<RecipeRecord>,lossesTotal:Int,
     onClose:()->Unit,onChange:(Int,String,String,Long?,String,Long?)->Unit,
     onObserve:(String,Int?,Int?,Int?,Int?)->Unit,
     onGrowth:()->Unit,
@@ -117,6 +117,17 @@ fun CultureDialog(
                         Text("${formatDate(e.time)} · ${e.kind}",fontWeight=FontWeight.Medium,style=MaterialTheme.typography.bodySmall)
                         if(kotlin.math.abs(e.recordedAt-e.time)>60000)Text("Внесено в журнал: ${formatDate(e.recordedAt)}",style=MaterialTheme.typography.bodySmall)
                         Text(e.note,style=MaterialTheme.typography.bodySmall)
+                    }
+                    if(audit.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text("Аудит изменений (до / после)",fontWeight=FontWeight.SemiBold)
+                        audit.take(30).forEach{entry->
+                            Text("${formatDate(entry.recordedAt)} · ${entry.source}",
+                                fontWeight=FontWeight.Medium,style=MaterialTheme.typography.bodySmall)
+                            entry.changes().forEach{line->
+                                Text(line,style=MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
                 "Осмотр" -> {
