@@ -17,18 +17,21 @@ fun LabActionDialog(
     culture: CultureRecord,
     allCultures: List<CultureRecord>,
     batches: List<BatchRecord>,
+    recipes: List<RecipeRecord>,
     operations: List<OperationRecord>,
     onClose: () -> Unit,
     onSplit: (List<TransferDestination>,Int,String,Long) -> Unit,
-    onMerge: (List<MergeInput>,Int,Long?,String,String,Boolean,Long) -> Unit,
+    onMerge: (List<MergeInput>,Int,Long?,String,String,Boolean,Long,Long?) -> Unit,
     onLoss: (Int,String,String,Long) -> Unit,
     onCorrection: (Int,String,Long) -> Unit,
+    onClarify: (String,Int,String,Long) -> Unit,
     onVoid: (String,Long) -> Unit,
     onIncident: (String,String,List<Long>,String,Long) -> Unit,
     onCancel: (String,String) -> Unit
 ) {
     val isOpen=culture.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)
-    val choices=if(isOpen) listOf("Пересадка","Объединить","Потери","Происшествие","Исправить ошибку","Отменить действие","Ошибочная запись")
+    val choices=if(isOpen) (if(culture.quantityKind=="Не уточнено")listOf("Уточнить единицу учёта") else emptyList())+
+        listOf("Пересадка","Объединить","Потери","Происшествие","Исправить ошибку","Отменить действие","Ошибочная запись")
         else listOf("Отменить действие","Происшествие")
     var mode by remember(culture.id){ mutableStateOf(choices.first()) }
     var reason by remember(culture.id,mode){ mutableStateOf("") }
@@ -38,7 +41,9 @@ fun LabActionDialog(
     var resultQty by remember(culture.id,mode){ mutableStateOf("1") }
     var losses by remember(culture.id,mode){ mutableStateOf("0") }
     var nextStage by remember(culture.id,mode){ mutableStateOf(culture.stage) }
-    var batchId by remember(culture.id,mode){ mutableStateOf<Long?>(culture.batchId) }
+    var batchId by remember(culture.id,mode){ mutableStateOf<Long?>(null) }
+    var mergeRecipeId by remember(culture.id,mode){ mutableStateOf<Long?>(null) }
+    var confirmedKind by remember(culture.id,mode){ mutableStateOf("Экспланты") }
     var place by remember(culture.id,mode){ mutableStateOf(culture.location) }
     var lossReason by remember(culture.id,mode){ mutableStateOf("Заражение") }
     var newQuantity by remember(culture.id,mode){ mutableStateOf(culture.quantity.toString()) }
@@ -49,7 +54,8 @@ fun LabActionDialog(
     val daughtersUsed=remember(culture.id,mode){ mutableStateListOf(culture.quantity.toString()) }
     val daughtersProduced=remember(culture.id,mode){ mutableStateListOf(culture.quantity.toString()) }
     val daughtersStage=remember(culture.id,mode){ mutableStateListOf(culture.stage) }
-    val daughtersBatch=remember(culture.id,mode){ mutableStateListOf<Long?>(culture.batchId) }
+    val daughtersBatch=remember(culture.id,mode){ mutableStateListOf<Long?>(null) }
+    val daughtersRecipe=remember(culture.id,mode){ mutableStateListOf<Long?>(null) }
     val daughtersPlace=remember(culture.id,mode){ mutableStateListOf(culture.location) }
     val daughtersKind=remember(culture.id,mode){ mutableStateListOf(culture.quantityKind) }
     val extraIncident=remember(culture.id,mode){ mutableStateListOf<Long>() }
@@ -60,14 +66,23 @@ fun LabActionDialog(
         return requireNotNull(parser.parse(happenedText.trim())) { "Укажи дату как 10.11.2026 16:30" }.time
     }
     val availableBatches=batches.filter{it.status=="Готова"}
+    val availableRecipes=recipes.filter{it.status=="Утверждена" && (it.plantId==null || it.plantId==culture.plantId)}
     val validDate=runCatching{timestamp()}.getOrNull()
-    val requiresNote=mode in listOf("Потери","Происшествие","Исправить ошибку","Отменить действие","Ошибочная запись")
-    val needsAck=mode in listOf("Пересадка","Объединить","Потери","Происшествие","Отменить действие","Ошибочная запись")
+    val requiresNote=mode in listOf("Потери","Происшествие","Исправить ошибку","Отменить действие","Ошибочная запись","Уточнить единицу учёта")
+    val needsAck=mode in listOf("Пересадка","Объединить","Потери","Происшествие","Отменить действие","Ошибочная запись","Уточнить единицу учёта")
     AlertDialog(onDismissRequest=onClose,title={Column{Text("Что произошло?");Text(culture.plantName+" · "+culture.code,style=MaterialTheme.typography.bodySmall)}},
         text={Column(Modifier.fillMaxWidth().heightIn(max=570.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             PickOne("Действие",choices,mode,{mode=it})
             if(culture.quantityKind=="Не уточнено" && mode in listOf("Пересадка","Объединить","Потери","Исправить ошибку")) Text("Для изменения количества сначала необходимо подтвердить единицу учёта контейнера. Сейчас она неизвестна; операция заблокирована, чтобы не списать другой тип биоматериала.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             when(mode){
+                "Уточнить единицу учёта" -> {
+                    Text("Подтверди, в каких объектах ведётся операционный остаток. Старое число нельзя без проверки считать растениями, побегами или эксплантами.",
+                        style=MaterialTheme.typography.bodySmall)
+                    PickOne("Тип объектов",LabTerms.quantityKinds.drop(1),confirmedKind,{confirmedKind=it})
+                    Field("Проверенное количество",newQuantity,{newQuantity=it.filter(Char::isDigit)},numeric=true)
+                    Text("До сохранения: ${culture.quantity} (${culture.quantityKind}). После сохранения оба значения останутся в аудите.",
+                        style=MaterialTheme.typography.bodySmall)
+                }
                 "Пересадка" -> {
                     Text("Перенос материала в один или несколько новых контейнеров",fontWeight=FontWeight.Medium)
                     HelpIcon("Количество при пересадке","Из исходного контейнера вынимается указанное количество объектов. После деления может получиться больше побегов или растений. Оба числа сохраняются отдельно. Потери в процессе тоже учитываются.")
@@ -78,12 +93,13 @@ fun LabActionDialog(
                         Field("Взято из исходного",daughtersUsed[i],{daughtersUsed[i]=it.filter(Char::isDigit)},numeric=true)
                         Field("Получено пригодных",daughtersProduced[i],{daughtersProduced[i]=it.filter(Char::isDigit)},numeric=true)
                         PickOne("Следующий этап",LabTerms.stages,daughtersStage[i],{daughtersStage[i]=it})
+                        RecipeChoice(availableRecipes,daughtersRecipe[i],{daughtersRecipe[i]=it})
                         BatchChoice(availableBatches,daughtersBatch[i],{daughtersBatch[i]=it})
                         PickOne("Что считаем",LabTerms.quantityKinds,daughtersKind[i],{daughtersKind[i]=it})
                         Field("Место",daughtersPlace[i],{daughtersPlace[i]=it})
-                        if(daughtersUsed.size>1) TextButton(onClick={daughtersUsed.removeAt(i);daughtersProduced.removeAt(i);daughtersStage.removeAt(i);daughtersBatch.removeAt(i);daughtersPlace.removeAt(i);daughtersKind.removeAt(i)}){Text("Убрать этот контейнер")}
+                        if(daughtersUsed.size>1) TextButton(onClick={daughtersUsed.removeAt(i);daughtersProduced.removeAt(i);daughtersStage.removeAt(i);daughtersBatch.removeAt(i);daughtersRecipe.removeAt(i);daughtersPlace.removeAt(i);daughtersKind.removeAt(i)}){Text("Убрать этот контейнер")}
                     }
-                    if(daughtersUsed.size<25)OutlinedButton(onClick={daughtersUsed.add("1");daughtersProduced.add("1");daughtersStage.add(culture.stage);daughtersBatch.add(culture.batchId);daughtersPlace.add(culture.location);daughtersKind.add(culture.quantityKind)}){Text("+ Ещё контейнер")}
+                    if(daughtersUsed.size<25)OutlinedButton(onClick={daughtersUsed.add("1");daughtersProduced.add("1");daughtersStage.add(culture.stage);daughtersBatch.add(null);daughtersRecipe.add(null);daughtersPlace.add(culture.location);daughtersKind.add(culture.quantityKind)}){Text("+ Ещё контейнер")}
                     Field("Потери во время операции",losses,{losses=it.filter(Char::isDigit)},numeric=true)
                     val spent=daughtersUsed.sumOf{it.toIntOrNull()?.toLong()?:0L}+(losses.toLongOrNull()?:0L)
                     Text("Из ${culture.quantity} исходных объектов будет израсходовано $spent; останется ${culture.quantity-spent}.",color=if(spent>culture.quantity)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
@@ -104,6 +120,7 @@ fun LabActionDialog(
                     }
                     Field("Сколько получилось после объединения",resultQty,{resultQty=it.filter(Char::isDigit)},numeric=true)
                     PickOne("Следующий этап",LabTerms.stages,nextStage,{nextStage=it})
+                    RecipeChoice(availableRecipes,mergeRecipeId,{mergeRecipeId=it})
                     BatchChoice(availableBatches,batchId,{batchId=it})
                     Row{Checkbox(checked=acknowledged,onCheckedChange={acknowledged=it});Text("Я понимаю риск смешения происхождения",modifier=Modifier.padding(top=13.dp),style=MaterialTheme.typography.bodySmall)}
                 }
@@ -151,15 +168,25 @@ fun LabActionDialog(
             }
         }},confirmButton={TextButton(enabled=((mode !in listOf("Пересадка","Объединить","Потери","Исправить ошибку")) || culture.quantityKind!="Не уточнено")&&(!needsAck||acknowledged)&&(!requiresNote||reason.isNotBlank())&&(mode!="Происшествие"||incidentTitle.isNotBlank())&&(mode=="Отменить действие"||validDate!=null)&&(mode!="Отменить действие"||selectedOperation!=null),onClick={
             when(mode){
-                "Пересадка" -> onSplit(daughtersUsed.indices.map{i->TransferDestination(daughtersUsed[i].toIntOrNull()?:0,daughtersProduced[i].toIntOrNull()?:0,daughtersStage[i],daughtersBatch[i],daughtersPlace[i],daughtersKind[i])},losses.toIntOrNull()?:0,reason,requireNotNull(validDate))
-                "Объединить" -> onMerge(listOf(MergeInput(culture.id,sourceUsed.toIntOrNull()?:0))+additional.map{MergeInput(it.key,it.value.toIntOrNull()?:0)},resultQty.toIntOrNull()?:0,batchId,nextStage,reason,acknowledged,requireNotNull(validDate))
+                "Пересадка" -> onSplit(daughtersUsed.indices.map{i->TransferDestination(daughtersUsed[i].toIntOrNull()?:0,daughtersProduced[i].toIntOrNull()?:0,daughtersStage[i],daughtersBatch[i],daughtersPlace[i],daughtersKind[i],daughtersRecipe[i])},losses.toIntOrNull()?:0,reason,requireNotNull(validDate))
+                "Объединить" -> onMerge(listOf(MergeInput(culture.id,sourceUsed.toIntOrNull()?:0))+additional.map{MergeInput(it.key,it.value.toIntOrNull()?:0)},resultQty.toIntOrNull()?:0,batchId,nextStage,reason,acknowledged,requireNotNull(validDate),mergeRecipeId)
                 "Потери" -> onLoss(losses.toIntOrNull()?:0,lossReason,reason,requireNotNull(validDate))
                 "Исправить ошибку" -> onCorrection(newQuantity.toIntOrNull()?:0,reason,requireNotNull(validDate))
+                "Уточнить единицу учёта" -> onClarify(confirmedKind,newQuantity.toIntOrNull()?:0,reason,requireNotNull(validDate))
                 "Ошибочная запись" -> onVoid(reason,requireNotNull(validDate))
                 "Происшествие" -> onIncident(incidentTitle,reason,listOf(culture.id)+extraIncident,incidentAction,requireNotNull(validDate))
                 "Отменить действие" -> selectedOperation?.let{onCancel(it,reason)}
             }
         }){Text(if(mode=="Отменить действие")"Отменить операцию" else "Сохранить")}},dismissButton={TextButton(onClick=onClose){Text("Закрыть")}})
+}
+
+@Composable
+private fun RecipeChoice(approved:List<RecipeRecord>,value:Long?,set:(Long?)->Unit) {
+    val options=listOf("Наследовать рецептуру")+approved.map{"${it.name} · v${it.version}"}
+    PickOne("Версия рецептуры",options,
+        approved.firstOrNull{it.id==value}?.let{"${it.name} · v${it.version}"}?:"Наследовать рецептуру",
+        {label->set(approved.firstOrNull{"${it.name} · v${it.version}"==label}?.id)},
+        "Выбор рецептуры не требует партии приготовления. Если партия указана, она должна соответствовать выбранной версии.")
 }
 
 @Composable
