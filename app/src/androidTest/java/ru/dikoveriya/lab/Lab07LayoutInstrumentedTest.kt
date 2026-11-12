@@ -45,8 +45,8 @@ class Lab07LayoutInstrumentedTest {
             }
         }
         rule.onNodeWithText("Моя лаборатория").assertExists()
-        rule.onNodeWithText("In vitro").assertExists()
-        rule.onNodeWithText("Нужен контроль").assertExists()
+        rule.onNodeWithText("В пробирках").assertExists()
+        rule.onNodeWithText("Требуют внимания").assertExists()
         rule.onNodeWithText("Новый контейнер").assertExists().assertHasClickAction()
         rule.onNodeWithText("Сканировать",substring=true).assertExists()
     }
@@ -131,5 +131,36 @@ class Lab07LayoutInstrumentedTest {
         rule.onNodeWithText("Сохранить изменения").assertExists().assertIsEnabled().performClick()
         rule.runOnIdle {assertEquals(LabTerms.CONTROL,chosen)}
         rule.onNodeWithText("Действие").assertDoesNotExist()
+    }
+
+    @Test fun labDashboardAllFourStatusCardsOpenTheirOwnWorklists() {
+        var route by mutableStateOf("")
+        rule.setContent {
+            DikoveriyaTheme {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(16.dp)) {
+                    Lab07Dashboard(
+                        plants=emptyList(),cultures=emptyList(),tasks=emptyList(),
+                        onCollection={},onContainer={},onNewContainer={},
+                        onNewPlant={},onMediums={},onScan={},
+                        counts=Lab072Counts(tubes=140,attention=19,growing=32,tasksDue=7),
+                        onMetric={route=it}
+                    )
+                }
+            }
+        }
+        for((title,key) in listOf(
+            "В пробирках" to "vitro",
+            "Требуют внимания" to "attention",
+            "Растут" to "growth",
+            "Задачи" to "tasks"
+        )){
+            rule.onNodeWithText(title).assertExists().performClick()
+            rule.runOnIdle{assertEquals("Clicked wrong list: $title",key,route)}
+        }
+        rule.onNodeWithText("140").assertExists()
+        rule.onNodeWithText("19").assertExists()
+        rule.onNodeWithText("32").assertExists()
+        rule.onNodeWithText("7").assertExists()
     }
 }
