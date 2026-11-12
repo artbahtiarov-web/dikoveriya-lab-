@@ -87,3 +87,11 @@
 - **Remaining release checks:** `versionName` raised from `0.6.1-rc1` to `0.6.1` in a later commit; must reverify latest SHA's CI and, if merged, signed main release APK/certificate. Real-user v4–v8 ZIP archives and physical Android UX still not exercised; no claim that these were tested.
 - **Data-risk rule:** SQLite v8 migration is additive and old tables are preserved; old backups remain supported, but unknown real historical DB variants cannot be independently validated in this session. Only release if new PR CI is successful; record any residual limitation.
 - **Next:** check latest PR CI, selectively merge if safe, verify signed APK artifact and label accurately. Then Stage 2 navigation/UX; do not confuse 0.6.1 with 1.0.
+
+## 2026-11-12 09:01 UTC — контроль подписанного выпуска 0.6.1
+
+- **PR:** https://github.com/artbahtiarov-web/dikoveriya-lab-/pull/12 .
+- **Проверенный исходный кандидат:** `7d54253bf163ed4981e0823b3529f43ca30c9cba`, PR CI https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43186872048 **success**: 23 Python/SQLite tests, `:app:testDebugUnitTest`, `:app:assembleDebug`, artifact ID `13929246936`.
+- **В выпуск дополнительно внесено:** versionName `0.6.1`; исправление `.github/workflows/build-apk.yml`: удалён опасный шаг v0.5 ZIP patch/automated git commit/push; permissions снижены `contents: write` → `contents: read`. Подписанный APK теперь должен строиться строго из checkout текущего SHA `main`; постоянные подписывающие секреты, сертификат и его SHA-256 НЕ менялись.
+- **Ограничения проверки:** новый SHA после этих изменений должен получить свой зелёный PR CI, затем merge в `main` с проверкой фактического подписанного release workflow и наличия APK. Реальные пользовательские резервные копии и физический Android не доступны для тестирования; Python v7→v8 fixture не следует выдавать за реальную восстановленную копию пользователя.
+- **Следующий шаг:** проверить последний PR CI; при успехе и приемлемом риске объединить, затем проверить подписанную сборку и артефакт. При провале — логи и исправление в PR #12, без merge.
