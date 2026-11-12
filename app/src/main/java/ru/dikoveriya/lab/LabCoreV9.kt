@@ -127,5 +127,26 @@ internal object LabCoreV9 {
 
     fun validate(db: SQLiteDatabase) {
         LabCoreV8.validate(db)
+        // FK alone cannot ensure that a production group has a homogeneous origin.
+        // Reject malformed v9 backups rather than silently rewriting lineage.
+        db.rawQuery("""SELECT cg.culture_id FROM culture_groups cg
+            JOIN cultures c ON c.id=cg.culture_id
+            JOIN production_groups g ON g.id=cg.group_id
+            WHERE c.plant_id!=g.plant_id
+               OR IFNULL(c.mother_id,-1)!=IFNULL(g.mother_id,-1)
+            LIMIT 1""",null).use { c->
+            require(!c.moveToFirst()) {
+                "В группе смешаны разные сорта или маточники"
+            }
+        }
+        db.rawQuery("""SELECT child.id FROM storage_locations child
+            LEFT JOIN storage_locations parent ON parent.id=child.parent_id
+            WHERE (child.level='Помещение' AND child.parent_id IS NOT NULL)
+               OR (child.level='Стеллаж' AND (parent.id IS NULL OR parent.level!='Помещение'))
+               OR (child.level='Полка' AND (parent.id IS NULL OR parent.level!='Стеллаж'))
+               OR (child.level='Позиция' AND (parent.id IS NULL OR parent.level!='Полка'))
+            LIMIT 1""",null).use{c->
+            require(!c.moveToFirst()) { "Нарушена иерархия мест хранения" }
+        }
     }
 }
