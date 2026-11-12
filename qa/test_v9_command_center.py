@@ -175,7 +175,7 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn("task_history",ACT)
         self.assertIn("val beforeAudit=auditTop072(id)",ACT)
         self.assertIn("id>?",ACT)
-        self.assertIn("result",ACT.lower())
+        self.assertIn("fun LabDatabase.resolveCase072(",ACT)
 
     def test_task_filters_avoid_global_scans(self):
         self.assertIn("fun LabDatabase.taskCount072(",ACT)
