@@ -56,3 +56,13 @@
 - **Проверки:** добавлен `qa/test_unknown_kind_mutations.py` (проверяет охранные условия и состояние кнопки); в PR CI должны выполняться Python проверки, Android unit tests и assembleDebug. **Результаты нового CI пока не подтверждены; PR не объединять до зелёного CI.**
 - **Безопасность:** нет изменения SQLite v7, старых записей, подписывания, backup-формата. Риск: для исторических контейнеров с неизвестной единицей остаётся недоступна корректировка и списание — до разработки отдельного подтверждаемого и аудируемого сценария уточнения типа.
 - **Следующий шаг:** проверить PR CI, исправить ошибки, объединить только при успехе; затем реализовать безопасный выбор/уточнение `quantity_kind` с сохранением старого и нового значения в истории, не угадывая тип автоматически.
+
+
+## 2026-11-12 07:49 UTC — Stage 1, legacy batch edit consistency (PR pending)
+
+- **Base main:** `047b331633bf43e183fd5301671a4e57cc1aa135`. Latest signed release run [43170137934](https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43170137934) succeeded and published `dikoveriya-lab-signed-release`. No open PR before this change.
+- **Branch:** `fix/culture-batch-recipe-sync-20261112`; code commit `14c5d0401ec4fc2f089331b00cf78762513d2244`; test commit `43eb289da75879a5f7d7fc66f80b03e483067622`.
+- **Change:** the legacy `updateCulture` path previously changed `medium_batch_id` without changing `medium_recipe_id`, producing contradictory effective medium metadata. On selecting a different non-null batch, its recipe now updates the direct recipe in the same transaction and appends recipe history when the recipe changes. Clearing a batch deliberately preserves the direct recipe; existing records and SQLite v7 are untouched.
+- **Checks:** new `qa/test_batch_recipe_edit.py` source regression; PR CI must run Python checks, `:app:testDebugUnitTest`, and `:app:assembleDebug`. Local Android compilation and on-device tests not available. **Do not merge until CI success.**
+- **Risk:** legacy edit UI still offers batch rather than direct recipe; no Android instrumentation test of historical database migration. Future work should unify edit forms around recipe selection and explicit user confirmation of changes.
+- **Next:** inspect PR CI, fix errors in same PR; merge only after success and low-risk review, verify permanent signed release artifact. Then implement explicit historical quantity-kind clarification with an audit event.
