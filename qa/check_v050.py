@@ -23,8 +23,8 @@ gradle=read('app/build.gradle.kts')
 models=read('app/src/main/java/ru/dikoveriya/lab/LabModels.kt')
 
 checks={
- 'db v8': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 8)' in db,
- 'v8 backup': 'put("schema",8)' in db and 'root.getInt("schema") in 4..8' in backup,
+ 'db v9': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 9)' in db,
+ 'v9 backup': 'put("schema",9)' in db and 'root.getInt("schema") in 4..9' in backup,
  'migration': 'ALTER TABLE cultures ADD COLUMN medium_recipe_id' in db and 'ALTER TABLE recipe_parts ADD COLUMN sugar_g_l' in db,
  'snapshot/history': 'CREATE TABLE IF NOT EXISTS culture_recipe_history' in db,
  'measurements': 'CREATE TABLE IF NOT EXISTS culture_measurements' in db,
@@ -36,7 +36,7 @@ checks={
  'growth': 'Lab07GrowthScreen(' in read('app/src/main/java/ru/dikoveriya/lab/Lab07Screens.kt') and 'addGrowthSample(' in store,
  'plant results': 'plantResults()' in main and 'mediumResults()' in main,
  'approved design': 'DikoveriyaTheme' in main and 'Lab07Palette' in theme,
- 'single version': 'versionCode = 70100 +' in gradle,
+ 'single version': 'versionCode = 70200 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }
