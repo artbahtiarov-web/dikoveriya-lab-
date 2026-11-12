@@ -362,8 +362,15 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             require(r.status=="Утверждена") { "Для новой версии сначала утверди текущую" }
             val newVersion=(recipes().filter{it.family==r.family}.maxOfOrNull{it.version}?:0)+1
             val newId=insertOrThrow("recipes",null,cv("family" to r.family,"version" to newVersion,"name" to r.name,"purpose" to r.purpose,"plant_id" to r.plantId,"status" to "Черновик","notes" to r.notes,"created_at" to System.currentTimeMillis()))
+            val sugarAgar=rawQuery("SELECT id,sugar_g_l,agar_g_l FROM recipe_parts WHERE recipe_id=?",arrayOf(recipeId.toString())).use { cursor ->
+                buildMap<Long,Pair<Double?,Double?>> {
+                    while(cursor.moveToNext()) put(cursor.getLong(0),
+                        (if(cursor.isNull(1))null else cursor.getDouble(1)) to
+                        (if(cursor.isNull(2))null else cursor.getDouble(2)))
+                }
+            }
             recipeParts(recipeId).forEach { p ->
-                insertOrThrow("recipe_parts",null,cv("recipe_id" to newId,"name" to p.name,"per_l" to p.perLiter,"unit" to p.unit,"has_sugar" to p.includesSugar,"has_agar" to p.includesAgar,"stock_mg_ml" to p.stockMgPerMl))
+                insertOrThrow("recipe_parts",null,cv("recipe_id" to newId,"name" to p.name,"per_l" to p.perLiter,"unit" to p.unit,"has_sugar" to p.includesSugar,"has_agar" to p.includesAgar,"stock_mg_ml" to p.stockMgPerMl,"sugar_g_l" to sugarAgar[p.id]?.first,"agar_g_l" to sugarAgar[p.id]?.second))
             }
         }
     }
@@ -618,6 +625,29 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             event(this,child,"Происхождение","Объединены источники: ${sources.joinToString { it.code }}. Маркировка: $origin. $note",null,produced,batchId,group,occurredAt)
         }
     }
+    /**
+     * Explicitly resolve a historical ambiguous operational unit. A measured count is user-provided,
+     * not inferred from explants/shoots/plants. Both the old value and the confirmed value are audited.
+     */
+    fun clarifyQuantityUnit(cultureId: Long, kind: String, verifiedCount: Int, reason: String,
+                            occurredAt: Long = System.currentTimeMillis()) {
+        require(kind in LabTerms.quantityKinds && kind != "Не уточнено") { "Выбери экспланты, побеги или растения" }
+        require(verifiedCount in 1..1000000) { "Подтверди фактическое количество выбранных объектов" }
+        val explanation=checkText(reason,2000)
+        writableDatabase.tx {
+            val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
+            require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Контейнер закрыт" }
+            require(c.quantityKind=="Не уточнено") { "Единица учёта уже подтверждена; для исправлений используй отдельную операцию" }
+            require(occurredAt>=c.createdAt) { "Дата уточнения раньше создания контейнера" }
+            val group=newOperation(this,"Уточнение единицы учёта",explanation,occurredAt)
+            update("cultures",cv("quantity_kind" to kind,"quantity" to verifiedCount,
+                "updated_at" to System.currentTimeMillis()),"id=?",arrayOf(cultureId.toString()))
+            changeSnapshot(this,group,c.id,c,verifiedCount,c.status)
+            event(this,c.id,"Уточнение единицы","Было: ${c.quantity} (${c.quantityKind}); подтверждено: $verifiedCount ($kind). $explanation",
+                c.quantity,verifiedCount,c.batchId,group,occurredAt)
+        }
+    }
+
     fun recordLoss(cultureId: Long, count: Int, reason: String, notes: String, occurredAt: Long = System.currentTimeMillis()) {
         require(count>0) { "Укажи количество потерянных объектов" }
         val cause=checkText(reason,120)
@@ -762,6 +792,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val db=readableDatabase
         val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",8).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
+        // A consistent read snapshot prevents a backup that mixes partially completed operations.
+        db.beginTransactionNonExclusive()
+        try {
         BACKUP_ORDER.forEach{table->
             val arr=JSONArray()
             db.rawQuery("SELECT * FROM $table",null).use{c->
@@ -781,7 +814,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
             tables.put(table,arr)
         }
-        return root.put("tables",tables).toString(2)
+        val result=root.put("tables",tables).toString(2)
+        db.setTransactionSuccessful()
+        return result
+        } finally { db.endTransaction() }
     }
     /** Restore is all-or-nothing; not a merge. Caller must obtain explicit user confirmation. */
     fun importJson(payload: String) {
@@ -822,11 +858,17 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 execSQL("UPDATE cultures SET medium_recipe_id=(SELECT recipe_id FROM batches WHERE batches.id=cultures.medium_batch_id) WHERE medium_batch_id IS NOT NULL AND medium_recipe_id IS NULL")
                 execSQL("INSERT INTO culture_recipe_history(culture_id,recipe_id,applied_at,note) SELECT id,medium_recipe_id,created_at,'Перенесено из резервной копии' FROM cultures WHERE medium_recipe_id IS NOT NULL")
             }
+            if(fromVersion<8) {
+                delete("culture_audit",null,null)
+                // Older backups know only the final state. Do not fabricate a change history.
+                LabCoreV8.seedCurrentState(this,"Восстановлено из копии v$fromVersion")
+                execSQL("UPDATE culture_measurements SET record_kind='baseline' WHERE notes='Показатели при создании'")
+            }
             if(fromVersion==4) {
                 execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")
                 execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
             }
-            rawQuery("PRAGMA foreign_key_check",null).use{c->require(!c.moveToFirst()){"Повреждены связи резервной копии"}}
+            LabCoreV8.validate(this)
         }
     }
 }
