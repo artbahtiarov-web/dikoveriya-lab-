@@ -105,7 +105,8 @@ class SQLiteV8Tests(unittest.TestCase):
             with self.subTest(name=name):
                 block=DB.split("fun "+name+"(",1)[1].split("\n    fun ",1)[0]
                 self.assertIn("writableDatabase.tx {",block)
-        self.assertIn("newOperation(this,\"Смена среды\"",FLOW)
+        self.assertIn('insertOrThrow("lab_operations"',FLOW)
+        self.assertIn('"kind" to "Смена среды"',FLOW)
         self.assertIn('"medium_batch_id" to null',FLOW)
         self.assertIn('"event_group" to op',FLOW)
         self.assertIn("assignDaughterRecipe(this,child,source.recipeId,part.batchId,occurredAt,part.recipeId)",DB)
