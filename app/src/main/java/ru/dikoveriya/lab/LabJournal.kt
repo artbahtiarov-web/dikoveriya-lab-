@@ -93,6 +93,11 @@ data class CultureAuditEntry(
     val beforeLocation: String?, val afterLocation: String?
 ) {
     fun changes(): List<String> = buildList {
+        if(source=="Состояние до миграции" || source.startsWith("Восстановлено")) {
+            add("Зафиксировано имеющееся состояние без восстановления неизвестной предыстории")
+            add("Количество: ${afterQty ?: "не известно"} (${afterKind ?: "тип неизвестен"})")
+            add("Рецептура ID: ${afterRecipe ?: "не указана"}; партия ID: ${afterBatch ?: "не указана"}")
+        } else {
         fun <T> describe(label: String, before: T?, after: T?) {
             if (before!=after) add("$label: ${before ?: "не указано"} → ${after ?: "не указано"}")
         }
@@ -103,7 +108,8 @@ data class CultureAuditEntry(
         describe("Рецептура ID", beforeRecipe, afterRecipe)
         describe("Этап", beforeStage, afterStage)
         describe("Место", beforeLocation, afterLocation)
-        if(isEmpty()) add("Подтверждено исходное состояние на момент миграции или восстановления")
+        if(isEmpty()) add("Изменения не обнаружены")
+        }
     }
 }
 
