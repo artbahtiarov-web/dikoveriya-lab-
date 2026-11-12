@@ -595,6 +595,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         writableDatabase.tx {
             val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
             require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Контейнер уже закрыт" }
+            require(c.quantityKind != "Не уточнено") { "Сначала уточни тип учёта контейнера: экспланты, побеги или растения. Количество нельзя менять без известной единицы" }
             require(occurredAt>=c.createdAt) { "Дата потерь раньше создания контейнера" }
             val rest=LabOperationRules.remainingAfterLoss(c.quantity,count)
             val group=newOperation(this,"Потери", "$cause. $explanation",occurredAt)
@@ -609,6 +610,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         writableDatabase.tx {
             val c=cultures().firstOrNull{it.id==cultureId}?:error("Контейнер не найден")
             require(c.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Закрытый контейнер нельзя изменить напрямую; проверь возможность отмены операции" }
+            require(c.quantityKind != "Не уточнено") { "Сначала уточни тип учёта контейнера: экспланты, побеги или растения. Количество нельзя менять без известной единицы" }
             require(quantity!=c.quantity) { "Количество не изменилось" }
             require(occurredAt>=c.createdAt) { "Дата исправления раньше создания контейнера" }
             val group=newOperation(this,"Исправление учёта",reason,occurredAt)
