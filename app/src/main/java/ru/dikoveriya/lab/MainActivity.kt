@@ -64,6 +64,7 @@ fun DikoveriyaApp() {
     var labelCultureId by remember { mutableStateOf<Long?>(null) }
     var legacyAssessmentId by remember { mutableStateOf<Long?>(null) }
     var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
+    var labelsForExport by remember { mutableStateOf(emptyList<Long>()) }
     var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
     var actionPreferredMode by rememberSaveable { mutableStateOf("") }
@@ -133,6 +134,33 @@ fun DikoveriyaApp() {
                 ?:throw IllegalStateException("Нет доступа к файлу") }
         }
         labelForExport=null
+    }
+    val exportLabelsZip=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")){uri->
+        val ids=labelsForExport
+        if(uri!=null && ids.isNotEmpty()){
+            act {
+                require(ids.size<=200 && ids.distinct().size==ids.size){
+                    "Можно сохранить до 200 разных этикеток за раз"
+                }
+                val output=context.contentResolver.openOutputStream(uri)
+                    ?:error("Файл недоступен")
+                java.util.zip.ZipOutputStream(output).use{zip->
+                    ids.forEach{id->
+                        val c=db.cultureById(id) ?:error("Контейнер не найден")
+                        val medium=db.currentMedium(id)
+                        val info=medium?.let{it.name+" · v"+it.version}.orEmpty()
+                        val spec=LabLabelSpec(c.code,c.plantName,c.passage,info,
+                            showMedium=true,dpi=203)
+                        val safeCode=c.code.replace(Regex("[^A-Za-z0-9_-]"),"_")
+                        zip.putNextEntry(java.util.zip.ZipEntry("$safeCode-40x12.png"))
+                        zip.write(LabLabel40.png(spec))
+                        zip.closeEntry()
+                    }
+                }
+            }
+        }
+        labelsForExport=emptyList()
     }
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
         if(result.contents!=null) {
@@ -214,6 +242,10 @@ fun DikoveriyaApp() {
                         onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
                         onChanged={refresh++},
                         onError={error=it},
+                        onExportLabels={ids->
+                            labelsForExport=ids
+                            exportLabelsZip.launch("dikoveriya-etiketki-40x12.zip")
+                        },
                         modifier=Modifier.fillMaxSize().padding(padding)
                     )
                 }
