@@ -18,6 +18,7 @@ internal object LabCoreV9 {
         db.execSQL("""CREATE TABLE IF NOT EXISTS production_groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
             plant_id INTEGER NOT NULL REFERENCES plants(id),
             mother_id INTEGER REFERENCES mother_plants(id),
             note TEXT NOT NULL DEFAULT '',
