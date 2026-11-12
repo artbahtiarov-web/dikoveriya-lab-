@@ -47,8 +47,8 @@ fun DikoveriyaApp() {
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
         "collection","variety"->"Коллекция"
-        "container","growth","medium","operations","history"->"Работа"
-        else->tab
+        "container","growth","medium","operations","history"->"Коллекция"
+        else->if(tab=="Аналитика")"Ещё" else tab
     }
     fun openRoute(next:String) {
         // The Collection tab itself is already a level: do not insert it twice.
@@ -58,25 +58,24 @@ fun DikoveriyaApp() {
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var cultureId by remember { mutableStateOf<Long?>(null) }
+    var photoCultureId by remember { mutableStateOf<Long?>(null) }
+    var saleCultureId by remember { mutableStateOf<Long?>(null) }
+    var labelCultureId by remember { mutableStateOf<Long?>(null) }
+    var legacyAssessmentId by remember { mutableStateOf<Long?>(null) }
+    var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
+    var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
     var actionPreferredMode by rememberSaveable { mutableStateOf("") }
     var recipeId by remember { mutableStateOf<Long?>(null) }
     var advancedRecipeId by remember { mutableStateOf<Long?>(null) }
     var preselectedRecipeId by remember { mutableStateOf<Long?>(null) }
-    var performanceCultureId by remember { mutableStateOf<Long?>(null) }
     var batchId by remember { mutableStateOf<Long?>(null) }
     var materialId by remember { mutableStateOf<Long?>(null) }
     var experimentId by remember { mutableStateOf<Long?>(null) }
-    var qrCode by remember { mutableStateOf<String?>(null) }
     var pendingPhotoId by remember { mutableStateOf<Long?>(null) }
     var pendingPhotoNote by remember { mutableStateOf("") }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var search by rememberSaveable { mutableStateOf("") }
-    var statusFilter by rememberSaveable { mutableStateOf("Все") }
-    var showIngredients by remember { mutableStateOf(false) }
-    var plantRecipeFilter by rememberSaveable { mutableStateOf("Все растения") }
-    var purposeRecipeFilter by rememberSaveable { mutableStateOf("Любое назначение") }
     var lastExitRequest by remember { mutableLongStateOf(0L) }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
@@ -118,21 +117,27 @@ fun DikoveriyaApp() {
         pendingPhotoId=null
         pendingPhotoNote=""
     }
-    val saveQr=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")){uri->
-        val code=qrCode
-        if(uri!=null && code!=null) act { context.contentResolver.openOutputStream(uri)?.use{it.write(LabQr.png(code))}?:throw IllegalStateException("Нет доступа к файлу") }
-        qrCode=null
+    val saveLabel=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/png")){uri->
+        val spec=labelForExport
+        if(uri!=null && spec!=null) {
+            act { context.contentResolver.openOutputStream(uri)?.use{it.write(LabLabel40.png(spec))}
+                ?:throw IllegalStateException("Нет доступа к файлу") }
+        }
+        labelForExport=null
     }
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
         if(result.contents!=null) {
             val code=LabQr.getCode(result.contents)
             val c=cultures.firstOrNull{it.code==code}
-            if(c!=null) { tab="Работа";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(c.id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
+            if(c!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(c.id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
         }
     }
     val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
-    val openSection: (String)->Unit = {if(tab!="Ещё")tabHistory=tabHistory+tab;tab="Ещё";routeStack=emptyList();subsection=it}
-    val openCulture: (Long)->Unit = {openRoute(Lab07Navigation.container(it))}
+    val openSection: (String)->Unit = {section->
+        val target=when(section){"Питательные среды"->"Среды";"Аналитика"->"Аналитика";else->"Ещё"}
+        if(tab!=target)tabHistory=tabHistory+tab
+        tab=target;routeStack=emptyList();subsection=if(target=="Ещё")section else ""
+    }
     // A single back policy is shared by toolbar and Android gestures.
     fun goBack() {
         when {
@@ -147,16 +152,16 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && actionCultureId==null &&
-        recipeId==null && advancedRecipeId==null && performanceCultureId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && actionCultureId==null &&
+        recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
 
     DikoveriyaTheme {
         Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
             NavigationBar(containerColor=Lab07Palette.DeepForest,tonalElevation=0.dp) {
-                listOf("Главная","Коллекция","Работа","Аналитика","Ещё").forEachIndexed{index, name->
-                    val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;3->Icons.Outlined.BarChart;else->Icons.Outlined.Menu}
+                listOf("Главная","Коллекция","Среды","Ещё").forEachIndexed{index, name->
+                    val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;else->Icons.Outlined.Menu}
                     NavigationBarItem(
                         selected=activeNavigationTab==name,
                         onClick={
@@ -164,7 +169,7 @@ fun DikoveriyaApp() {
                             tab=name;subsection="";routeStack=emptyList()
                         },
                         icon={Icon(icon,contentDescription=null)},
-                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Сорта";"Работа"->"Учёт";"Аналитика"->"Итоги";else->name},maxLines=1)},
+                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Коллекция";else->name},maxLines=1)},
                         colors=NavigationBarItemDefaults.colors(
                             selectedIconColor=Lab07Palette.Brass,
                             selectedTextColor=Lab07Palette.Champagne,
@@ -183,12 +188,32 @@ fun DikoveriyaApp() {
                         plants=plants,cultures=cultures,recipes=recipes,
                         onBack={goBack()},
                         onNavigate={openRoute(it)},
-                        onNewContainer={dialog="newCulture"},
+                        onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
                         onEdit={cultureId=it},
+                        onLabel={labelCultureId=it},
+                        onPhotos={photoCultureId=it},
+                        onSale={saleCultureId=it},
+                        onLegacyAssessment={legacyAssessmentId=it},
                         onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
                         onChanged={refresh++},
                         onError={error=it},
+                        modifier=Modifier.fillMaxSize().padding(padding)
+                    )
+                }
+            } else if(tab=="Среды") {
+                stateHolder.SaveableStateProvider("medium-catalog") {
+                    Lab071MediumCatalog(
+                        plants=plants,recipes=recipes,batches=batches,
+                        ingredients=ingredients,revision=refresh,
+                        onCreate={dialog="newRecipe"},
+                        onRecipe={recipeId=it},
+                        onNewBatch={dialog="prepareBatch"},
+                        onBatch={batchId=it},
+                        onAddIngredient={dialog="newIngredient"},
+                        onIngredient={dialog="ingredientInfo:$it"},
+                        onImport={importRecipes.launch(arrayOf("text/csv","text/plain","application/octet-stream"))},
+                        onExport={exportRecipes.launch("dikoveriya-recipes.csv")},
                         modifier=Modifier.fillMaxSize().padding(padding)
                     )
                 }
@@ -214,40 +239,12 @@ fun DikoveriyaApp() {
                                 plants,cultures,tasks,
                                 onCollection={openRoute(Lab07Navigation.COLLECTION)},
                                 onContainer={openRoute(Lab07Navigation.container(it))},
-                                onNewContainer={dialog="newCulture"},
+                                onNewContainer={preselectedPlantId=null;dialog="newCulture"},
                                 onNewPlant={dialog="addPlant"},
                                 onMediums={openSection("Питательные среды")},
                                 onScan=scan
                             )
                         }
-                    }
-                    "Растения" -> {
-                        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                            Button(onClick={dialog="addPlant"}){Text("+ Растение")}
-                            OutlinedButton(onClick={dialog="addMother"}){Text("+ Маточник")}
-                        } }
-                        item { SectionTitle("Каталог · ${plants.size}") }
-                        items(plants,key={"plant-${it.id}"}){p->SmallCard(p.name,p.description.ifEmpty{"В каталоге"}){dialog="plantInfo:${p.id}"}}
-                        item { SectionTitle("Маточные растения · ${mothers.size}") }
-                        items(mothers,key={"mother-${it.id}"}){m->SmallCard(m.plantName,"${m.code} · ${m.origin} · ${m.status}"){dialog="motherInfo:${m.id}"}}
-                    }
-                    "Работа" -> {
-                        item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                            Button(onClick={dialog="newCulture"}){Text("+ Контейнер")}
-                            OutlinedButton(onClick={openSection("Задачи")}){Text("Задачи")}
-                        } }
-                        item { Field("Поиск по названию, номеру, месту",search,{search=it}) }
-                        item { PickOne("Показать",listOf("Все","Активные","На контроле","Архив"),statusFilter,{statusFilter=it}) }
-                        val filtered=cultures.filter{c->
-                            (search.isBlank()||listOf(c.code,c.plantName,c.location).any{it.contains(search,true)}) && when(statusFilter){
-                                "Активные"->c.status==LabTerms.IN_CULTURE
-                                "На контроле"->c.status==LabTerms.CONTROL||c.status==LabTerms.QUARANTINE
-                                "Архив"->c.status in listOf(LabTerms.DISPOSED,LabTerms.TRANSFERRED,LabTerms.SOLD)
-                                else->true
-                            }
-                        }
-                        item { Text("Найдено: ${filtered.size}",color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                        items(filtered,key={"work-${it.id}"}){c->CultureCard(c){openCulture(c.id)}}
                     }
                     "Аналитика" -> {
                         item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
@@ -255,64 +252,41 @@ fun DikoveriyaApp() {
                         item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
                         item { SectionTitle("Результаты по сортам") }
                         items(cultivarResults,key={"results-${it.plantId}"}) { r ->
-                            SmallCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}") {}
+                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}")
                         }
                         item { SectionTitle("Рост по рецептурам") }
                         item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
                         items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
-                            SmallCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}") {}
+                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
                         }
-                        item { SectionTitle("Эффективность питательных сред (прежний журнал)") }
+                        item { SectionTitle("Архивные наблюдения по партиям") }
                         item { Text("Только по зарегистрированным измерениям. Без повторностей сравнение предварительное.",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall) }
                         if(metrics.isEmpty()) item { Text("Нет измерений из прежнего журнала партий. Новый журнал находится в карточке контейнера → Рост и результаты.") }
                         items(metrics,key={"metric-${it.recipe}"}){m->
-                            val ratio=if(m.input>0)m.healthy.toDouble()/m.input else null
-                            SmallCard(m.recipe,"Наблюдений: ${m.count} · выход: ${ratio?.let{RecipeCalculator.formatAmount(it)}?:"—"}× · отмечено заражений: ${m.infected} · средний срок: ${RecipeCalculator.formatAmount(m.averageDays)} дн.") {}
+                            Lab07ReadOnlyCard(m.recipe,"Осмотров: ${m.count} · исходных объектов: ${m.input} · архивная категория «здоровых»: ${m.healthy} · заражённых: ${m.infected}. Без коэффициента размножения: тип материала не подтверждён.")
                         }
                         item { SectionTitle("По сортам") }
                         items(plants,key={"stat-${it.id}"}){p->
                             val subset=cultures.filter{it.plantId==p.id}
-                            SmallCard(p.name,"Контейнеров: ${subset.size}; живых объектов в активных: ${subset.filter{it.status==LabTerms.IN_CULTURE}.sumOf{it.quantity}}"){}
+                            Lab07ReadOnlyCard(p.name,"Контейнеров: ${subset.size}. Остатки в разных единицах нельзя складывать; смотри каждый контейнер.")
                         }
                         item { Text("Показатели по рецептам не являются доказательством причинно-следственной связи: нужен сопоставимый опыт.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
-                            items(listOf("Питательные среды","Задачи","Склад","Оборудование","Инциденты","Эксперименты","Продажи","Резервные копии","О программе")){label->
+                            items(listOf("Аналитика","Маточники","Задачи","Склад","Оборудование","Инциденты","Эксперименты","Продажи","Резервные копии","О программе")){label->
                                 TextEntryRow(label){openSection(label)}
                                 HorizontalDivider()
                             }
                         } else {
                             item{TextButton(onClick={subsection=""}){Text("‹ Ко всем разделам")}}
                             when(subsection){
-                                "Питательные среды" -> {
-                                    item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                        Button(onClick={dialog="newRecipe"}){Text("+ Новая среда")}
-                                        OutlinedButton(onClick={dialog="batchChooser"}){Text("Учесть партию (необязательно)")}
-                                    } }
-                                    item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                        OutlinedButton(onClick={importRecipes.launch(arrayOf("text/csv","text/plain","application/octet-stream"))}){Text("Импорт CSV")}
-                                        OutlinedButton(onClick={exportRecipes.launch("dikoveriya-recipes.csv")}){Text("Экспорт CSV")}
-                                    } }
-                                    item { Text("CSV можно редактировать в Excel или Google Sheets. После импорта создаётся новая версия-черновик; старые приготовления не изменяются. Автоматическое подключение Google пока не настроено.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                                    item { OutlinedButton(onClick={showIngredients=!showIngredients}) { Text(if(showIngredients) "Скрыть компоненты" else "Компоненты среды · ${ingredients.size}") } }
-                                    if(showIngredients) item { OutlinedButton(onClick={dialog="newIngredient"}) { Text("+ Добавить компонент") } }
-                                    if(showIngredients && ingredients.isEmpty()) item { Text("Компонентов пока нет") }
-                                    if(showIngredients) items(ingredients,key={"ingredient-${it.id}"}) { ing ->
-                                        SmallCard(ing.name,"${ing.category} · ${ing.unit}") { dialog="ingredientInfo:${ing.id}" }
+                                "Маточники" -> {
+                                    item{Button(onClick={dialog="addMother"}){Text("Добавить маточное растение")}}
+                                    if(mothers.isEmpty())item{Text("Маточников пока нет.")}
+                                    items(mothers,key={"mother-${it.id}"}){m->
+                                        SmallCard(m.plantName,"${m.code} · ${m.origin} · ${m.status}"){dialog="motherInfo:${m.id}"}
                                     }
-                                    item { SectionTitle("Готовые питательные среды") }
-                                    item { PickOne("Растение",listOf("Все растения")+plants.map{it.name},plantRecipeFilter,{plantRecipeFilter=it}) }
-                                    item { PickOne("Назначение",listOf("Любое назначение")+LabTerms.purposes,purposeRecipeFilter,{purposeRecipeFilter=it}) }
-                                    items(recipes.filter { r ->
-                                        (plantRecipeFilter=="Все растения" || r.plantId==null || plants.firstOrNull{it.id==r.plantId}?.name==plantRecipeFilter) &&
-                                        (purposeRecipeFilter=="Любое назначение" || r.purpose==purposeRecipeFilter)
-                                    },key={"recipe-${it.id}"}) { r ->
-                                        val plantName=plants.firstOrNull{it.id==r.plantId}?.name?:"Для любых растений"
-                                        SmallCard(r.name,"$plantName · ${r.purpose} · версия ${r.version} · ${r.status}"){recipeId=r.id}
-                                    }
-                                    item { SectionTitle("Партии приготовлений") }
-                                    items(batches,key={"batch-${it.id}"}){b->SmallCard(b.code,"${b.recipeName} · ${b.volumeMl} мл · ${b.status} · ${formatDate(b.preparedAt)}"){batchId=b.id}}
                                 }
                                 "Задачи" -> {
                                     item{Button(onClick={dialog="newTask"}){Text("+ Задача")}}
@@ -342,7 +316,7 @@ fun DikoveriyaApp() {
                                 }
                                 "Продажи" -> {
                                     item{Text("Продажа оформляется из карточки растения на адаптации, доращивании или готового к продаже.")}
-                                    items(sales,key={"sale-${it.id}"}){s->SmallCard(s.cultureCode,"${s.quantity} шт. · ${money(s.price)} · ${formatDate(s.time)}") {}}
+                                    items(sales,key={"sale-${it.id}"}){s->Lab07ReadOnlyCard(s.cultureCode,"${s.quantity} шт. · ${money(s.price)} · ${formatDate(s.time)}")}
                                 }
                                 "Резервные копии" -> {
                                     item{Text("Резервная копия ZIP содержит всю локальную базу и оригиналы фотографий. Храни её отдельно от телефона.")}
@@ -351,7 +325,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.7.0 · локальная база SQLite v8. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.7.1 · локальная база SQLite v8. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -365,14 +339,15 @@ fun DikoveriyaApp() {
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
-                "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,onClose={dialog="";preselectedRecipeId=null},
-                    onSaved={id->dialog="";preselectedRecipeId=null;refresh++;openRoute(Lab07Navigation.container(id))},onChanged={refresh++})
+                "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,preselectedPlantId,onClose={dialog="";preselectedRecipeId=null;preselectedPlantId=null},
+                    onSaved={id->dialog="";preselectedRecipeId=null;preselectedPlantId=null;refresh++;openRoute(Lab07Navigation.container(id))},onChanged={refresh++})
                 "newIngredient" -> AddIngredientDialog(onClose={dialog=""},onSave={name,category,unit,notes->
                     if(act{db.addIngredient(name,category,unit,notes)})dialog=""
                 })
                 "newRecipe" -> QuickMediumDialog(db,onClose={dialog=""},onSaved={id->dialog="";refresh++;recipeId=id},
                     onUseExisting={id->dialog="";recipeId=id})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
+                "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
                 "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c->if(act{db.addMaterial(n,u,q,m,c)})dialog=""})
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
@@ -403,16 +378,44 @@ fun DikoveriyaApp() {
                 if(i!=null && i.status=="Аннулирован") DialogForm(i.title,close={dialog=""}){Text("Происшествие аннулировано. История сохранена. "+i.note)}
                 else if(i!=null) IncidentReviewDialog(i,db.incidentCultures(i.id),db.incidentFollowups(i.id),onClose={dialog=""},onSave={status,note->if(act{db.updateIncident(i.id,status,note)})dialog=""})
             }
-            cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                CultureDialog(c,db.events(id),db.auditTrail(id),db.photos(id),context.filesDir,db.ancestors(id),batches,recipes,db.confirmedLosses(id),onClose={cultureId=null},
-                    onChange={q,st,loc,b,n,recipe->if(act{db.updateCulture(id,q,st,loc,b,n,recipe,true)})cultureId=null},
-                    onObserve={n,start,healthy,infected,days->if(act{db.addObservation(id,n,start,healthy,infected,days)})cultureId=null},
-                    onGrowth={performanceCultureId=id;cultureId=null},
-                    onOperations={actionCultureId=id;cultureId=null},
-                    onSale={q,total,n->if(act{db.sale(id,q,total,n)})cultureId=null},
-                    onQr={qrCode=c.code;saveQr.launch("${c.code}.png")},
-                    onPhoto={note->pendingPhotoId=c.id;pendingPhotoNote=note;selectPhoto.launch("image/*")}
-                )
+            cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                val medium=recipes.firstOrNull{it.id==culture.recipeId}
+                Lab071PassportDialog(culture,medium?.let{"${it.name} v${it.version}"},
+                    onClose={cultureId=null},
+                    onSave={status,location,reason->
+                        if(act{db.updateCulture(id,culture.quantity,status,location,culture.batchId,reason,
+                            culture.recipeId,true)})cultureId=null
+                    })
+            }}
+            saleCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                Lab071SaleDialog(culture,onClose={saleCultureId=null},
+                    onSave={qty,total,note->
+                        if(act{db.sale(id,qty,total,note)})saleCultureId=null
+                    })
+            }}
+            photoCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                Lab071PhotosDialog(culture,db.photos(id),context.filesDir,
+                    onClose={photoCultureId=null},
+                    onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")})
+            }}
+            labelCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                val medium=recipes.firstOrNull{it.id==culture.recipeId}
+                Lab071LabelDialog(culture,medium?.let{"${it.name} v${it.version}"},
+                    onClose={labelCultureId=null},
+                    onExport={spec->
+                        labelForExport=spec
+                        saveLabel.launch("dikoveriya-${spec.code}-40x12.png")
+                    },
+                    onShare={spec->
+                        try{LabLabel40.share(context,spec)}
+                        catch(e:Exception){error=e.message?:"Не удалось передать этикетку"}
+                    })
+            }}
+            legacyAssessmentId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                Lab071LegacyAssessmentDialog(culture,onClose={legacyAssessmentId=null},
+                    onSave={note,start,healthy,infected,days->
+                        if(act{db.addObservation(id,note,start,healthy,infected,days)})legacyAssessmentId=null
+                    })
             }}
             actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
                 stateHolder.SaveableStateProvider("action:$id:$actionPreferredMode") {
@@ -442,9 +445,6 @@ fun DikoveriyaApp() {
                     onPrepare={volume,ph,sterilization,note,actual->if(act{db.prepareBatch(id,volume,ph,sterilization,note,actual)})advancedRecipeId=null}
                 )
             }}
-            performanceCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                GrowthDialog(db,c,onClose={performanceCultureId=null},onChanged={refresh++})
-            }}
             batchId?.let{id->batches.firstOrNull{it.id==id}?.let{b->
                 BatchDialog(b,db.batchSnapshot(id),onClose={batchId=null},onReject={reason->if(act{db.rejectBatch(id,reason)})batchId=null})
             }}
@@ -462,16 +462,3 @@ fun DikoveriyaApp() {
     }
 }
 
-@Composable
-private fun InfoCard(label:String,value:String,modifier:Modifier=Modifier){
-    Card(modifier=modifier,shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-        colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-        Text(value,style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-        Text(label,style=MaterialTheme.typography.bodySmall)
-    }}
-}
-@Composable
-private fun CultureCard(c:CultureRecord,onClick:()->Unit){
-    SmallCard(c.plantName,"${c.code} · ${c.status} · ${c.stage} · ${c.quantity} · ${c.quantityKind}${if(c.location.isNotBlank())" · ${c.location}" else ""}",onClick)
-}

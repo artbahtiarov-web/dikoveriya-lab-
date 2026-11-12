@@ -86,4 +86,50 @@ class Lab07LayoutInstrumentedTest {
             rule.runOnIdle { assertEquals(title,chosen) }
         }
     }
+
+    @Test fun labelDialogHasReadable40x12PreviewAndTwoWorkingActions() {
+        val c=CultureRecord(id=13,code="LAB-000013",plantId=1,
+            plantName="Alocasia Black Velvet Aurea variegata",
+            quantity=10,status=LabTerms.IN_CULTURE,passage=2,stage=LabTerms.IN_VITRO,
+            location="Rack 1",batchId=null,motherId=null,createdAt=1000L,
+            notes="",quantityKind="Побеги")
+        var export:LabLabelSpec?=null
+        var shared:LabLabelSpec?=null
+        rule.setContent {
+            DikoveriyaTheme {
+                Lab071LabelDialog(c,"MS v2",onClose={},
+                    onExport={export=it},onShare={shared=it})
+            }
+        }
+        rule.onNodeWithText("Этикетка · 40 × 12 мм").assertExists()
+        rule.onNodeWithText("Сохранить PNG 40×12").assertExists()
+            .assertHasClickAction().performClick()
+        rule.runOnIdle {
+            assertEquals("LAB-000013",export?.code)
+            assertEquals(203,export?.dpi)
+        }
+        rule.onNodeWithText("Передать в NIIMBOT / другое приложение")
+            .assertExists().assertHasClickAction().performClick()
+        rule.runOnIdle {assertEquals("LAB-000013",shared?.code)}
+    }
+
+    @Test fun passportEditingHasNoUndiscoverableActionSelector() {
+        val c=CultureRecord(id=14,code="LAB-000014",plantId=1,
+            plantName="Monstera Burle Marx Flame",
+            quantity=12,status=LabTerms.IN_CULTURE,passage=1,stage=LabTerms.ADAPTATION,
+            location="Shelf 2",batchId=null,motherId=null,createdAt=1000L,
+            notes="",quantityKind="Растения")
+        var chosen:String?=null
+        rule.setContent {
+            DikoveriyaTheme {
+                Lab071PassportDialog(c,"MS · v2",onClose={},
+                    onSave={status,_,_->chosen=status})
+            }
+        }
+        rule.onNodeWithText("Паспорт контейнера").assertExists()
+        rule.onNodeWithText("На контроле").assertExists().performClick()
+        rule.onNodeWithText("Сохранить изменения").assertExists().assertIsEnabled().performClick()
+        rule.runOnIdle {assertEquals(LabTerms.CONTROL,chosen)}
+        rule.onNodeWithText("Действие").assertDoesNotExist()
+    }
 }

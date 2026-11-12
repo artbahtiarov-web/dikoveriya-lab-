@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +47,12 @@ fun money(amount: Double): String = String.format(Locale("ru"),"%,.2f ₽",amoun
         if(help!=null) HelpIcon(label,help)
     }
     Box {
-        OutlinedButton(onClick={expanded=true},modifier=Modifier.fillMaxWidth()) { Text(selected.ifEmpty{"Выбрать"},maxLines=1) }
+        OutlinedButton(onClick={expanded=true},
+            modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+            Text(selected.ifEmpty{"Выбрать"},modifier=Modifier.weight(1f),maxLines=2)
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Outlined.ExpandMore,contentDescription="Открыть выбор: $label")
+        }
         DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
             values.forEach{v->DropdownMenuItem(text={Text(v)},onClick={change(v);expanded=false})}
         }
