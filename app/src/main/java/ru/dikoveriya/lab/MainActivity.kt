@@ -415,7 +415,7 @@ fun DikoveriyaApp() {
                 )
             }}
             actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                stateHolder.SaveableStateProvider("action:$id") {
+                stateHolder.SaveableStateProvider("action:$id:$actionPreferredMode") {
                 LabActionDialog(c,cultures,batches,recipes,db.operationsForCulture(id),onClose={actionCultureId=null},initialMode=actionPreferredMode,
                     onSplit={parts,lost,note,date->if(act{db.splitCulture(id,parts,lost,note,date)})actionCultureId=null},
                     onMerge={parts,out,b,stage,note,confirm,date,recipe->if(act{db.mergeCultures(parts,out,b,stage,note,confirm,date,recipe)})actionCultureId=null},
