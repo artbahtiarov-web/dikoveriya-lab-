@@ -533,6 +533,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         writableDatabase.tx {
             val source=cultures().firstOrNull{it.id==sourceId}?:error("Исходный контейнер не найден")
             require(source.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)) { "Нельзя пересаживать закрытый контейнер" }
+            require(source.quantityKind != "Не уточнено") { "Тип исходных объектов не указан. Пересадка по общему количеству небезопасна: уточни тип учёта контейнера" }
             require(occurredAt>=source.createdAt) { "Дата пересадки раньше создания исходного контейнера" }
             val rest=LabOperationRules.remainingAfterSplit(source.quantity,destinations.map{it.used},destinations.map{it.produced},lost)
             destinations.forEach{verifyBatch(it.batchId)}
@@ -563,6 +564,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
             require(sources.map{it.plantId}.distinct().size==1) { "Нельзя объединять разные виды или сорта растений в одну линию" }
             require(sources.map{it.quantityKind}.distinct().size==1) { "Для объединения источников приведи учёт к одной категории: экспланты, побеги или растения" }
+            require(sources.all{it.quantityKind != "Не уточнено"}) { "Нельзя объединять контейнеры с неизвестным типом объектов. Сначала уточни учёт каждого источника" }
             require(occurredAt>=sources.maxOf{it.createdAt}) { "Дата объединения раньше даты создания одного из источников" }
             val remains=LabOperationRules.remainingAfterMerge(sources.map{it.quantity},inputs.map{it.used},produced)
             verifyBatch(batchId)
