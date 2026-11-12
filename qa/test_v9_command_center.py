@@ -115,13 +115,13 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn('if (oldVersion < 9) LabCoreV9.create(db)',DB)
         self.assertIn('LabCoreV9.validate(this)',DB)
 
-    def test_10k_paged_sql_and_indexes(self):
+    def test_20k_paged_sql_and_indexes(self):
         db=fixture()
         upgrade(db)
         db.executemany("""INSERT INTO cultures VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
             [(i,"LAB-%06d"%i,1,None,12,"Побеги","В культуре",
               "В пробирке" if i%3 else "Адаптация",i*10,i*10,"Стеллаж А",None)
-             for i in range(2,10002)])
+             for i in range(2,20002)])
         db.commit()
         started=time.perf_counter()
         count=db.execute("""SELECT COUNT(*) FROM cultures
@@ -130,7 +130,7 @@ class LabV9Migration(unittest.TestCase):
             WHERE stage='В пробирке' AND status IN ('В культуре','На контроле','Карантин')
             ORDER BY created_at DESC,id DESC LIMIT 40 OFFSET 0""").fetchall()
         elapsed=time.perf_counter()-started
-        self.assertGreater(count,6000)
+        self.assertGreater(count,13000)
         self.assertEqual(len(page),40)
         self.assertEqual(len({x[0] for x in page}),40)
         self.assertLess(elapsed,4.0,"SQL query exceeds a generous CI sanity ceiling")
