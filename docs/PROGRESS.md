@@ -95,3 +95,11 @@
 - **В выпуск дополнительно внесено:** versionName `0.6.1`; исправление `.github/workflows/build-apk.yml`: удалён опасный шаг v0.5 ZIP patch/automated git commit/push; permissions снижены `contents: write` → `contents: read`. Подписанный APK теперь должен строиться строго из checkout текущего SHA `main`; постоянные подписывающие секреты, сертификат и его SHA-256 НЕ менялись.
 - **Ограничения проверки:** новый SHA после этих изменений должен получить свой зелёный PR CI, затем merge в `main` с проверкой фактического подписанного release workflow и наличия APK. Реальные пользовательские резервные копии и физический Android не доступны для тестирования; Python v7→v8 fixture не следует выдавать за реальную восстановленную копию пользователя.
 - **Следующий шаг:** проверить последний PR CI; при успехе и приемлемом риске объединить, затем проверить подписанную сборку и артефакт. При провале — логи и исправление в PR #12, без merge.
+
+## 2026-11-12 09:40 UTC — count-boundary regression coverage (Stage 1 follow-up)
+
+- Base main: `c22b9a281f8b02b9ac5ea5e31f7590a55ebf3269`; latest signed release workflow https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43188290536 completed successfully. Existing PR #13 predates main and its release-workflow changes are already included in #12; review/close as obsolete, never merge stale changes.
+- Branch: `test/operation-count-boundaries-20261112`; source-test commit `f15143df8945e66eadfbdfdf56529351b9526a0f`.
+- Added JVM regression cases for count conservation in splits, separate merge-source remainders, exact losses, invalid zero/overdrawn quantities, maximum destination count, and large integer input. No production, SQLite, schema, signing, or backup modifications.
+- Verification pending: PR CI must pass `:app:testDebugUnitTest` and `:app:assembleDebug` plus Python SQLite tests. Do not merge on unverified compilation. Tests are unit-level and do not prove historical biological-unit classification or physical device UX.
+- Next: review PR CI, fix failing tests in this branch; then address Stage 2 Back-stack behavior with explicit navigation tests, retaining Stage 1 data invariants.
