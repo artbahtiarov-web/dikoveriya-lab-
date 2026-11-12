@@ -366,8 +366,8 @@ fun DikoveriyaApp() {
                 else if(i!=null) IncidentReviewDialog(i,db.incidentCultures(i.id),db.incidentFollowups(i.id),onClose={dialog=""},onSave={status,note->if(act{db.updateIncident(i.id,status,note)})dialog=""})
             }
             cultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                CultureDialog(c,db.events(id),db.photos(id),context.filesDir,db.ancestors(id),batches,db.confirmedLosses(id),onClose={cultureId=null},
-                    onChange={q,st,loc,b,n->if(act{db.updateCulture(id,q,st,loc,b,n)})cultureId=null},
+                CultureDialog(c,db.events(id),db.auditTrail(id),db.photos(id),context.filesDir,db.ancestors(id),batches,recipes,db.confirmedLosses(id),onClose={cultureId=null},
+                    onChange={q,st,loc,b,n,recipe->if(act{db.updateCulture(id,q,st,loc,b,n,recipe,true)})cultureId=null},
                     onObserve={n,start,healthy,infected,days->if(act{db.addObservation(id,n,start,healthy,infected,days)})cultureId=null},
                     onGrowth={performanceCultureId=id;cultureId=null},
                     onOperations={actionCultureId=id;cultureId=null},
@@ -377,11 +377,12 @@ fun DikoveriyaApp() {
                 )
             }}
             actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
-                LabActionDialog(c,cultures,batches,db.operationsForCulture(id),onClose={actionCultureId=null},
+                LabActionDialog(c,cultures,batches,recipes,db.operationsForCulture(id),onClose={actionCultureId=null},
                     onSplit={parts,lost,note,date->if(act{db.splitCulture(id,parts,lost,note,date)})actionCultureId=null},
-                    onMerge={parts,out,b,stage,note,confirm,date->if(act{db.mergeCultures(parts,out,b,stage,note,confirm,date)})actionCultureId=null},
+                    onMerge={parts,out,b,stage,note,confirm,date,recipe->if(act{db.mergeCultures(parts,out,b,stage,note,confirm,date,recipe)})actionCultureId=null},
                     onLoss={lost,reason,note,date->if(act{db.recordLoss(id,lost,reason,note,date)})actionCultureId=null},
                     onCorrection={quantity,reason,date->if(act{db.correctQuantity(id,quantity,reason,date)})actionCultureId=null},
+                    onClarify={kind,quantity,reason,date->if(act{db.clarifyQuantityUnit(id,kind,quantity,reason,date)})actionCultureId=null},
                     onVoid={reason,date->if(act{db.voidCulture(id,reason,date)})actionCultureId=null},
                     onIncident={title,notes,affected,response,date->if(act{db.reportIncident(title,notes,affected,response,date)})actionCultureId=null},
                     onCancel={op,reason->if(act{db.cancelOperation(op,reason)})actionCultureId=null}

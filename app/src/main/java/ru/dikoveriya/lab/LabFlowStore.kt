@@ -122,19 +122,58 @@ fun LabDatabase.addGrowthSample(cultureId: Long, explants: Int?, shoots: Int?, p
     }
 }
 
+/** A medium change is one transaction across the active recipe, batch, timeline and audit. */
 fun LabDatabase.assignMedium(cultureId: Long, newRecipeId: Long, reason: String) {
     val db = writableDatabase
     db.atomicResult {
-        require(rawQuery("SELECT 1 FROM recipes WHERE id=? AND status='Утверждена'", arrayOf(newRecipeId.toString())).use{it.moveToFirst()}) { "Выбирай только готовые рецептуры" }
-        val current = rawQuery("SELECT medium_recipe_id,status FROM cultures WHERE id=?",arrayOf(cultureId.toString())).use { c ->
-            require(c.moveToFirst()) { "Контейнер не найден" }
-            require(c.getString(1) !in listOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.ANNULLED,LabTerms.TRANSFERRED)) { "Нельзя сменить среду у закрытого контейнера" }
-            if(c.isNull(0)) null else c.getLong(0)
+        val candidate=rawQuery("SELECT r.status,r.plant_id,r.name,r.version FROM recipes r WHERE r.id=?",
+            arrayOf(newRecipeId.toString())).use { c ->
+            require(c.moveToFirst()) { "Рецептура не найдена" }
+            require(c.getString(0)=="Утверждена") { "Выбирай только готовые рецептуры" }
+            val plantId=if(c.isNull(1))null else c.getLong(1)
+            Triple(plantId,c.getString(2),c.getInt(3))
         }
-        require(current != newRecipeId) { "Эта среда уже выбрана" }
-        update("cultures",values("medium_recipe_id" to newRecipeId,"updated_at" to System.currentTimeMillis()),"id=?",arrayOf(cultureId.toString()))
+        val previous=rawQuery("""SELECT medium_recipe_id,medium_batch_id,status,plant_id,quantity
+            FROM cultures WHERE id=?""".trimIndent(),arrayOf(cultureId.toString())).use { c ->
+            require(c.moveToFirst()) { "Контейнер не найден" }
+            val current=if(c.isNull(0))null else c.getLong(0)
+            val batch=if(c.isNull(1))null else c.getLong(1)
+            arrayOf(current,batch,c.getString(2),c.getLong(3),c.getInt(4))
+        }
+        val oldRecipe=previous[0] as Long?
+        val oldBatch=previous[1] as Long?
+        val status=previous[2] as String
+        val plantId=previous[3] as Long
+        val quantity=previous[4] as Int
+        require(status !in listOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.ANNULLED,LabTerms.TRANSFERRED)) {
+            "Нельзя сменить среду у закрытого контейнера"
+        }
+        require(candidate.first==null || candidate.first==plantId) {
+            "Рецептура предназначена другому растению"
+        }
+        require(oldRecipe!=newRecipeId || oldBatch!=null) {
+            "Эта рецептура уже выбрана"
+        }
+        val now=System.currentTimeMillis()
+        val op=UUID.randomUUID().toString()
+        val details=reason.trim().ifEmpty{"Смена питательной среды"}.take(1000)
+        insertOrThrow("lab_operations",null,values("id" to op,"kind" to "Смена среды",
+            "occurred_at" to now,"recorded_at" to now,"note" to details,"status" to "Проведена"))
+        // The previous batch applies to the previous recipe: it cannot remain current.
+        update("cultures",values("medium_recipe_id" to newRecipeId,"medium_batch_id" to null,
+            "updated_at" to now),"id=?",arrayOf(cultureId.toString()))
         insertOrThrow("culture_recipe_history",null,values("culture_id" to cultureId,"recipe_id" to newRecipeId,
-            "applied_at" to System.currentTimeMillis(),"note" to reason.trim().ifEmpty { "Смена рецептуры" }.take(1000)))
+            "applied_at" to now,"note" to details))
+        insertOrThrow("operation_changes",null,values("operation_id" to op,"culture_id" to cultureId,
+            "before_qty" to quantity,"after_qty" to quantity,
+            "before_status" to status,"after_status" to status,"created" to 0))
+        execSQL("""UPDATE culture_audit SET operation_id=? WHERE
+            id=(SELECT MAX(id) FROM culture_audit WHERE culture_id=? AND operation_id IS NULL)""",
+            arrayOf(op,cultureId))
+        insertOrThrow("events",null,values("culture_id" to cultureId,"kind" to "Смена среды",
+            "note" to "Рецептура: ${oldRecipe ?: "не указана"} → ${candidate.second} · v${candidate.third}. $details",
+            "created_at" to now,"occurred_at" to now,"before_qty" to quantity,
+            "after_qty" to quantity,"medium_batch_id" to null,"event_group" to op))
     }
 }
 
@@ -170,7 +209,7 @@ fun LabDatabase.mediumResults(): List<MediumResult> {
     val db=readableDatabase
     return db.rawQuery("""
         SELECT r.id,r.name || ' · v' || r.version,COUNT(DISTINCT cm.culture_id),
-               COUNT(CASE WHEN cm.notes <> 'Показатели при создании'
+               COUNT(CASE WHEN cm.record_kind='observation'
                  AND (cm.explants IS NOT NULL OR cm.shoots IS NOT NULL
                       OR cm.plants IS NOT NULL OR cm.contaminated IS NOT NULL)
                  THEN cm.id END),

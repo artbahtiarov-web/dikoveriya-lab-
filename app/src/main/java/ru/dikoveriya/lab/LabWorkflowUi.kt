@@ -269,7 +269,7 @@ fun EasyRecipeDialog(db:LabDatabase,r:RecipeRecord,plantName:String?,onClose:()-
 @Composable
 fun GrowthDialog(db:LabDatabase,c:CultureRecord,onClose:()->Unit,onChanged:()->Unit) {
     var revision by remember { mutableIntStateOf(0) }
-    val samples=remember(revision){db.growthSamples(c.id)}
+    val journal=remember(revision){db.unifiedJournal(c.id)}
     val medium=remember(revision){db.currentMedium(c.id)}
     val recipes=remember(revision){db.recipes().filter{it.status=="Утверждена"}}
     var explants by remember{mutableStateOf("")};var shoots by remember{mutableStateOf("")}
@@ -311,12 +311,11 @@ fun GrowthDialog(db:LabDatabase,c:CultureRecord,onClose:()->Unit,onChanged:()->U
             }catch(e:Exception){savedMessage=null;errorMessage=e.message}}){Text("Сохранить наблюдение")}
             if(errorMessage!=null)Text(errorMessage!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             HorizontalDivider()
-            Text("История наблюдений",fontWeight=FontWeight.SemiBold)
-            if(samples.isEmpty()) Text("Пока нет наблюдений")
-            samples.take(25).forEach{sample->
-                val values=listOfNotNull(sample.explants?.let{"экспланты $it"},sample.shoots?.let{"побеги $it"},
-                    sample.plants?.let{"растения $it"},sample.contaminated?.let{"заражено $it"}).joinToString(" · ")
-                SmallCard(formatDate(sample.date),listOf(values,sample.notes).filter{it.isNotBlank()}.joinToString(" · ")){}
+            Text("Единый журнал: наблюдения, осмотры, исходные значения и действия",
+                fontWeight=FontWeight.SemiBold)
+            if(journal.isEmpty()) Text("Пока нет записей")
+            journal.take(50).forEach{entry->
+                SmallCard(formatDate(entry.occurredAt)+" · "+entry.kind,entry.summary()){}
             }
         }
     },confirmButton={TextButton(onClick=onClose){Text("Закрыть")}})

@@ -23,14 +23,16 @@ class MediumObservationCountTest(unittest.TestCase):
           CREATE TABLE culture_measurements(
             id INTEGER PRIMARY KEY,culture_id INTEGER,recipe_id INTEGER,
             observed_at INTEGER,explants INTEGER,shoots INTEGER,plants INTEGER,
-            contaminated INTEGER,notes TEXT NOT NULL);
+            contaminated INTEGER,notes TEXT NOT NULL,
+            record_kind TEXT NOT NULL DEFAULT 'observation');
           INSERT INTO recipes VALUES (1,'MS',1);
-          INSERT INTO culture_measurements VALUES
+          INSERT INTO culture_measurements(id,culture_id,recipe_id,observed_at,explants,shoots,plants,contaminated,notes) VALUES
             (1,10,1,100,4,2,1,NULL,'Показатели при создании'),
             (2,10,1,200,NULL,NULL,NULL,NULL,'Внешний вид без изменений'),
             (3,10,1,300,NULL,0,NULL,NULL,'Побеги не обнаружены'),
             (4,10,1,400,NULL,NULL,3,NULL,'Рост растений'),
             (5,11,1,110,5,NULL,NULL,NULL,'Показатели при создании');
+          UPDATE culture_measurements SET record_kind='baseline' WHERE notes='Показатели при создании';
         """)
         rows = db.execute(QUERY.group(1)).fetchall()
         self.assertEqual(len(rows), 1)
@@ -44,11 +46,13 @@ class MediumObservationCountTest(unittest.TestCase):
           CREATE TABLE culture_measurements(
             id INTEGER PRIMARY KEY,culture_id INTEGER,recipe_id INTEGER,
             observed_at INTEGER,explants INTEGER,shoots INTEGER,plants INTEGER,
-            contaminated INTEGER,notes TEXT NOT NULL);
+            contaminated INTEGER,notes TEXT NOT NULL,
+            record_kind TEXT NOT NULL DEFAULT 'observation');
           INSERT INTO recipes VALUES (1,'MS',1);
-          INSERT INTO culture_measurements VALUES
+          INSERT INTO culture_measurements(id,culture_id,recipe_id,observed_at,explants,shoots,plants,contaminated,notes) VALUES
             (1,10,1,100,4,2,1,NULL,'Показатели при создании'),
             (2,10,1,200,NULL,NULL,NULL,NULL,'Только заметка');
+          UPDATE culture_measurements SET record_kind='baseline' WHERE notes='Показатели при создании';
         """)
         row = db.execute(QUERY.group(1)).fetchone()
         self.assertEqual(row[3], 0)
