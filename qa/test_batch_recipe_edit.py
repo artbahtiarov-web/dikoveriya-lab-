@@ -13,7 +13,8 @@ class BatchRecipeEditTests(unittest.TestCase):
         self.assertIn("val changedBatch = batchId != c.batchId", method)
         self.assertIn("verifyBatch(batchId)", method)
         self.assertIn("batches().firstOrNull { it.id == batchId }?.recipeId", method)
-        self.assertRegex(method, r'"medium_recipe_id"\s+to\s+\(selectedRecipeId \?: c.recipeId\)')
+        self.assertIn('"medium_recipe_id" to effectiveRecipeId', method)
+        self.assertIn("val effectiveRecipeId = if (recipeChosen) recipeId else (selectedRecipeId ?: c.recipeId)",method)
         self.assertIn('insertOrThrow("culture_recipe_history"', method)
         self.assertIn("selectedRecipeId != c.recipeId", method)
 
