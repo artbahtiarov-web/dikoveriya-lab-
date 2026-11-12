@@ -318,3 +318,26 @@ fun LabDatabase.updateTask072(taskId:Long,done:Boolean?=null,
         "previous_priority" to before.third,"next_priority" to targetPriority,
         "note" to note))
 }
+
+/** One task per selected container, all-or-nothing; never one committed task out of 200. */
+fun LabDatabase.createTasksBulk072(ids:List<Long>,title:String,dueAt:Long,
+    priority:String,kind:String,recipeId:Long?):Unit=lab072Tx{
+    checkedIds072(ids)
+    require(priority in priority072){"Выбери важность"}
+    require(dueAt>0){"Укажи срок"}
+    val caption=lab072Text(title,200)
+    val operation=lab072Text(kind,60)
+    val now=System.currentTimeMillis()
+    ids.forEach{id->
+        row072(id) // validate existence before writing each row; transaction rollback on failure
+        val taskId=insertOrThrow("tasks",null,lab072CV(
+            "title" to caption,"due_at" to dueAt,"culture_id" to id,"done" to 0))
+        insertOrThrow("task_metadata",null,lab072CV(
+            "task_id" to taskId,"priority" to priority,
+            "kind" to operation,"recipe_id" to recipeId,"updated_at" to now))
+        insertOrThrow("task_history",null,lab072CV(
+            "task_id" to taskId,"recorded_at" to now,"action" to "Создана",
+            "next_due_at" to dueAt,"next_done" to 0,
+            "next_priority" to priority,"note" to "Массовое назначение"))
+    }
+}
