@@ -35,8 +35,8 @@ checks={
  'new workflow': 'QuickCultureDialog(db,preselectedRecipeId' in main and 'QuickMediumDialog(db' in main,
  'growth': 'GrowthDialog(db,c' in main and 'addGrowthSample(' in store,
  'plant results': 'plantResults()' in main and 'mediumResults()' in main,
- 'approved design': 'DikoveriyaTheme' in main and '0xFFF7F6F2' in theme,
- 'single version': 'versionCode = 60100 +' in gradle,
+ 'approved design': 'DikoveriyaTheme' in main and 'Lab07Palette' in theme,
+ 'single version': 'versionCode = 70000 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }
