@@ -189,3 +189,44 @@ fun Lab071LabelDialog(
         },
         dismissButton={TextButton(onClick=onClose){Text("Закрыть")}})
 }
+
+/**
+ * Compatibility entry for historical "starting/healthy/days" assessments.
+ * It is explicitly segregated from typed growth observations to prevent
+ * treating an unspecified healthy unit as a count of plants or shoots.
+ */
+@Composable
+fun Lab071LegacyAssessmentDialog(culture:CultureRecord,
+    onClose:()->Unit,onSave:(String,Int?,Int?,Int?,Int?)->Unit) {
+    var note by rememberSaveable(culture.id){mutableStateOf("")}
+    var starting by rememberSaveable(culture.id){mutableStateOf("")}
+    var healthy by rememberSaveable(culture.id){mutableStateOf("")}
+    var contaminated by rememberSaveable(culture.id){mutableStateOf("")}
+    var days by rememberSaveable(culture.id){mutableStateOf("")}
+    val hasValues=listOf(starting,healthy,contaminated,days).any{it.isNotBlank()}
+    val allEntered=listOf(starting,healthy,contaminated,days).all{it.isNotBlank()}
+    val numeric=starting.toIntOrNull()!=null && healthy.toIntOrNull()!=null &&
+        contaminated.toIntOrNull()!=null && days.toIntOrNull()!=null
+    val accepted=if(!hasValues)note.isNotBlank() else allEntered && numeric &&
+        (starting.toIntOrNull()?:0)>0 && (healthy.toIntOrNull()?:-1)>=0 &&
+        (contaminated.toIntOrNull()?:-1)>=0 && (days.toIntOrNull()?:0)>0
+    AlertDialog(onDismissRequest=onClose,title={Text("Расширенный осмотр · старый формат")},
+        text={Column(Modifier.fillMaxWidth().heightIn(max=520.dp)
+            .verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+            Text("Совместимость с прежними записями. Показатель «здоровых» не имеет уточнённой единицы и НЕ смешивается с эксплантами, побегами или растениями из нового журнала.",
+                style=MaterialTheme.typography.bodySmall)
+            Field("Что обнаружено",note,{note=it},single=false)
+            Field("Исходное количество (старый формат)",starting,{starting=it.filter(Char::isDigit)},numeric=true)
+            Field("Здоровых объектов (тип не определён)",healthy,{healthy=it.filter(Char::isDigit)},numeric=true)
+            Field("Заражённых",contaminated,{contaminated=it.filter(Char::isDigit)},numeric=true)
+            Field("Дней с начала опыта",days,{days=it.filter(Char::isDigit)},numeric=true)
+            Text("Можно сохранить только заметку. Если заполняешь показатели — укажи все четыре поля.",
+                style=MaterialTheme.typography.bodySmall)
+        }},
+        confirmButton={Button(enabled=accepted,onClick={
+            if(hasValues)onSave(note,starting.toIntOrNull(),healthy.toIntOrNull(),
+                contaminated.toIntOrNull(),days.toIntOrNull())
+            else onSave(note,null,null,null,null)
+        }){Text("Записать осмотр")}},
+        dismissButton={TextButton(onClick=onClose){Text("Отмена")}})
+}
