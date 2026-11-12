@@ -112,7 +112,9 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn('root.optInt("schema") in 4..9',DB)
         self.assertIn('root.getInt("schema") in 4..9',BACKUP)
         self.assertIn('LabCoreV9.create(db)',DB)
-        self.assertIn('if (oldVersion < 9) LabCoreV9.create(db)',DB)
+        self.assertIn('if (oldVersion < 9) {',DB)
+        self.assertIn('LabCoreV9.create(db)',DB)
+        self.assertIn('LabCoreV9.validate(db)',DB)
         self.assertIn('LabCoreV9.validate(this)',DB)
 
     def test_20k_paged_sql_and_indexes(self):
