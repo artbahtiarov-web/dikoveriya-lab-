@@ -259,12 +259,11 @@ fun DikoveriyaApp() {
                         items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
                             Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
                         }
-                        item { SectionTitle("Эффективность питательных сред (прежний журнал)") }
+                        item { SectionTitle("Архивные наблюдения по партиям") }
                         item { Text("Только по зарегистрированным измерениям. Без повторностей сравнение предварительное.",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall) }
                         if(metrics.isEmpty()) item { Text("Нет измерений из прежнего журнала партий. Новый журнал находится в карточке контейнера → Рост и результаты.") }
                         items(metrics,key={"metric-${it.recipe}"}){m->
-                            val ratio=if(m.input>0)m.healthy.toDouble()/m.input else null
-                            Lab07ReadOnlyCard(m.recipe,"Наблюдений: ${m.count} · предварительный показатель: ${ratio?.let{RecipeCalculator.formatAmount(it)}?:"—"}× · отмечено заражений: ${m.infected} · средний срок: ${RecipeCalculator.formatAmount(m.averageDays)} дн.")
+                            Lab07ReadOnlyCard(m.recipe,"Осмотров: ${m.count} · исходных объектов: ${m.input} · архивная категория «здоровых»: ${m.healthy} · заражённых: ${m.infected}. Без коэффициента размножения: тип материала не подтверждён.")
                         }
                         item { SectionTitle("По сортам") }
                         items(plants,key={"stat-${it.id}"}){p->
@@ -317,7 +316,7 @@ fun DikoveriyaApp() {
                                 }
                                 "Продажи" -> {
                                     item{Text("Продажа оформляется из карточки растения на адаптации, доращивании или готового к продаже.")}
-                                    items(sales,key={"sale-${it.id}"}){s->SmallCard(s.cultureCode,"${s.quantity} шт. · ${money(s.price)} · ${formatDate(s.time)}") {}}
+                                    items(sales,key={"sale-${it.id}"}){s->Lab07ReadOnlyCard(s.cultureCode,"${s.quantity} шт. · ${money(s.price)} · ${formatDate(s.time)}")}
                                 }
                                 "Резервные копии" -> {
                                     item{Text("Резервная копия ZIP содержит всю локальную базу и оригиналы фотографий. Храни её отдельно от телефона.")}
