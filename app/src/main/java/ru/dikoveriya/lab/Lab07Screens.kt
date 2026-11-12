@@ -71,6 +71,7 @@ private fun Lab07Filters(values:List<String>,selected:String,onSelect:(String)->
             FilterChip(
                 selected=value==selected,
                 onClick={onSelect(value)},
+                modifier=Modifier.heightIn(min=48.dp),
                 label={Text(value,maxLines=1)},
                 colors=FilterChipDefaults.filterChipColors(
                     selectedContainerColor=Lab07Palette.Forest,
