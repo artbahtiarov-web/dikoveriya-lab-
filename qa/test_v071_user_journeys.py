@@ -22,7 +22,7 @@ GRADLE=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class UnifiedJourneys071(unittest.TestCase):
     def test_version_keeps_db_and_certificate(self):
-        self.assertIn('versionName = "0.7.1-rc1"',GRADLE)
+        self.assertIn('versionName = "0.7.1"',GRADLE)
         self.assertIn('versionCode = 70100 +',GRADLE)
         self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 8)',DB)
         self.assertIn('applicationId = "ru.dikoveriya.lab"',GRADLE)
