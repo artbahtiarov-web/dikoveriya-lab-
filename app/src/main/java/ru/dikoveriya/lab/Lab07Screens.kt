@@ -36,6 +36,20 @@ fun Lab07RouteScreen(
     val id=route.substringAfter(':',"").toLongOrNull()
     val culture=cultures.firstOrNull{it.id==id}
     when(route.substringBefore(':')) {
+        "work" -> {
+            val groupId=if(route.startsWith("work:group:"))
+                route.substringAfterLast(':').toLongOrNull() else null
+            Lab072RegistryScreen(
+                mode=if(groupId!=null)"all" else route.substringAfter(':'),
+                initialGroupId=groupId,
+                db=db,revision=revision,plants=plants,recipes=recipes,
+                onBack=onBack,onNavigate=onNavigate,
+                onChanged=onChanged,onError=onError,modifier=modifier)
+        }
+        "tasks" -> Lab072TasksScreen(db,revision,plants,recipes,
+            onBack,onNavigate,onChanged,onError,modifier)
+        "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
+        "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
         "collection" -> Lab07CollectionScreen(plants,cultures,onBack,onNavigate,onNewPlant,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
