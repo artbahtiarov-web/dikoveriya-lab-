@@ -16,6 +16,15 @@ object Lab07Navigation {
     fun medium(cultureId: Long): String = "medium:$cultureId"
     fun operations(cultureId: Long): String = "operations:$cultureId"
     fun history(cultureId: Long): String = "history:$cultureId"
+    fun work(mode:String):String{
+        require(mode in setOf("vitro","attention","growth","all"))
+        return "work:$mode"
+    }
+    fun groupWork(id:Long):String="work:group:$id"
+    const val TASKS="tasks"
+    const val GROUPS="groups"
+    const val PLACES="places"
+
 
     fun enter(stack: List<String>, next: String): List<String> {
         require(isKnown(next)) { "Unknown screen: $next" }
@@ -27,7 +36,9 @@ object Lab07Navigation {
     fun current(stack: List<String>): String? = stack.lastOrNull()
 
     fun isKnown(route: String): Boolean {
-        if(route == COLLECTION) return true
+        if(route in setOf(COLLECTION,TASKS,GROUPS,PLACES)) return true
+        if(route in setOf("work:vitro","work:attention","work:growth","work:all")) return true
+        if(route.startsWith("work:group:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
         return group in setOf("variety","container","growth","medium","operations","history") &&
