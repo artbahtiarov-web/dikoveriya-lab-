@@ -196,8 +196,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
         } catch(e: Exception) { tmp.delete();final.delete();throw e }
     }
-    fun events(cultureId: Long): List<LabEvent> = readableDatabase.rawQuery("SELECT id,culture_id,kind,note,COALESCE(occurred_at,created_at),before_qty,after_qty,created_at FROM events WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
-        buildList { while(c.moveToNext()) add(LabEvent(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4),if(c.isNull(5))null else c.getInt(5),if(c.isNull(6))null else c.getInt(6),c.getLong(7))) }
+    /** A single timeline replaces the split old events / assessments / growth presentation. */
+    fun events(cultureId: Long): List<LabEvent> = unifiedJournal(cultureId).map { entry ->
+        LabEvent(if(entry.source=="event")entry.sourceId else -entry.sourceId,
+            cultureId,entry.kind,entry.summary(),entry.occurredAt,entry.beforeQty,
+            entry.afterQty,entry.recordedAt)
     }
     fun ancestors(cultureId: Long): List<Pair<String,String>> = readableDatabase.rawQuery("WITH RECURSIVE chain(depth,parent_id,used_qty,result_qty) AS (SELECT 1,parent_culture_id,used_qty,result_qty FROM culture_links WHERE child_culture_id=? AND cancelled=0 UNION ALL SELECT chain.depth+1,l.parent_culture_id,l.used_qty,l.result_qty FROM culture_links l JOIN chain ON l.child_culture_id=chain.parent_id WHERE chain.depth < 100 AND l.cancelled=0) SELECT p.code, chain.used_qty || ' → ' || chain.result_qty FROM chain JOIN cultures p ON p.id=chain.parent_id ORDER BY chain.depth,p.code", arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(c.getString(0) to c.getString(1)) }
