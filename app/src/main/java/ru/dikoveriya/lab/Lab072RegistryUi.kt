@@ -172,7 +172,8 @@ fun Lab072RegistryScreen(
                                 query=saved.text;plantId=saved.plantId;recipeId=saved.recipeId
                                 groupId=saved.groupId;locationId=saved.locationId
                                 stage=saved.stage;status=saved.status;order=saved.order
-                                period="Всё время";reset()
+                                period=org.json.JSONObject(view.config).optString("period","Всё время")
+                reset()
                             }
                         })
                 }
@@ -243,7 +244,11 @@ fun Lab072RegistryScreen(
         AlertDialog(onDismissRequest={viewDialog=false},title={Text("Сохранить набор фильтров")},
             text={Field("Название, например «Алоказии на проверке»",viewName,{viewName=it})},
             confirmButton={Button(onClick={
-                changed{db.saveView072(mode,viewName,filter.json());viewDialog=false;viewName=""}
+                changed{
+                    val stored=org.json.JSONObject(filter.json()).put("period",period).toString()
+                    db.saveView072(mode,viewName,stored)
+                    viewDialog=false;viewName=""
+                }
             },enabled=viewName.isNotBlank()){Text("Сохранить")}},
             dismissButton={TextButton(onClick={viewDialog=false}){Text("Отмена")}})
     }
