@@ -31,7 +31,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
     }
     private fun createExtra(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS culture_measurements (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), recipe_id INTEGER REFERENCES recipes(id), observed_at INTEGER NOT NULL, explants INTEGER CHECK(explants>=0), shoots INTEGER CHECK(shoots>=0), plants INTEGER CHECK(plants>=0), contaminated INTEGER CHECK(contaminated>=0), notes TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE IF NOT EXISTS culture_measurements (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), recipe_id INTEGER REFERENCES recipes(id), observed_at INTEGER NOT NULL, explants INTEGER CHECK(explants>=0), shoots INTEGER CHECK(shoots>=0), plants INTEGER CHECK(plants>=0), contaminated INTEGER CHECK(contaminated>=0), notes TEXT NOT NULL DEFAULT '', record_kind TEXT NOT NULL DEFAULT 'observation')")
         db.execSQL("CREATE TABLE IF NOT EXISTS culture_recipe_history (id INTEGER PRIMARY KEY AUTOINCREMENT, culture_id INTEGER NOT NULL REFERENCES cultures(id), recipe_id INTEGER NOT NULL REFERENCES recipes(id), applied_at INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_measure_culture ON culture_measurements(culture_id,observed_at)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_measure_recipe ON culture_measurements(recipe_id,observed_at)")
