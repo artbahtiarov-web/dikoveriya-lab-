@@ -312,6 +312,12 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,
                 "medium_recipe_id" to effectiveRecipeId,
                 "updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
+            // A manual free-text change supersedes any previously assigned structured
+            // location. Otherwise the new registry would still display the old shelf.
+            // Historical storage_movements remain immutable.
+            if(c.location != location) {
+                delete("culture_storage","culture_id=?",arrayOf(id.toString()))
+            }
             if (effectiveRecipeId != null && effectiveRecipeId != c.recipeId) {
                 insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to effectiveRecipeId,
                     "applied_at" to System.currentTimeMillis(),"note" to "Рецептура изменена в карточке контейнера"))
