@@ -26,7 +26,7 @@ fun Lab07RouteScreen(
     route:String, db:LabDatabase, revision:Int,
     plants:List<PlantRecord>,cultures:List<CultureRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewContainer:()->Unit,onNewPlant:()->Unit,
+    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
@@ -165,7 +165,7 @@ private fun Lab07CollectionScreen(
 @Composable
 private fun Lab07VarietyScreen(
     plant:PlantRecord,cultures:List<CultureRecord>,
-    onBack:()->Unit,onNavigate:(String)->Unit,onNewContainer:()->Unit,modifier:Modifier
+    onBack:()->Unit,onNavigate:(String)->Unit,onNewContainer:(Long?)->Unit,modifier:Modifier
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var status by rememberSaveable { mutableStateOf("Все") }
@@ -190,7 +190,7 @@ private fun Lab07VarietyScreen(
                 "БОТАНИЧЕСКИЙ АТЛАС")
         }
         item(key="new") {
-            Button(onClick=onNewContainer,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+            Button(onClick={onNewContainer(plant.id)},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                 Icon(Icons.Outlined.AddCircleOutline,null);Spacer(Modifier.width(8.dp));Text("Создать контейнер")
             }
         }
