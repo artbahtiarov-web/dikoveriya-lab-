@@ -269,7 +269,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
         return resultId
     }
-    fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String) {
+    fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String, recipeId: Long? = null, recipeChosen: Boolean = false) {
         require(status in LabTerms.statuses || status == LabTerms.TRANSFERRED) { "Некорректный статус" }
         val reason=checkText(note,2000)
         val db=writableDatabase
@@ -287,14 +287,25 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 batches().firstOrNull { it.id == batchId }?.recipeId
                     ?: error("Партия среды не найдена")
             } else null
-            update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,
-                "medium_recipe_id" to (selectedRecipeId ?: c.recipeId),
-                "updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
-            if (selectedRecipeId != null && selectedRecipeId != c.recipeId) {
-                insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to selectedRecipeId,
-                    "applied_at" to System.currentTimeMillis(),"note" to "Рецептура изменена при выборе партии приготовления"))
+            val effectiveRecipeId = if (recipeChosen) recipeId else (selectedRecipeId ?: c.recipeId)
+            if (recipeChosen && effectiveRecipeId != null) {
+                val selected=recipes().firstOrNull { it.id==effectiveRecipeId } ?: error("Рецептура не найдена")
+                require(selected.status=="Утверждена" && (selected.plantId==null || selected.plantId==c.plantId)) {
+                    "Выбери утверждённую рецептуру для этого растения"
+                }
             }
-            event(this,id,if(status==LabTerms.DISPOSED)"Утилизация" else "Изменение","${c.status} → $status; ${c.quantity} → $quantity; место: ${c.location} → $location; среда: ${c.batchId ?: "нет"} → ${batchId ?: "нет"}; причина: $reason",c.quantity,quantity,batchId)
+            if (recipeChosen && batchId != null) {
+                val batchRecipe=batches().firstOrNull{it.id==batchId}?.recipeId
+                require(batchRecipe==effectiveRecipeId) { "Партия не соответствует версии рецептуры" }
+            }
+            update("cultures",cv("quantity" to quantity,"status" to status,"location" to location,"medium_batch_id" to batchId,
+                "medium_recipe_id" to effectiveRecipeId,
+                "updated_at" to System.currentTimeMillis()),"id=?",arrayOf(id.toString()))
+            if (effectiveRecipeId != null && effectiveRecipeId != c.recipeId) {
+                insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to effectiveRecipeId,
+                    "applied_at" to System.currentTimeMillis(),"note" to "Рецептура изменена в карточке контейнера"))
+            }
+            event(this,id,if(status==LabTerms.DISPOSED)"Утилизация" else "Изменение","${c.status} → $status; ${c.quantity} → $quantity; место: ${c.location} → $location; партия: ${c.batchId ?: "нет"} → ${batchId ?: "нет"}; рецептура: ${c.recipeId ?: "нет"} → ${effectiveRecipeId ?: "нет"}; причина: $reason",c.quantity,quantity,batchId)
         }
     }
     fun addObservation(cultureId: Long, note: String, starting: Int?, healthy: Int?, contaminated: Int?, days: Int?) {
