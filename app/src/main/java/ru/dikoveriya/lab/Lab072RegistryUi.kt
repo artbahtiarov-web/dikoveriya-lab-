@@ -243,7 +243,8 @@ fun Lab072RegistryScreen(
     }
     if(action.isNotEmpty()){
         Lab072BulkDialog(action,selected,db,locations,recipes,
-            onClose={action=""},onSaved={changed{}},onError=onError)
+            onClose={action=""},onSaved={changed{}},onError=onError,
+            onPlaces={action="";onNavigate(Lab07Navigation.PLACES)})
     }
     shownId?.let{id->
         val cases=remember(id,revision){db.cases072(id)}
