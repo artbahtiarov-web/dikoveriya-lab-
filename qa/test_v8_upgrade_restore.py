@@ -106,11 +106,11 @@ class UpgradeRestoreRehearsal(unittest.TestCase):
 
     def test_backup_json_version_table_contract(self):
         self.assertIn('BACKUP_ORDER_V7=BACKUP_ORDER_V6+listOf("culture_measurements","culture_recipe_history")',DB)
-        self.assertIn('BACKUP_ORDER=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
+        self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
         self.assertIn('7->BACKUP_ORDER_V7',DB)
-        self.assertIn('root.optInt("schema") in 4..8',DB)
+        self.assertIn('root.optInt("schema") in 4..9',DB)
         self.assertIn('delete("culture_audit",null,null)',DB)
-        self.assertIn('LabCoreV8.validate(this)',DB)
+        self.assertIn('LabCoreV9.validate(this)',DB)
 
 if __name__=="__main__":
     unittest.main()

@@ -69,8 +69,8 @@ fun Lab07BrandHero(title:String, subtitle:String, overline:String="ДИКОВЕ�
 
 @Composable
 fun Lab07Metric(title:String,value:String,qualifier:String,accent:Color,
-                modifier:Modifier=Modifier) {
-    Card(modifier=modifier.heightIn(min=104.dp),
+                modifier:Modifier=Modifier,onClick:()->Unit) {
+    Card(onClick=onClick,modifier=modifier.heightIn(min=112.dp),
         shape=RoundedCornerShape(18.dp),
         colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),
         border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
@@ -81,6 +81,8 @@ fun Lab07Metric(title:String,value:String,qualifier:String,accent:Color,
                 Box(Modifier.size(7.dp).clip(RoundedCornerShape(5.dp)).background(accent))
                 Text(title,color=MaterialTheme.colorScheme.onSurfaceVariant,
                     style=MaterialTheme.typography.bodySmall,maxLines=2)
+            Icon(Icons.Outlined.ChevronRight,contentDescription="Открыть: $title",
+                tint=Lab07Palette.InkBrass,modifier=Modifier.size(16.dp))
             }
             Text(value,style=MaterialTheme.typography.headlineMedium,
                 color=MaterialTheme.colorScheme.onSurface)
@@ -112,23 +114,24 @@ fun Lab07QuickAction(text:String,icon:@Composable ()->Unit,primary:Boolean=false
 fun Lab07Dashboard(
     plants:List<PlantRecord>,cultures:List<CultureRecord>,tasks:List<TaskRecord>,
     onCollection:()->Unit,onContainer:(Long)->Unit,
-    onNewContainer:()->Unit,onNewPlant:()->Unit,onMediums:()->Unit,onScan:()->Unit
+    onNewContainer:()->Unit,onNewPlant:()->Unit,onMediums:()->Unit,onScan:()->Unit,
+    counts:Lab072Counts?=null,onMetric:(String)->Unit={}
 ) {
     val active=cultures.filter{it.status in setOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
-    val inVitro=active.count{it.stage==LabTerms.IN_VITRO}
-    val controls=active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
-    val growth=active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
-    val due=tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
+    val inVitro=counts?.tubes ?: active.count{it.stage==LabTerms.IN_VITRO}
+    val controls=counts?.attention ?: active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
+    val growth=counts?.growing ?: active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
+    val due=counts?.tasksDue ?: tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
     Column(verticalArrangement=Arrangement.spacedBy(15.dp)) {
         Lab07BrandHero("Моя лаборатория","Коллекция редких растений · точный учёт")
         SectionTitle("Состояние лаборатории")
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Lab07Metric("In vitro",inVitro.toString(),"контейнеров",Lab07Palette.Forest,Modifier.weight(1f))
-            Lab07Metric("Нужен контроль",controls.toString(),"контейнеров",Lab07Palette.Danger,Modifier.weight(1f))
+            Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
+            Lab07Metric("Требуют внимания",controls.toString(),"контейнеров",Lab07Palette.Danger,Modifier.weight(1f)){onMetric("attention")}
         }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Lab07Metric("Адаптация и рост",growth.toString(),"контейнеров",Lab07Palette.Moss,Modifier.weight(1f))
-            Lab07Metric("Задачи",due.toString(),"срок наступил",Lab07Palette.InkBrass,Modifier.weight(1f))
+            Lab07Metric("Растут",growth.toString(),"адаптация / доращивание",Lab07Palette.Moss,Modifier.weight(1f)){onMetric("growth")}
+            Lab07Metric("Задачи",due.toString(),"срок наступил",Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
         }
         SectionTitle("Быстрые действия")
         BoxWithConstraints(Modifier.fillMaxWidth()) {

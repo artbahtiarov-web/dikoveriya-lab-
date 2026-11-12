@@ -16,9 +16,9 @@ BUILD=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class BotanicalNavigation07(unittest.TestCase):
     def test_version_is_07_and_db_is_still_08(self):
-        self.assertIn('versionName = "0.7.1"',BUILD)
-        self.assertIn("versionCode = 70100 +",BUILD)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 8)',DB)
+        self.assertIn('versionName = "0.7.2"',BUILD)
+        self.assertIn("versionCode = 70200 +",BUILD)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 9)',DB)
         self.assertIn('namespace = "ru.dikoveriya.lab"',BUILD)
 
     def test_enter_and_back_have_no_clear_all(self):
@@ -36,7 +36,7 @@ class BotanicalNavigation07(unittest.TestCase):
         for tile in ("Рост","Среда","Операции","История"):
             self.assertIn('Lab07ActionTile("'+tile+'"',SCREEN)
         self.assertIn("Lab07Navigation.variety(plant.id)",SCREEN)
-        self.assertIn("Lab07Navigation.container(culture.id)",SCREEN)
+        self.assertIn("Lab07Navigation.container(row.id)",(SRC/"Lab072RegistryUi.kt").read_text(encoding="utf-8"))
 
     def test_filters_scroll_position_and_drafts_persist(self):
         self.assertIn("rememberSaveableStateHolder()",MAIN)
@@ -44,7 +44,11 @@ class BotanicalNavigation07(unittest.TestCase):
         self.assertIn('SaveableStateProvider("legacy:$tab:$subsection")',MAIN)
         self.assertIn("rememberLazyListState()",SCREEN)
         self.assertIn("rememberSaveable",SCREEN)
-        for label in ("Активные","На контроле","Архив","30 дней","90 дней"):
+        registry=(SRC/"Lab072RegistryUi.kt").read_text(encoding="utf-8")
+        for label in ("7 дней","30 дней","По побегам","По растениям"):
+            self.assertIn('"'+label+'"',registry)
+        self.assertIn("LabTerms.statuses",registry)
+        for label in ("30 дней","90 дней"):
             self.assertIn('"'+label+'"',SCREEN)
         self.assertIn("rememberSaveable(culture.id,mode)",OPS)
 
