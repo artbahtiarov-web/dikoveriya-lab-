@@ -61,6 +61,7 @@ fun DikoveriyaApp() {
     var photoCultureId by remember { mutableStateOf<Long?>(null) }
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
     var labelCultureId by remember { mutableStateOf<Long?>(null) }
+    var legacyAssessmentId by remember { mutableStateOf<Long?>(null) }
     var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
     var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
@@ -151,7 +152,7 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && actionCultureId==null &&
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
@@ -193,6 +194,7 @@ fun DikoveriyaApp() {
                         onLabel={labelCultureId=it},
                         onPhotos={photoCultureId=it},
                         onSale={saleCultureId=it},
+                        onLegacyAssessment={legacyAssessmentId=it},
                         onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
                         onChanged={refresh++},
                         onError={error=it},
@@ -408,6 +410,12 @@ fun DikoveriyaApp() {
                     onShare={spec->
                         try{LabLabel40.share(context,spec)}
                         catch(e:Exception){error=e.message?:"Не удалось передать этикетку"}
+                    })
+            }}
+            legacyAssessmentId?.let{id->cultures.firstOrNull{it.id==id}?.let{culture->
+                Lab071LegacyAssessmentDialog(culture,onClose={legacyAssessmentId=null},
+                    onSave={note,start,healthy,infected,days->
+                        if(act{db.addObservation(id,note,start,healthy,infected,days)})legacyAssessmentId=null
                     })
             }}
             actionCultureId?.let{id->cultures.firstOrNull{it.id==id}?.let{c->
