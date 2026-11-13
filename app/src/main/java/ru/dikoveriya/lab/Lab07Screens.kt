@@ -29,6 +29,7 @@ fun Lab07RouteScreen(
     onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
+    onTask:(Long)->Unit,
     onLegacyAssessment:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit= {},
@@ -60,7 +61,7 @@ fun Lab07RouteScreen(
             if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
             else Lab07MissingScreen(onBack,modifier)
         }
-        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,modifier)
+        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,onTask,modifier)
                        else Lab07MissingScreen(onBack,modifier)
         "growth" -> if(culture!=null) Lab07GrowthScreen(culture,db,revision,onBack,onChanged,onError,onLegacyAssessment,modifier)
                     else Lab07MissingScreen(onBack,modifier)
@@ -205,7 +206,7 @@ private fun Lab07ContainerScreen(
     culture:CultureRecord,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,onEdit:(Long)->Unit,
     onAction:(Long,String)->Unit,onLabel:(Long)->Unit,onPhotos:(Long)->Unit,
-    onSale:(Long)->Unit,modifier:Modifier
+    onSale:(Long)->Unit,onTask:(Long)->Unit,modifier:Modifier
 ) {
     val last=remember(culture.id,revision){db.unifiedJournal(culture.id).firstOrNull()}
     val activeMedium=remember(culture.id,revision){db.currentMedium(culture.id)}
@@ -226,6 +227,7 @@ private fun Lab07ContainerScreen(
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp),
                     verticalArrangement=Arrangement.spacedBy(7.dp)) {
+                    Text("Пассаж P${culture.passage} · ${culture.stage}")
                     Text("Остаток: ${culture.quantity} · ${culture.quantityKind}",
                         style=MaterialTheme.typography.titleMedium)
                     Text("Среда: ${activeMedium?.let{"${it.name} · v${it.version}"} ?: "не указана"}")
@@ -258,6 +260,14 @@ private fun Lab07ContainerScreen(
                         {Icon(Icons.Outlined.RemoveCircleOutline,null)},modifier=Modifier.weight(1f),
                         onClick={onAction(culture.id,"Потери")})
                 }
+            }
+        }
+        if(!closed)item(key="schedule") {
+            OutlinedButton(onClick={onTask(culture.id)},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.EventNote,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Назначить задачу этому контейнеру")
             }
         }
         item(key="labels") {
