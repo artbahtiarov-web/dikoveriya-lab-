@@ -19,7 +19,8 @@ internal data class Lab11PlantItem(
     val parentItemId:Long?,val parentCultureId:Long?,
     val locationId:Long?,val location:String,
     val substrate:String,val rootingMethod:String,val stimulant:String,
-    val potMl:Int?,val notes:String,val favorite:Boolean,val cover:String?
+    val potMl:Int?,val notes:String,val favorite:Boolean,val cover:String?,
+    val customKind:String=""
 )
 
 internal data class Lab11ItemEvent(
