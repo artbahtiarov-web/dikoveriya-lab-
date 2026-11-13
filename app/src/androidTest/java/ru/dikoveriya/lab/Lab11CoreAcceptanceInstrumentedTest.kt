@@ -140,6 +140,58 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun weightedStockPriceIsFrozenAndFailedConsumptionRollsBack(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            if("Субстраты" !in db.categories11("Материалы"))
+                db.addCategory11("Материалы","Субстраты")
+            val materialName="QA weighted "+UUID.randomUUID()
+            db.addMaterial(materialName,"л",0.0,0.0,0.0,"Субстраты")
+            val materialId=db.materials().first{it.name==materialName}.id
+            val item=db.addPlantItem11(plant(db),"Горшечное")
+            val p1=db.purchase11(materialName,"Субстраты",10000,
+                System.currentTimeMillis(),materialId=materialId,quantity=1.0,unit="л")
+            val first=db.performItemAction11(item,"Пересадка",
+                System.currentTimeMillis(),newSubstrate=materialName,
+                materialId=materialId,materialQty=0.2)
+            assertEquals(2000L,db.directCost11("item",item))
+            val p2=db.purchase11(materialName,"Субстраты",30000,
+                System.currentTimeMillis(),materialId=materialId,quantity=1.0,unit="л")
+            db.performItemAction11(item,"Пересадка",System.currentTimeMillis(),
+                materialId=materialId,materialQty=0.5)
+            val used=db.readableDatabase.rawQuery("""
+                SELECT total_minor FROM stock_usage WHERE entity_kind='item'
+                    AND entity_id=? ORDER BY id""",
+                arrayOf(item.toString())).use{c->buildList{
+                while(c.moveToNext())add(c.getLong(0))
+            }}
+            assertEquals(2000L,used[0])
+            assertEquals(10556L,used[1])
+            assertEquals(12556L,db.directCost11("item",item))
+            val beforeQty=db.materials().first{it.id==materialId}.quantity
+            val beforeCosts=db.directCost11("item",item)
+            var failed=false
+            try{db.performItemAction11(item,"Пересадка",
+                System.currentTimeMillis(),materialId=materialId,materialQty=99.0)}
+            catch(_:Exception){failed=true}
+            assertTrue("Insufficient stock must abort the whole operation",failed)
+            assertEquals(beforeQty,db.materials().first{it.id==materialId}.quantity,1e-9)
+            assertEquals(beforeCosts,db.directCost11("item",item))
+            assertEquals(1,db.cashRows11().count{it.source=="purchase" && it.sourceId==p1})
+            assertEquals(1,db.cashRows11().count{it.source=="purchase" && it.sourceId==p2})
+            assertEquals(2,db.itemEvents11(item).count{it.kind=="Пересадка"})
+        }finally{db.close()}
+    }
+
+    @Test fun scheduledReminderNeverUsesArbitraryPastTime(){
+        val zone=java.time.ZoneId.of("Europe/Moscow")
+        val date=java.time.LocalDate.of(2026,12,5)
+        val due=date.atTime(23,59).atZone(zone).toInstant().toEpochMilli()
+        val expected=date.atTime(9,0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(expected,Lab11Reminders.dueReminderAt(due,zone))
+    }
+
     @Test fun massCultureCreationHasIndependentIdentityAndCommonBatch(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
