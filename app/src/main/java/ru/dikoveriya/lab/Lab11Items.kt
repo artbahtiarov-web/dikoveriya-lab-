@@ -59,7 +59,8 @@ private fun SQLiteDatabase.newItemRow11(
     require(potMl==null || potMl in 1..500000){"Укажи объём горшка в мл"}
     val cv=ContentValues().apply {
         put("code","PENDING-"+UUID.randomUUID());put("plant_id",plantId)
-        put("kind",kind);put("stage",if(kind=="Черенок")"Укоренение" else "В работе")
+        put("kind",kind);put("custom_kind",customKind.trim().take(100))
+        put("stage",if(kind=="Черенок")"Укоренение" else "В работе")
         put("status","Активен");put("acquired_at",acquiredAt)
         put("created_at",System.currentTimeMillis());put("updated_at",System.currentTimeMillis())
         put("supplier",text11(supplier,200));put("purchase_cost_minor",costMinor)
