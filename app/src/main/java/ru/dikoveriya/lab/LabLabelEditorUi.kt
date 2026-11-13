@@ -66,6 +66,7 @@ fun Lab080LabelEditor(
         .getOrNull()?:LabelDesign.initial()}
     var serialized by rememberSaveable(culture.id){mutableStateOf(initial.encode())}
     val layout=remember(serialized){LabelDesign.decode(serialized)}
+    val latestLayout by rememberUpdatedState(layout)
     var selected by rememberSaveable(culture.id){mutableStateOf("plant")}
     var zoom by rememberSaveable(culture.id){mutableFloatStateOf(1f)}
     var grid by rememberSaveable(culture.id){mutableStateOf(true)}
@@ -165,31 +166,37 @@ fun Lab080LabelEditor(
                             }?.let{setSelected(it.id)}
                         }
                     }
-                    .pointerInput(selected,previewWidthPx,snap){
+                    .pointerInput(previewWidthPx,snap){
+                        var origin:LabelLayer?=null
+                        var cumulative=Offset.Zero
                         detectDragGestures(
                             onDragStart={point->
                                 val mx=point.x/previewWidthPx*40f
                                 val my=point.y/previewWidthPx*40f
-                                layout.layers.asReversed().firstOrNull{layer->
+                                origin=latestLayout.layers.asReversed().firstOrNull{layer->
                                     mx in layer.x..(layer.x+layer.width) &&
                                     my in layer.y..(layer.y+layer.height)
-                                }?.let{selected=it.id;checkpoint()}
+                                }
+                                cumulative=Offset.Zero
+                                origin?.let{selected=it.id;checkpoint()}
                             },
                             onDrag={change,delta->
                                 change.consume()
-                                val target=layout.layers.firstOrNull{it.id==selected}
-                                if(target!=null){
-                                    val dx=delta.x/previewWidthPx*40f
-                                    val dy=delta.y/previewWidthPx*40f
-                                    val next=target.moved(dx,dy)
-                                    fun nearest(v:Float):Float=if(snap)
+                                val start=origin
+                                if(start!=null){
+                                    cumulative+=delta
+                                    val nx=start.x+cumulative.x/previewWidthPx*40f
+                                    val ny=start.y+cumulative.y/previewWidthPx*40f
+                                    fun nearest(v:Float)=if(snap)
                                         (v*2f).roundToInt()/2f else v
-                                    val result=next.copy(
-                                        x=nearest(next.x).coerceIn(0f,40f-next.width),
-                                        y=nearest(next.y).coerceIn(0f,12f-next.height))
-                                    commit(layout.replace(result),history=false)
+                                    val result=start.copy(
+                                        x=nearest(nx).coerceIn(0f,40f-start.width),
+                                        y=nearest(ny).coerceIn(0f,12f-start.height))
+                                    commit(latestLayout.replace(result),history=false)
                                 }
-                            }
+                            },
+                            onDragEnd={origin=null},
+                            onDragCancel={origin=null}
                         )
                     }
             ){
