@@ -16,7 +16,7 @@ private val standardOps11=setOf("Посадка","Введение в культ
  */
 internal fun LabDatabase.performItemAction11(
     itemId:Long,kind:String,at:Long,
-    note:String="",newStage:String?=null,newLocation:String?=null,
+    note:String="",newStage:String?=null,newKind:String?=null,newLocation:String?=null,
     newSubstrate:String?=null,stimulant:String?=null,
     materialId:Long?=null,materialQty:Double=0.0
 ):Long{
@@ -25,15 +25,16 @@ internal fun LabDatabase.performItemAction11(
     }
     require(at>0 && at<=System.currentTimeMillis()+86400000L)
     require(note.length<=2000)
+    require(newKind==null || newKind in setOf("Горшечное","Черенок","Маточник","Другое"))
     require(materialId==null || materialQty.isFinite() && materialQty>0)
     val db=writableDatabase
     db.beginTransaction()
     try{
-        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,stimulant
+        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,stimulant,kind
             FROM plant_items WHERE id=?""",arrayOf(itemId.toString())).use{c->
             require(c.moveToFirst()){"Растение не найдено"}
             listOf(c.getString(0),c.getString(1),c.getString(2),
-                c.getString(3),c.getString(4))
+                c.getString(3),c.getString(4),c.getString(5))
         }
         require(before[0] !in setOf("Утилизирован","Продан") || kind=="Исправление"){
             "Закрытый экземпляр нельзя изменять обычной операцией"
@@ -42,8 +43,9 @@ internal fun LabDatabase.performItemAction11(
             .put("before_stage",before[1])
             .put("before_location",before[2])
             .put("before_substrate",before[3])
-            .put("before_stimulant",before[4])
+            .put("before_stimulant",before[4]).put("before_kind",before[5])
         if(newStage!=null)details.put("new_stage",newStage)
+        if(newKind!=null)details.put("new_kind",newKind)
         if(newLocation!=null)details.put("new_location",newLocation)
         if(newSubstrate!=null)details.put("new_substrate",newSubstrate)
         if(stimulant!=null)details.put("new_stimulant",stimulant)
@@ -89,6 +91,7 @@ internal fun LabDatabase.performItemAction11(
         }
         val cv=ContentValues().apply{
             if(newStage!=null)put("stage",newStage.take(100))
+            if(newKind!=null)put("kind",newKind)
             if(newLocation!=null)put("location_text",newLocation.take(200))
             if(newSubstrate!=null)put("substrate",newSubstrate.take(500))
             if(stimulant!=null)put("stimulant",stimulant.take(300))
@@ -146,6 +149,7 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
         }
         val previous=ContentValues().apply{
             if(d.has("before_status"))put("status",d.getString("before_status"))
+            if(d.has("before_kind"))put("kind",d.getString("before_kind"))
             if(d.has("before_stage"))put("stage",d.getString("before_stage"))
             if(d.has("before_location"))put("location_text",d.getString("before_location"))
             if(d.has("before_substrate"))put("substrate",d.getString("before_substrate"))
