@@ -37,7 +37,7 @@ internal fun LabDatabase.measureItem11(itemId:Long,at:Long,
 }
 internal fun LabDatabase.itemGrowth11(id:Long):List<Lab11GrowthSample> =
     readableDatabase.rawQuery("""SELECT id,observed_at,height_mm,leaves,roots,note
-        FROM item_measurements WHERE item_id=? ORDER BY observed_at,id LIMIT 1000""",
+        FROM item_measurements WHERE item_id=? AND cancelled=0 ORDER BY observed_at,id LIMIT 1000""",
         arrayOf(id.toString())).use{c->buildList{
             while(c.moveToNext())add(Lab11GrowthSample(c.getLong(0),c.getLong(1),
                 if(c.isNull(2))null else c.getDouble(2),
