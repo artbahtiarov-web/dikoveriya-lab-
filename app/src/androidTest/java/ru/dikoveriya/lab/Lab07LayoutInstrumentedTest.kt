@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Run twice using 360dp/150% and 430dp/160% emulator configurations.
+ * Runs at 360, 393 and 430dp with enlarged system fonts.
  * Tests visible semantics, working tap targets and a scrollable dashboard.
  */
 @RunWith(AndroidJUnit4::class)
@@ -47,8 +47,11 @@ class Lab07LayoutInstrumentedTest {
         rule.onNodeWithText("Что происходит сейчас").assertExists()
         rule.onNodeWithText("В пробирках").assertExists()
         rule.onNodeWithText("Требуют внимания").assertExists()
-        rule.onNodeWithText("Новый контейнер").assertExists().assertHasClickAction()
-        rule.onNodeWithText("Сканировать",substring=true).assertExists()
+        // Quick actions live in the central '+' menu. The home page must not
+        // duplicate controls already accessible from permanent navigation.
+        rule.onNodeWithText("Новый контейнер").assertDoesNotExist()
+        rule.onNodeWithText("Сканировать",substring=true).assertDoesNotExist()
+        rule.onNodeWithText("Финансы проекта").assertExists().assertHasClickAction()
     }
 
     @Test fun allFourTilesAreClickableAndStayInsideScreen() {
