@@ -70,6 +70,11 @@ fun Lab07RouteScreen(
                         else Lab07MissingScreen(onBack,modifier)
         "history" -> if(culture!=null) Lab07HistoryScreen(culture,db,revision,onBack,modifier)
                      else Lab07MissingScreen(onBack,modifier)
+        "label" -> if(culture!=null) Lab080LabelEditor(
+            culture,db,revision,db.currentMedium(culture.id)?.let{
+                "${it.name} · v${it.version}"
+            }.orEmpty(),onBack,onChanged,onError,modifier)
+                   else Lab07MissingScreen(onBack,modifier)
         else -> Lab07MissingScreen(onBack,modifier)
     }
 }
