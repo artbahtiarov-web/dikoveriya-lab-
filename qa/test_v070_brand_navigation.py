@@ -46,7 +46,7 @@ class BotanicalNavigation07(unittest.TestCase):
         self.assertIn("rememberSaveable",SCREEN)
         registry=(SRC/"Lab072RegistryUi.kt").read_text(encoding="utf-8")
         for label in ("7 дней","30 дней","По побегам","По растениям"):
-            self.assertIn('"'+label+'"',registry)
+            self.assertIn('"'+label+'"',(SRC/"Lab10FilterUi.kt").read_text(encoding="utf-8"))
         self.assertIn("LabTerms.statuses",registry)
         for label in ("30 дней","90 дней"):
             self.assertIn('"'+label+'"',SCREEN)
