@@ -44,7 +44,7 @@ class Lab07LayoutInstrumentedTest {
                 }
             }
         }
-        rule.onNodeWithText("Моя лаборатория").assertExists()
+        rule.onNodeWithText("Состояние лаборатории").assertExists()
         rule.onNodeWithText("В пробирках").assertExists()
         rule.onNodeWithText("Требуют внимания").assertExists()
         rule.onNodeWithText("Новый контейнер").assertExists().assertHasClickAction()
