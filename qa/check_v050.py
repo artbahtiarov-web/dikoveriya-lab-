@@ -36,7 +36,7 @@ checks={
  'growth': 'Lab07GrowthScreen(' in read('app/src/main/java/ru/dikoveriya/lab/Lab07Screens.kt') and 'addGrowthSample(' in store,
  'plant results': 'plantResults()' in main and 'mediumResults()' in main,
  'approved design': 'DikoveriyaTheme' in main and 'Lab07Palette' in theme,
- 'single version': 'versionCode = 80000 +' in gradle,
+ 'single version': 'versionCode = 90000 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }

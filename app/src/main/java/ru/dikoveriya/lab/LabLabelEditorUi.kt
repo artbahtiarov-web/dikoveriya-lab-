@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -21,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,6 +77,7 @@ fun Lab080LabelEditor(
     var selected by rememberSaveable(culture.id){mutableStateOf("plant")}
     var zoom by rememberSaveable(culture.id){mutableFloatStateOf(1f)}
     var grid by rememberSaveable(culture.id){mutableStateOf(true)}
+    var fontPickerOpen by rememberSaveable(culture.id){mutableStateOf(false)}
     var snap by rememberSaveable(culture.id){mutableStateOf(true)}
     var templateName by rememberSaveable(culture.id){mutableStateOf("")}
     var confirmDelete by rememberSaveable(culture.id){mutableStateOf<Long?>(null)}
@@ -85,6 +90,7 @@ fun Lab080LabelEditor(
     val bmp=remember(serialized,values){LabLabelDesigner.bitmap(values,layout).asImageBitmap()}
     val warnings=remember(serialized){LabLabelDesigner.warnings(layout)}
     var previewWidthPx by remember{mutableFloatStateOf(1f)}
+    val handleWidthPx=with(LocalDensity.current){48.dp.toPx()}
 
     fun checkpoint(){
         undo.add(serialized)
@@ -139,11 +145,13 @@ fun Lab080LabelEditor(
             "Холст 40 × 12 мм. Перетащи элемент пальцем, настрой размеры и сохрани шаблон.",::requestBack)
         Row(verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Text("Увеличение",style=MaterialTheme.typography.bodySmall)
+            Text("Только просмотр",style=MaterialTheme.typography.bodySmall)
             Slider(value=zoom,onValueChange={zoom=it},valueRange=1f..2.5f,
                 modifier=Modifier.weight(1f))
             Text("${(zoom*100).roundToInt()}%",style=MaterialTheme.typography.bodySmall)
         }
+        Text("Размер объекта меняется за золотые углы наклейки или кнопками + / − ниже.",
+            style=MaterialTheme.typography.bodySmall)
         Row(verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.SpaceBetween,
             modifier=Modifier.fillMaxWidth()){
@@ -177,37 +185,59 @@ fun Lab080LabelEditor(
                         }
                     }
                     .pointerInput(previewWidthPx,snap){
-                        var origin:LabelLayer?=null
-                        var cumulative=Offset.Zero
-                        detectDragGestures(
-                            onDragStart={point->
-                                val mx=point.x/previewWidthPx*40f
-                                val my=point.y/previewWidthPx*40f
-                                origin=latestLayout.layers.asReversed().firstOrNull{layer->
-                                    mx in layer.x..(layer.x+layer.width) &&
-                                    my in layer.y..(layer.y+layer.height)
+                        awaitEachGesture {
+                            val down=awaitFirstDown(requireUnconsumed=false)
+                            val mmX=down.position.x/previewWidthPx*40f
+                            val mmY=down.position.y/previewWidthPx*40f
+                            var basis=latestLayout.layers.asReversed().firstOrNull{layer->
+                                !layer.locked &&
+                                mmX in layer.x..(layer.x+layer.width) &&
+                                mmY in layer.y..(layer.y+layer.height)
+                            }
+                            basis?.let{selected=it.id}
+                            var startPos=down.position
+                            var startDistance:Float?=null
+                            var checkpointed=false
+                            while(true){
+                                val event=awaitPointerEvent()
+                                val live=event.changes.filter{it.pressed}
+                                if(live.isEmpty())break
+                                val source=basis
+                                if(source!=null){
+                                    var next:LabelLayer?=null
+                                    if(live.size>=2){
+                                        val distance=(live[0].position-live[1].position).getDistance()
+                                        if(startDistance==null){
+                                            basis=latestLayout.layers.firstOrNull{it.id==source.id}
+                                            startDistance=distance.coerceAtLeast(1f)
+                                        }else{
+                                            next=(basis?:source).scaled(distance/startDistance!!)
+                                        }
+                                    }else{
+                                        if(startDistance!=null){
+                                            basis=latestLayout.layers.firstOrNull{it.id==source.id}
+                                            startPos=live[0].position
+                                            startDistance=null
+                                        }
+                                        val movement=live[0].position-startPos
+                                        if(movement.getDistance()>=2f){
+                                            val dx=movement.x/previewWidthPx*40f
+                                            val dy=movement.y/previewWidthPx*40f
+                                            fun step(value:Float)=if(snap)
+                                                (value*2f).roundToInt()/2f else value
+                                            val base=basis?:source
+                                            next=base.copy(x=step(base.x+dx).coerceIn(0f,40f-base.width),
+                                                y=step(base.y+dy).coerceIn(0f,12f-base.height))
+                                        }
+                                    }
+                                    next?.let{changed->
+                                        if(!checkpointed){checkpoint();checkpointed=true}
+                                        commit(latestLayout.replace(changed),history=false)
+                                    }
                                 }
-                                cumulative=Offset.Zero
-                                origin?.let{selected=it.id;checkpoint()}
-                            },
-                            onDrag={change,delta->
-                                change.consume()
-                                val start=origin
-                                if(start!=null){
-                                    cumulative+=delta
-                                    val nx=start.x+cumulative.x/previewWidthPx*40f
-                                    val ny=start.y+cumulative.y/previewWidthPx*40f
-                                    fun nearest(v:Float)=if(snap)
-                                        (v*2f).roundToInt()/2f else v
-                                    val result=start.copy(
-                                        x=nearest(nx).coerceIn(0f,40f-start.width),
-                                        y=nearest(ny).coerceIn(0f,12f-start.height))
-                                    commit(latestLayout.replace(result),history=false)
-                                }
-                            },
-                            onDragEnd={origin=null},
-                            onDragCancel={origin=null}
-                        )
+                                event.changes.forEach{if(it.pressed)it.consume()}
+                            }
+                        }
                     }
             ){
                 Image(bmp,"Предпросмотр наклейки 40 на 12 миллиметров",
@@ -230,6 +260,52 @@ fun Lab080LabelEditor(
                             size=androidx.compose.ui.geometry.Size(
                                 layer.width*mm,layer.height*mm),
                             style=Stroke(width=2.dp.toPx()))
+                    }
+                }
+                chosen?.let{layer->
+                    // Four visible resizing corners. Hit zones are 48 dp while
+                    // the gold markers themselves are 16 dp.
+                    listOf(
+                        Triple(0,layer.x,layer.y),
+                        Triple(1,layer.x+layer.width,layer.y),
+                        Triple(2,layer.x,layer.y+layer.height),
+                        Triple(3,layer.x+layer.width,layer.y+layer.height)
+                    ).forEach{(corner,mx,my)->
+                        Box(Modifier
+                            .offset {
+                                IntOffset(
+                                    (mx*previewWidthPx/40f-handleWidthPx/2f).roundToInt(),
+                                    (my*previewWidthPx/40f-handleWidthPx/2f).roundToInt()
+                                )
+                            }
+                            .size(48.dp)
+                            .pointerInput(layer.id,corner,previewWidthPx,layer.locked) {
+                                var baseline=layer
+                                var deltaMm=Offset.Zero
+                                detectDragGestures(
+                                    onDragStart={
+                                        baseline=latestLayout.layers.firstOrNull{it.id==layer.id}?:layer
+                                        deltaMm=Offset.Zero
+                                        if(!baseline.locked)checkpoint()
+                                    },
+                                    onDrag={change,amount->
+                                        change.consume()
+                                        if(!baseline.locked){
+                                            deltaMm+=amount
+                                            val newLayer=baseline.resizedFromCorner(
+                                                corner,deltaMm.x/previewWidthPx*40f,
+                                                deltaMm.y/previewWidthPx*40f)
+                                            commit(latestLayout.replace(newLayer),history=false)
+                                        }
+                                    }
+                                )
+                            },
+                            contentAlignment=Alignment.Center) {
+                            Box(Modifier.size(16.dp)
+                                .border(2.dp,if(layer.locked)Color.Gray
+                                    else Color(0xFFB98635),RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.surface))
+                        }
                     }
                 }
             }
@@ -293,6 +369,25 @@ fun Lab080LabelEditor(
                         Field("Свой текст",layer.text,{edit(layer.copy(text=it.take(150)))},
                             single=false)
                     }
+                    Text("РАЗМЕР ВЫБРАННОГО ОБЪЕКТА",
+                        style=MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
+                        OutlinedButton(enabled=!layer.locked,
+                            onClick={edit(layer.scaled(.9f))},
+                            modifier=Modifier.weight(1f).heightIn(min=48.dp)){
+                            Text("− 10%")
+                        }
+                        OutlinedButton(enabled=!layer.locked,
+                            onClick={edit(layer.scaled(1.1f))},
+                            modifier=Modifier.weight(1f).heightIn(min=48.dp)){
+                            Text("+ 10%")
+                        }
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Checkbox(checked=layer.locked,
+                            onCheckedChange={edit(layer.copy(locked=it))})
+                        Text("Закрепить от случайного перемещения")
+                    }
                     Text("Положение, мм",style=MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                         OutlinedButton(onClick={edit(layer.moved(-.5f,0f))},
@@ -334,15 +429,34 @@ fun Lab080LabelEditor(
                         Slider(value=layer.fontMm,
                             onValueChange={edit(layer.copy(fontMm=it))},
                             valueRange=.65f..4f)
-                        PickOne("Шрифт",listOf("Sans","Serif","Mono"),layer.family,
-                            {edit(layer.copy(family=it))})
+                        OutlinedButton(onClick={fontPickerOpen=true},
+                            modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                            Icon(Icons.Outlined.FontDownload,null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Шрифт: "+LabelFontCatalog.option(layer.family).title)
+                            Spacer(Modifier.weight(1f))
+                            Icon(Icons.Outlined.ChevronRight,null)
+                        }
                         PickOne("Выравнивание",listOf("Слева","По центру","Справа"),
                             layer.align,{edit(layer.copy(align=it))})
-                        Row(verticalAlignment=Alignment.CenterVertically){
-                            Checkbox(checked=layer.bold,
-                                onCheckedChange={edit(layer.copy(bold=it))})
-                            Text("Полужирный")
+                        Text("Форматирование · B / I / U можно сочетать",
+                            style=MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            FilterChip(selected=layer.bold,
+                                onClick={edit(layer.copy(bold=!layer.bold))},
+                                label={Text("B · Жирный")},modifier=Modifier.heightIn(min=48.dp))
+                            FilterChip(selected=layer.italic,
+                                onClick={edit(layer.copy(italic=!layer.italic))},
+                                label={Text("I · Курсив")},modifier=Modifier.heightIn(min=48.dp))
                         }
+                        FilterChip(selected=layer.underline,
+                            onClick={edit(layer.copy(underline=!layer.underline))},
+                            label={Text("U · Подчёркнутый")},modifier=Modifier.heightIn(min=48.dp))
+                        Text("Межбуквенный интервал: "+label080(layer.letterSpacingMm)+" мм",
+                            style=MaterialTheme.typography.bodySmall)
+                        Slider(value=layer.letterSpacingMm,
+                            onValueChange={edit(layer.copy(letterSpacingMm=it))},
+                            valueRange=-.2f..0.8f)
                     }
                     PickOne("Поворот",listOf("0","90","180","270"),
                         layer.rotation.toString(),
@@ -455,9 +569,16 @@ fun Lab080LabelEditor(
         if(savedNotice.isNotBlank())Text(savedNotice,
             color=Lab07Palette.Forest,
             style=MaterialTheme.typography.bodyMedium)
-        Text("Считывание QR зависит от реальной печати, бумаги и камеры. Прямая Bluetooth-печать отсутствует.",
+        HorizontalDivider()
+        Lab09PrintPanel(values=values,layout=layout,onError=onError)
+        Text("Официальное приложение NIIMBOT может отсутствовать в меню Android Share. Встроенная печать выше подключается к принтеру напрямую по Bluetooth. Экспорт PNG остаётся запасным вариантом.",
             style=MaterialTheme.typography.bodySmall,
             color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if(fontPickerOpen && chosen!=null && chosen.kind!="qr"){
+        Lab09FontPicker(selected=chosen.family,
+            onSelect={id->edit(chosen.copy(family=id))},
+            onDismiss={fontPickerOpen=false})
     }
     if(confirmLeave)AlertDialog(
         onDismissRequest={confirmLeave=false},

@@ -1,0 +1,259 @@
+{
+  "source": "google/fonts",
+  "pinned_commit": "3e5667764ccfea32ce0c3d58a3a4756de890adc1",
+  "license": "OFL (each family license downloaded and packaged)",
+  "fonts": [
+    {
+      "id": "montserrat",
+      "name": "montserrat",
+      "asset": "montserrat.ttf",
+      "path": "ofl/montserrat/Montserrat[wght].ttf",
+      "git_blob_sha": "c97aca18592834d8706549c279cb8d5ac5d85f69",
+      "size": 744936,
+      "license": "ofl/montserrat/OFL.txt"
+    },
+    {
+      "id": "roboto",
+      "name": "roboto",
+      "asset": "roboto.ttf",
+      "path": "ofl/roboto/Roboto[wdth,wght].ttf",
+      "git_blob_sha": "5522a368d9072fd88c299916e61fcff369949061",
+      "size": 488584,
+      "license": "ofl/roboto/OFL.txt"
+    },
+    {
+      "id": "opensans",
+      "name": "opensans",
+      "asset": "opensans.ttf",
+      "path": "ofl/opensans/OpenSans[wdth,wght].ttf",
+      "git_blob_sha": "9db85693b027f3b05f6d77471d215f20707127c1",
+      "size": 532636,
+      "license": "ofl/opensans/OFL.txt"
+    },
+    {
+      "id": "inter",
+      "name": "inter",
+      "asset": "inter.ttf",
+      "path": "ofl/inter/Inter[opsz,wght].ttf",
+      "git_blob_sha": "047c92f6e2212473dc436020afed689527076d44",
+      "size": 876576,
+      "license": "ofl/inter/OFL.txt"
+    },
+    {
+      "id": "rubik",
+      "name": "rubik",
+      "asset": "rubik.ttf",
+      "path": "ofl/rubik/Rubik[wght].ttf",
+      "git_blob_sha": "a59aeb632df494345a542697c357f608875481b0",
+      "size": 359804,
+      "license": "ofl/rubik/OFL.txt"
+    },
+    {
+      "id": "manrope",
+      "name": "manrope",
+      "asset": "manrope.ttf",
+      "path": "ofl/manrope/Manrope[wght].ttf",
+      "git_blob_sha": "75274da58537d6123b14f2cd0c355ad4681fc2b3",
+      "size": 164700,
+      "license": "ofl/manrope/OFL.txt"
+    },
+    {
+      "id": "raleway",
+      "name": "raleway",
+      "asset": "raleway.ttf",
+      "path": "ofl/raleway/Raleway[wght].ttf",
+      "git_blob_sha": "d81d42f537c7dc1bbde81b54e4c52a92977a8fde",
+      "size": 312352,
+      "license": "ofl/raleway/OFL.txt"
+    },
+    {
+      "id": "playfairdisplay",
+      "name": "playfairdisplay",
+      "asset": "playfairdisplay.ttf",
+      "path": "ofl/playfairdisplay/PlayfairDisplay[wght].ttf",
+      "git_blob_sha": "7a09eb71f10622fd083134ac9ed46f59b21bee18",
+      "size": 300724,
+      "license": "ofl/playfairdisplay/OFL.txt"
+    },
+    {
+      "id": "lora",
+      "name": "lora",
+      "asset": "lora.ttf",
+      "path": "ofl/lora/Lora[wght].ttf",
+      "git_blob_sha": "ee1914c3746140523de2940d267ec2215bd85d5b",
+      "size": 212196,
+      "license": "ofl/lora/OFL.txt"
+    },
+    {
+      "id": "nunito",
+      "name": "nunito",
+      "asset": "nunito.ttf",
+      "path": "ofl/nunito/Nunito[wght].ttf",
+      "git_blob_sha": "2ec1f4b0676c83ef33049db87b311171699e9192",
+      "size": 276932,
+      "license": "ofl/nunito/OFL.txt"
+    },
+    {
+      "id": "oswald",
+      "name": "oswald",
+      "asset": "oswald.ttf",
+      "path": "ofl/oswald/Oswald[wght].ttf",
+      "git_blob_sha": "d1a3b9cb1325bf20b3a06ef9849d21c411212a3b",
+      "size": 172088,
+      "license": "ofl/oswald/OFL.txt"
+    },
+    {
+      "id": "ptsans",
+      "name": "ptsans",
+      "asset": "ptsans.ttf",
+      "path": "ofl/ptsans/PT_Sans-Web-Regular.ttf",
+      "git_blob_sha": "83a21b724c47127a95e725b5c6bdfa30fcc1a7be",
+      "size": 442960,
+      "license": "ofl/ptsans/OFL.txt"
+    },
+    {
+      "id": "ptserif",
+      "name": "ptserif",
+      "asset": "ptserif.ttf",
+      "path": "ofl/ptserif/PT_Serif-Web-Regular.ttf",
+      "git_blob_sha": "5310691a999658437d6db608b9447d606598753e",
+      "size": 359048,
+      "license": "ofl/ptserif/OFL.txt"
+    },
+    {
+      "id": "ibmplexsans",
+      "name": "ibmplexsans",
+      "asset": "ibmplexsans.ttf",
+      "path": "ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf",
+      "git_blob_sha": "30f837e8b02e8ecddce6cbebc425b1f422392515",
+      "size": 537244,
+      "license": "ofl/ibmplexsans/OFL.txt"
+    },
+    {
+      "id": "ibmplexserif",
+      "name": "ibmplexserif",
+      "asset": "ibmplexserif.ttf",
+      "path": "ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
+      "git_blob_sha": "069d26a6c7951cd60811dcd100bdf2e6f39cfcc4",
+      "size": 163068,
+      "license": "ofl/ibmplexserif/OFL.txt"
+    },
+    {
+      "id": "ibmplexmono",
+      "name": "ibmplexmono",
+      "asset": "ibmplexmono.ttf",
+      "path": "ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+      "git_blob_sha": "0c9770d5183ba60dc4350d3e011b782a320761ae",
+      "size": 135580,
+      "license": "ofl/ibmplexmono/OFL.txt"
+    },
+    {
+      "id": "firacode",
+      "name": "firacode",
+      "asset": "firacode.ttf",
+      "path": "ofl/firacode/FiraCode[wght].ttf",
+      "git_blob_sha": "83f2b3875f734f135154f18bb4f13d4075186927",
+      "size": 260364,
+      "license": "ofl/firacode/OFL.txt"
+    },
+    {
+      "id": "jost",
+      "name": "jost",
+      "asset": "jost.ttf",
+      "path": "ofl/jost/Jost[wght].ttf",
+      "git_blob_sha": "cdf8630280e37a7e8040dd5a32e3c13a9794e6d4",
+      "size": 134996,
+      "license": "ofl/jost/OFL.txt"
+    },
+    {
+      "id": "merriweather",
+      "name": "merriweather",
+      "asset": "merriweather.ttf",
+      "path": "ofl/merriweather/Merriweather[opsz,wdth,wght].ttf",
+      "git_blob_sha": "cb775b80fa0a6f3b2aea114869a7171695b50a62",
+      "size": 4628080,
+      "license": "ofl/merriweather/OFL.txt"
+    },
+    {
+      "id": "yesevaone",
+      "name": "yesevaone",
+      "asset": "yesevaone.ttf",
+      "path": "ofl/yesevaone/YesevaOne-Regular.ttf",
+      "git_blob_sha": "8c22da37c23bd976e696575a5cb223b88909a2fe",
+      "size": 108016,
+      "license": "ofl/yesevaone/OFL.txt"
+    },
+    {
+      "id": "comfortaa",
+      "name": "comfortaa",
+      "asset": "comfortaa.ttf",
+      "path": "ofl/comfortaa/Comfortaa[wght].ttf",
+      "git_blob_sha": "8b8e5f81bf740a8154bb6cd9f4eee5ac4bda6b18",
+      "size": 201756,
+      "license": "ofl/comfortaa/OFL.txt"
+    },
+    {
+      "id": "cormorantgaramond",
+      "name": "cormorantgaramond",
+      "asset": "cormorantgaramond.ttf",
+      "path": "ofl/cormorantgaramond/CormorantGaramond[wght].ttf",
+      "git_blob_sha": "d992a83ce525c330fad3a19087746bcb2dc038ee",
+      "size": 1195560,
+      "license": "ofl/cormorantgaramond/OFL.txt"
+    },
+    {
+      "id": "philosopher",
+      "name": "philosopher",
+      "asset": "philosopher.ttf",
+      "path": "ofl/philosopher/Philosopher-Regular.ttf",
+      "git_blob_sha": "cec1b938c0ce77e6ef12ec0bd0ca4748965a9be7",
+      "size": 111676,
+      "license": "ofl/philosopher/OFL.txt"
+    },
+    {
+      "id": "forum",
+      "name": "forum",
+      "asset": "forum.ttf",
+      "path": "ofl/forum/Forum-Regular.ttf",
+      "git_blob_sha": "961dffbbcc699392519a525e13df9a652ae33f1a",
+      "size": 303316,
+      "license": "ofl/forum/OFL.txt"
+    },
+    {
+      "id": "prata",
+      "name": "prata",
+      "asset": "prata.ttf",
+      "path": "ofl/prata/Prata-Regular.ttf",
+      "git_blob_sha": "6c0e862cdb2c2409546fb2c42a709319db43f538",
+      "size": 101284,
+      "license": "ofl/prata/OFL.txt"
+    },
+    {
+      "id": "tenorsans",
+      "name": "tenorsans",
+      "asset": "tenorsans.ttf",
+      "path": "ofl/tenorsans/TenorSans-Regular.ttf",
+      "git_blob_sha": "5b63bb960e56995c11f4048bc03037f24c539346",
+      "size": 131896,
+      "license": "ofl/tenorsans/OFL.txt"
+    },
+    {
+      "id": "spectral",
+      "name": "spectral",
+      "asset": "spectral.ttf",
+      "path": "ofl/spectral/Spectral-Regular.ttf",
+      "git_blob_sha": "25a6c47f8050e4ea3c9713a02a4843a8d6c503d5",
+      "size": 261088,
+      "license": "ofl/spectral/OFL.txt"
+    },
+    {
+      "id": "alegreya",
+      "name": "alegreya",
+      "asset": "alegreya.ttf",
+      "path": "ofl/alegreya/Alegreya[wght].ttf",
+      "git_blob_sha": "af2b22024311daaa15ec4ab879bd67f790abb9f1",
+      "size": 425288,
+      "license": "ofl/alegreya/OFL.txt"
+    }
+  ]
+}

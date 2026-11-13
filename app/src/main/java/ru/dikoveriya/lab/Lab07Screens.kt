@@ -33,6 +33,7 @@ fun Lab07RouteScreen(
     onLegacyAssessment:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit= {},
+    onPrintLabels:(List<Long>)->Unit= {},
     modifier:Modifier=Modifier
 ) {
     val id=route.substringAfter(':',"").toLongOrNull()
@@ -49,7 +50,8 @@ fun Lab07RouteScreen(
                 db=db,revision=revision,plants=plants,recipes=recipes,
                 onBack=onBack,onNavigate=onNavigate,
                 onChanged=onChanged,onError=onError,
-                onExportLabels=onExportLabels,modifier=modifier)
+                onExportLabels=onExportLabels,
+                onPrintLabels=onPrintLabels,modifier=modifier)
         }
         "tasks" -> Lab072TasksScreen(db,revision,plants,recipes,
             onBack,onNavigate,onChanged,onError,modifier)

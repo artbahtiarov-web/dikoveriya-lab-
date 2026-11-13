@@ -10,8 +10,8 @@ android {
         applicationId = "ru.dikoveriya.lab"
         minSdk = 26
         targetSdk = 35
-        versionCode = 80000 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "0.8.0"
+        versionCode = 90000 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
+        versionName = "0.9.0-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -54,6 +54,20 @@ android {
     buildFeatures { compose = true }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
+// The font files are not downloaded at runtime. They are vendor-pinned OFL
+// assets verified during the build and packaged into the installed APK.
+android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/font-assets"))
+val prepareLabelFonts by tasks.registering(Exec::class) {
+    workingDir = rootProject.projectDir
+    commandLine("python3", "scripts/prepare_label_fonts.py")
+    inputs.file(rootProject.file("scripts/label_fonts_manifest.json"))
+    inputs.file(rootProject.file("scripts/prepare_label_fonts.py"))
+    outputs.dir(layout.buildDirectory.dir("generated/font-assets"))
+}
+tasks.named("preBuild") { dependsOn(prepareLabelFonts) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(prepareLabelFonts) }
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.activity:activity-compose:1.9.3")

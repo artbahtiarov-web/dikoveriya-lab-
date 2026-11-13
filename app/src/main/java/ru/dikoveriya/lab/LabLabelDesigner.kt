@@ -26,15 +26,60 @@ data class LabelLayer(
     val fontMm:Float=1.65f,
     val family:String="Sans",
     val bold:Boolean=false,
+    val italic:Boolean=false,
+    val underline:Boolean=false,
+    val letterSpacingMm:Float=0f,
+    val locked:Boolean=false,
     val align:String="Слева",
     val rotation:Int=0,
     val text:String="",
     val visible:Boolean=true
 ) {
-    fun moved(dx:Float,dy:Float):LabelLayer=copy(
+    fun moved(dx:Float,dy:Float):LabelLayer=if(locked)this else copy(
         x=(x+dx).coerceIn(0f,40f-width),
         y=(y+dy).coerceIn(0f,12f-height)
     )
+    /** Scale the physical object; QR remains square, text size scales with its box. */
+    /**
+     * corner: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
+     * The opposite corner stays fixed. QR never loses its 1:1 aspect ratio.
+     */
+    fun resizedFromCorner(corner:Int,dx:Float,dy:Float):LabelLayer{
+        if(locked||corner !in 0..3||!dx.isFinite()||!dy.isFinite())return this
+        val leftCorner=corner==0||corner==2
+        val topCorner=corner==0||corner==1
+        val minW=if(kind=="qr")8.8f else 2f
+        val minH=if(kind=="qr")8.8f else .8f
+        val originalRight=x+width
+        val originalBottom=y+height
+        val left=if(leftCorner)(x+dx).coerceIn(0f,originalRight-minW)else x
+        val right=if(leftCorner)originalRight else (originalRight+dx).coerceIn(x+minW,40f)
+        val top=if(topCorner)(y+dy).coerceIn(0f,originalBottom-minH)else y
+        val bottom=if(topCorner)originalBottom else (originalBottom+dy).coerceIn(y+minH,12f)
+        var w=right-left
+        var h=bottom-top
+        if(kind=="qr"){val side=minOf(w,h);w=side;h=side}
+        val nextX=if(leftCorner)right-w else left
+        val nextY=if(topCorner)bottom-h else top
+        return copy(x=nextX,y=nextY,width=w,height=h)
+    }
+
+    fun scaled(factor:Float):LabelLayer {
+        if(locked||!factor.isFinite()||factor<=0f)return this
+        val minWidth=if(kind=="qr")8.8f else 2f
+        val minHeight=if(kind=="qr")8.8f else .8f
+        val maxFactor=minOf((40f-x)/width,(12f-y)/height)
+        val minFactor=maxOf(minWidth/width,minHeight/height,
+            if(kind=="qr")0f else .65f/fontMm)
+        if(maxFactor<minFactor)return this
+        val scale=factor.coerceIn(minFactor,maxFactor)
+        val proposedWidth=width*scale
+        val proposedHeight=height*scale
+        val side=if(kind=="qr")minOf(proposedWidth,proposedHeight)else 0f
+        return copy(width=if(kind=="qr")side else proposedWidth,
+            height=if(kind=="qr")side else proposedHeight,
+            fontMm=if(kind=="qr")fontMm else (fontMm*scale).coerceIn(.65f,4f))
+    }
 }
 
 data class LabelDesign(val layers:List<LabelLayer>,val dpi:Int=203) {
@@ -50,7 +95,7 @@ data class LabelDesign(val layers:List<LabelLayer>,val dpi:Int=203) {
         fun decode(raw:String):LabelDesign {
             require(raw.length<=30000){"Слишком большой макет"}
             val json=JSONObject(raw)
-            require(json.optInt("version")==1){"Неподдерживаемая версия редактора"}
+            require(json.optInt("version") in 1..2){"Неподдерживаемая версия редактора"}
             val dpi=json.optInt("dpi",203)
             require(dpi in LabLabel40.supportedDpi)
             val arr=json.getJSONArray("layers")
@@ -63,6 +108,10 @@ data class LabelDesign(val layers:List<LabelLayer>,val dpi:Int=203) {
                     width=o.getDouble("w").toFloat(),height=o.getDouble("h").toFloat(),
                     fontMm=o.optDouble("fontMm",1.65).toFloat(),
                     family=o.optString("family","Sans"),bold=o.optBoolean("bold",false),
+                    italic=o.optBoolean("italic",false),
+                    underline=o.optBoolean("underline",false),
+                    letterSpacingMm=o.optDouble("letterSpacingMm",0.0).toFloat(),
+                    locked=o.optBoolean("locked",false),
                     align=o.optString("align","Слева"),rotation=o.optInt("rotation",0),
                     text=o.optString("text",""),visible=o.optBoolean("visible",true)
                 )
@@ -79,11 +128,12 @@ data class LabelDesign(val layers:List<LabelLayer>,val dpi:Int=203) {
         layers.forEach{l->
             require(l.kind in types){"Неизвестное поле: ${l.kind}"}
             require(l.id.length in 1..50 && l.text.length<=150)
-            require(listOf(l.x,l.y,l.width,l.height,l.fontMm).all{it.isFinite()})
+            require(listOf(l.x,l.y,l.width,l.height,l.fontMm,l.letterSpacingMm).all{it.isFinite()})
             require(l.x>=0f && l.y>=0f && l.width>=.5f && l.height>=.5f)
             require(l.x+l.width<=40.001f && l.y+l.height<=12.001f){"Элемент выходит за край бумаги"}
             require(l.fontMm in .65f..4.0f)
-            require(l.family in listOf("Sans","Serif","Mono"))
+            require(LabelFontCatalog.options.any{it.id==l.family}){"Выбранный шрифт недоступен"}
+            require(l.letterSpacingMm in -.2f..0.8f)
             require(l.align in listOf("Слева","По центру","Справа"))
             require(l.rotation in listOf(0,90,180,270))
             if(l.kind=="qr")require(min(l.width,l.height)>=8.8f){"QR меньше 8,8 мм — затруднено сканирование"}
@@ -92,12 +142,14 @@ data class LabelDesign(val layers:List<LabelLayer>,val dpi:Int=203) {
     fun encode():String {
         verify()
         return JSONObject().apply{
-            put("version",1);put("dpi",dpi)
+            put("version",2);put("dpi",dpi)
             put("layers",JSONArray().apply{layers.forEach{l->
                 put(JSONObject().apply{
                     put("id",l.id);put("kind",l.kind);put("x",l.x);put("y",l.y)
                     put("w",l.width);put("h",l.height);put("fontMm",l.fontMm)
-                    put("family",l.family);put("bold",l.bold);put("align",l.align)
+                    put("family",l.family);put("bold",l.bold);put("italic",l.italic)
+                    put("underline",l.underline);put("letterSpacingMm",l.letterSpacingMm)
+                    put("locked",l.locked);put("align",l.align)
                     put("rotation",l.rotation);put("text",l.text);put("visible",l.visible)
                 })
             }})
@@ -167,28 +219,28 @@ object LabLabelDesigner {
             }else {
                 val raw=values.value(layer).trim()
                 if(raw.isNotEmpty()){
-                    val family=when(layer.family){
-                        "Serif"->"serif";"Mono"->"monospace";else->"sans-serif"
-                    }
                     val paint=Paint(black).apply{
-                        typeface=Typeface.create(family,
-                            if(layer.bold)Typeface.BOLD else Typeface.NORMAL)
+                        typeface=LabelFontCatalog.typeface(layer.family,layer.bold,layer.italic)
                         textSize=layer.fontMm*mm
-                        textAlign=when(layer.align){
-                            "По центру"->Paint.Align.CENTER
-                            "Справа"->Paint.Align.RIGHT
-                            else->Paint.Align.LEFT
-                        }
+                        isUnderlineText=layer.underline
+                        textAlign=Paint.Align.LEFT
                     }
+                    val gap=layer.letterSpacingMm*mm
                     val horizontal=when(layer.align){
                         "По центру"->x+boxW/2
                         "Справа"->x+boxW-.1f*mm
                         else->x+.1f*mm
                     }
                     val availableLines=(layer.height/(layer.fontMm*1.22f)).toInt().coerceAtLeast(1).coerceAtMost(3)
-                    val strings=wrap(raw,boxW-.3f*mm,paint,availableLines)
+                    val strings=wrap(raw,boxW-.3f*mm,paint,availableLines,gap)
                     strings.forEachIndexed{i,line->
-                        c.drawText(line,horizontal,y+(i+1)*layer.fontMm*mm*1.12f,paint)
+                        val len=measure(line,paint,gap)
+                        val position=when(layer.align){
+                            "По центру"->horizontal-len/2
+                            "Справа"->horizontal-len
+                            else->horizontal
+                        }
+                        drawSpaced(c,line,position,y+(i+1)*layer.fontMm*mm*1.12f,paint,gap)
                     }
                 }
             }
@@ -197,20 +249,36 @@ object LabLabelDesigner {
         return bitmap
     }
 
-    private fun wrap(raw:String,width:Float,paint:Paint,lines:Int):List<String>{
+    private fun measure(text:String,paint:Paint,gap:Float):Float =
+        paint.measureText(text)+(text.codePointCount(0,text.length)-1).coerceAtLeast(0)*gap
+
+    private fun drawSpaced(canvas:Canvas,text:String,x:Float,y:Float,paint:Paint,gap:Float){
+        if(gap==0f){canvas.drawText(text,x,y,paint);return}
+        var cursor=x
+        var i=0
+        while(i<text.length){
+            val cp=Character.codePointAt(text,i)
+            val str=String(Character.toChars(cp))
+            canvas.drawText(str,cursor,y,paint)
+            cursor+=paint.measureText(str)+gap
+            i+=Character.charCount(cp)
+        }
+    }
+
+    private fun wrap(raw:String,width:Float,paint:Paint,lines:Int,gap:Float):List<String>{
         fun ellipsis(value:String):String{
-            if(paint.measureText(value)<=width)return value
+            if(measure(value,paint,gap)<=width)return value
             var text=value
-            while(text.isNotEmpty()&&paint.measureText(text+"…")>width)
+            while(text.isNotEmpty()&&measure(text+"…",paint,gap)>width)
                 text=text.dropLast(1)
             return text.trimEnd()+"…"
         }
         if(lines==1)return listOf(ellipsis(raw))
         val result=mutableListOf<String>()
-        var words=raw.split(Regex("\\s+")).toMutableList()
+        val words=raw.split(Regex("\\s+")).toMutableList()
         while(words.isNotEmpty()&&result.size<lines){
             var next=words.removeAt(0)
-            while(words.isNotEmpty()&&paint.measureText(next+" "+words.first())<=width)
+            while(words.isNotEmpty()&&measure(next+" "+words.first(),paint,gap)<=width)
                 next+=" "+words.removeAt(0)
             if(result.size==lines-1 && words.isNotEmpty())
                 next+=" "+words.joinToString(" ")
