@@ -1,5 +1,7 @@
 package ru.dikoveriya.lab
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +25,18 @@ internal fun Lab11StorageScreen(
     onChanged:()->Unit,onError:(String)->Unit,
     initialFocusId:Long?=null,modifier:Modifier=Modifier
 ){
+    val context=androidx.compose.ui.platform.LocalContext.current
+    var pendingLabel by remember{mutableStateOf<Long?>(null)}
+    val saveQr=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/png")){uri->
+        val id=pendingLabel
+        pendingLabel=null
+        if(uri!=null && id!=null)runCatching{
+            context.contentResolver.openOutputStream(uri)?.use{
+                it.write(LabQr.png("LOC-%06d".format(java.util.Locale.US,id)))
+            }?:error("Файл не создан")
+        }.onFailure{onError(it.message?:"Ошибка сохранения QR места")}
+    }
     val racks=remember(revision){db.racks11()}
     val focusedRack=remember(initialFocusId,revision){
         racks.firstOrNull{rack->rack.shelves.any{sh->
@@ -214,6 +228,15 @@ internal fun Lab11StorageScreen(
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 Text("Содержимое позиции",style=MaterialTheme.typography.headlineSmall)
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Text("QR: LOC-%06d".format(java.util.Locale.US,locId),
+                        style=MaterialTheme.typography.bodySmall,
+                        modifier=Modifier.weight(1f))
+                    TextButton(onClick={
+                        pendingLabel=locId
+                        saveQr.launch("LOC-%06d.png".format(java.util.Locale.US,locId))
+                    }){Text("Сохранить этикетку")}
+                }
                 if(occupants.isEmpty())Text("Место свободно")
                 occupants.forEach{row->
                     OutlinedCard(onClick={
