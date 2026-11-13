@@ -23,6 +23,7 @@ private val lab10MoreSections=listOf(
         Lab10MoreAction("Оборудование","Состояние и обслуживание",Icons.Outlined.Build)
     ),
     "Работа" to listOf(
+        Lab10MoreAction("Операции","Журнал с историей и результатами",Icons.Outlined.History),
         Lab10MoreAction("Задачи","План на день и поручения",Icons.Outlined.EventNote),
         Lab10MoreAction("Инциденты","Проблемы и решения",Icons.Outlined.ReportProblem),
         Lab10MoreAction("Эксперименты","Опыты и наблюдения",Icons.Outlined.Science),
