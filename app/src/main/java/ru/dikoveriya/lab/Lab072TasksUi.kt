@@ -88,50 +88,10 @@ fun Lab072TasksScreen(
                 "Открытые","Все","Выполнено","Отменённые"),period,{period=it;pages=1})
         }
         item(key="filters"){
-            OutlinedButton(onClick={advanced=!advanced},
+            OutlinedButton(onClick={advanced=true},
                 modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
                 Icon(Icons.Outlined.Tune,null);Spacer(Modifier.width(7.dp))
-                Text(if(advanced)"Скрыть дополнительные фильтры"
-                    else "Фильтр по важности, сорту и среде")
-            }
-        }
-        if(advanced)item(key="advanced"){
-            Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                PickOne("Приоритет",listOf("Все","Не задан","Низкий","Обычный",
-                    "Высокий","Срочный"),priority.ifBlank{"Все"},
-                    {priority=if(it=="Все")"" else it;pages=1})
-                PickOne("Вид работы",listOf("Все","Осмотр","Пересадка","Уход",
-                    "Подготовка среды","Другое"),kind.ifBlank{"Все"},
-                    {kind=if(it=="Все")"" else it;pages=1})
-                PickOne("Растение",listOf("Все")+plants.map{it.name},
-                    plants.firstOrNull{it.id==plantId}?.name?:"Все",
-                    {plantId=plants.firstOrNull{p->p.name==it}?.id;pages=1})
-                PickOne("Среда, если указана в задаче",listOf("Все")+
-                    recipes.map{it.name+" · v"+it.version},
-                    recipes.firstOrNull{it.id==recipeId}?.let{it.name+" · v"+it.version}?:"Все",
-                    {choice->recipeId=recipes.firstOrNull{
-                        it.name+" · v"+it.version==choice}?.id;pages=1})
-                Field("Не раньше (дд.мм.гггг)",fromText,{fromText=it;pages=1})
-                Field("Не позже (дд.мм.гггг)",toText,{toText=it;pages=1})
-                PickOne("Сортировка",listOf("Ближайшие","Важные","Поздние"),
-                    order,{order=it;pages=1})
-                OutlinedButton(onClick={viewDialog=true}){
-                    Icon(Icons.Outlined.BookmarkAdd,null)
-                    Spacer(Modifier.width(7.dp));Text("Сохранить фильтр")
-                }
-                if(saved.isNotEmpty())PickOne("Мои фильтры",
-                    listOf("Выбрать")+saved.map{it.name},"Выбрать",{name->
-                        saved.firstOrNull{it.name==name}?.let{
-                            val f=filter.withSaved(it.config)
-                            period=f.period;priority=f.priority;kind=f.kind
-                            plantId=f.plantId;recipeId=f.recipeId
-                            search=f.text;order=f.order
-                            val opts=org.json.JSONObject(it.config)
-                            fromText=opts.optString("fromText","")
-                            toText=opts.optString("toText","")
-                            pages=1
-                        }
-                    })
+                Text("Фильтры: важность, сорт, среда и даты")
             }
         }
         item(key="count"){SectionTitle("Задачи · "+total)}
@@ -211,6 +171,32 @@ fun Lab072TasksScreen(
                 Text("Ещё 40 · осталось "+(total-rows.size))
             }
         }
+    }
+    if(advanced){
+        Lab10TaskFilterSheet(
+            initial=Lab10TaskFilters(priority,kind,plantId,recipeId,fromText,toText,order),
+            plants=plants,recipes=recipes,savedNames=saved.map{it.name},
+            onSelectSaved={name->
+                saved.firstOrNull{it.name==name}?.let{view->
+                    val f=filter.withSaved(view.config)
+                    period=f.period;priority=f.priority;kind=f.kind
+                    plantId=f.plantId;recipeId=f.recipeId
+                    search=f.text;order=f.order
+                    val opts=org.json.JSONObject(view.config)
+                    fromText=opts.optString("fromText","")
+                    toText=opts.optString("toText","")
+                    pages=1
+                }
+                advanced=false
+            },
+            onSave={advanced=false;viewDialog=true},
+            onApply={v->
+                priority=v.priority;kind=v.kind;plantId=v.plantId
+                recipeId=v.recipeId;fromText=v.fromText;toText=v.toText
+                order=v.order;advanced=false;pages=1
+            },
+            onDismiss={advanced=false}
+        )
     }
     cancelTaskId?.let{id->
         AlertDialog(onDismissRequest={cancelTaskId=null},
