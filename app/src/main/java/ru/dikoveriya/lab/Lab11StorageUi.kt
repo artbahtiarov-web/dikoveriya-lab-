@@ -226,22 +226,20 @@ internal fun Lab11StorageScreen(
                     }
                 }
                 if(assign){
-                    Field("Номер LAB-000001 или PLT-000001",code,{code=it})
+                    Field("Номера LAB-, PLT- или ГР- через запятую или с новой строки",
+                        code,{code=it},single=false)
                     Field("Причина размещения",reason,{reason=it})
+                    Text("Можно переместить один экземпляр, несколько контейнеров либо все контейнеры партии за одну операцию.",
+                        style=MaterialTheme.typography.bodySmall)
                     Button(onClick={
                         try{
-                            val normalized=code.trim().uppercase()
-                            if(normalized.startsWith("PLT-")){
-                                val id=db.itemIdByCode11(normalized)?:error("Растение не найдено")
-                                db.moveItem11(id,locId,reason=reason)
-                            }else if(normalized.startsWith("LAB-")){
-                                val id=db.findCulture072(normalized)?:error("Контейнер не найден")
-                                db.moveContainers072(listOf(id),locId,reason)
-                            }else error("Укажи реальный номер контейнера или растения")
+                            val codes=code.trim().split(Regex("[,;\\s]+"))
+                                .map{it.trim()}.filter{it.isNotBlank()}
+                            val count=db.moveSelected11(codes,locId,reason)
                             assign=false;selected=null;onChanged()
                         }catch(e:Exception){onError(e.message?:"Не удалось разместить")}
                     },modifier=Modifier.fillMaxWidth()){
-                        Text("Сохранить размещение")
+                        Text("Разместить выбранные объекты")
                     }
                 }else Button(onClick={assign=true},modifier=Modifier.fillMaxWidth()){
                     Text("Разместить объект")
