@@ -92,10 +92,10 @@ class SQLiteV8Tests(unittest.TestCase):
         self.assertEqual(db.execute("SELECT COUNT(*) FROM culture_audit").fetchone()[0],0)
 
     def test_backup_schema_and_predecessors(self):
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10)',DB)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11)',DB)
         self.assertIn('BACKUP_ORDER_V7=BACKUP_ORDER_V6+',DB)
         self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
-        self.assertIn('root.optInt("schema") in 4..10',DB)
+        self.assertIn('root.optInt("schema") in 4..11',DB)
         self.assertIn('if(fromVersion<8)',DB)
         self.assertIn("LabCoreV10.validate(this)",DB)
         self.assertIn("db.beginTransactionNonExclusive()",DB)
