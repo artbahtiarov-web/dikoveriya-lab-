@@ -170,5 +170,6 @@ private fun Lab10StatCard(label:String,value:String,
         }
     }
 }
+@Composable
 private fun heightInColor()=CardDefaults.cardColors(
     containerColor=Lab07Palette.Champagne)
