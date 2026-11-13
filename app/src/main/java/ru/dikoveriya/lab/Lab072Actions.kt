@@ -256,6 +256,7 @@ data class Lab072TaskFilter(
 )
 private fun taskFilter072(f:Lab072TaskFilter,now:Long):Pair<String,Array<String>>{
     val w=mutableListOf<String>()
+    w+="NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='task' AND a.entity_id=t.id)"
     val args=mutableListOf<String>()
     when(f.period){
         "Просрочено"->{w+="t.done=0 AND t.due_at<?";args+=now.toString()}
