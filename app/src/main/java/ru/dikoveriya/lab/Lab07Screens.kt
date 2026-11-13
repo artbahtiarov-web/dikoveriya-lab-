@@ -398,7 +398,7 @@ private fun Lab07GrowthScreen(
                 },modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                     Icon(Icons.Outlined.Save,null);Spacer(Modifier.width(8.dp));Text("Сохранить наблюдение")
                 }
-                if(saved.isNotBlank()) Text(saved,color=Lab07Palette.Forest,
+                if(saved.isNotBlank()) Text(saved,color=MaterialTheme.colorScheme.primary,
                     style=MaterialTheme.typography.labelLarge)
             }
         } else item(key="closed") {
@@ -457,7 +457,7 @@ private fun Lab10GrowthTile(title:String,value:String,modifier:Modifier=Modifier
             Text(title,style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value,style=MaterialTheme.typography.titleMedium,
-                color=Lab07Palette.Forest,maxLines=2)
+                color=MaterialTheme.colorScheme.primary,maxLines=2)
         }
     }
 }
@@ -522,7 +522,7 @@ private fun Lab07MediumScreen(
                     },modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
                     Text("Записать смену среды")
                 }
-                if(saved.isNotBlank()) Text(saved,color=Lab07Palette.Forest,
+                if(saved.isNotBlank()) Text(saved,color=MaterialTheme.colorScheme.primary,
                     style=MaterialTheme.typography.labelLarge)
             }
         }
@@ -658,7 +658,7 @@ private fun Lab07HistoryScreen(
                         Text(entry.kind,style=MaterialTheme.typography.titleMedium,
                             modifier=Modifier.weight(1f))
                         Icon(if(expanded)Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                            "Детали",tint=Lab07Palette.InkBrass)
+                            "Детали",tint=MaterialTheme.colorScheme.tertiary)
                     }
                     Text(formatDate(entry.occurredAt),style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
