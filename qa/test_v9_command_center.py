@@ -151,7 +151,9 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn("AND m.plants IS NOT NULL",REG)
         self.assertIn("last_shoots DESC",REG)
         self.assertIn("last_plants DESC",REG)
-        self.assertIn("db.findCulture072(it)",(SRC/"MainActivity.kt").read_text("utf-8"))
+        main=(SRC/"MainActivity.kt").read_text("utf-8")
+        self.assertIn("db.findCulture072(code)",main)
+        self.assertIn("db.itemIdByCode11(code)",main)
 
     def test_four_action_cards_have_clear_names_and_real_routes(self):
         for title in ("В пробирках","Требуют внимания","Растут","Задачи"):
