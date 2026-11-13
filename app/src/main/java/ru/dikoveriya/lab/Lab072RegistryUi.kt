@@ -41,6 +41,7 @@ fun Lab072RegistryScreen(
     onBack:()->Unit,onNavigate:(String)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit = {},
+    onNewContainer:(()->Unit)?=null,
     modifier:Modifier=Modifier
 ) {
     val title=when(mode) {
@@ -111,7 +112,18 @@ fun Lab072RegistryScreen(
         contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)) {
         item(key="top") {
-            Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАБОЧИЙ СПИСОК",title,subtitle,onBack)
+            Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАБОЧИЙ СПИСОК",
+                initialPlantId?.let {id->
+                    plants.firstOrNull{it.id==id}?.name
+                } ?: title,subtitle,onBack)
+        }
+        if(onNewContainer!=null)item(key="new-container"){
+            Button(onClick=onNewContainer,
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.AddCircleOutline,null)
+                Spacer(Modifier.width(7.dp))
+                Text("Создать контейнер этого сорта")
+            }
         }
         item(key="search") {
             Field("Найти контейнер, сорт, группу или место",query,
