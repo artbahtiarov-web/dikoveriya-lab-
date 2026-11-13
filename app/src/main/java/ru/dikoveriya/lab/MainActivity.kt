@@ -339,21 +339,7 @@ fun DikoveriyaApp() {
                     }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
-                            item { Text("Лаборатория",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Питательные среды","Маточники","Группы контейнеров","Места хранения","Склад","Оборудование","База знаний")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
-                            item { Text("Работа",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Задачи","Инциденты","Эксперименты","Продажи")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
-                            item { Text("Данные и приложение",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Резервные копии","О программе")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
+                            item{Lab10MoreMenu(onSection={openSection(it)})}
                         } else {
                             item{TextButton(onClick={subsection=""}){Text("‹ Ко всем разделам")}}
                             when(subsection){
