@@ -141,7 +141,7 @@ internal fun LabDatabase.consumeMaterial11(
 
 internal fun LabDatabase.directCost11(kind:String,id:Long):Long=
     readableDatabase.rawQuery("""SELECT COALESCE(SUM(amount_minor),0)
-        FROM direct_costs WHERE entity_kind=? AND entity_id=?""",
+        FROM direct_costs WHERE reversed=0 AND entity_kind=? AND entity_id=?""",
         arrayOf(kind,id.toString())).use{it.moveToFirst();it.getLong(0)}
 
 internal fun LabDatabase.cashRows11(limit:Int=300):List<Lab11CashRow>{
@@ -174,7 +174,7 @@ internal fun LabDatabase.financeSummary11(from:Long=0L,to:Long=Long.MAX_VALUE):L
     val dates=arrayOf(from.toString(),to.toString())
     val income=sum("SELECT COALESCE(SUM(amount_minor),0) FROM cash_ledger WHERE direction='Доход' AND occurred_at BETWEEN ? AND ?",dates)
     val paid=sum("SELECT COALESCE(SUM(amount_minor),0) FROM cash_ledger WHERE direction='Расход' AND occurred_at BETWEEN ? AND ?",dates)
-    val direct=sum("SELECT COALESCE(SUM(amount_minor),0) FROM direct_costs WHERE occurred_at BETWEEN ? AND ?",dates)
+    val direct=sum("SELECT COALESCE(SUM(amount_minor),0) FROM direct_costs WHERE reversed=0 AND occurred_at BETWEEN ? AND ?",dates)
     val inventory=decimalMinor11(db.rawQuery(
         "SELECT COALESCE(SUM(quantity*cost_per_unit),0) FROM materials",null
     ).use{it.moveToFirst();it.getDouble(0)})
