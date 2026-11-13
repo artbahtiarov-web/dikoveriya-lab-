@@ -124,6 +124,11 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
             arrayOf(id.toString(),eventId.toString())).use{it.moveToFirst();it.getInt(0)}
         require(newer==0){"Можно отменить только последнее событие: последующие зависят от него"}
         val d=JSONObject(row[4])
+        if(d.has("measurement_id")){
+            db.update("item_measurements",ContentValues().apply{
+                put("cancelled",1)
+            },"id=?",arrayOf(d.getLong("measurement_id").toString()))
+        }
         if(d.has("usage_id")){
             val usageId=d.getLong("usage_id")
             val stock=db.rawQuery("""SELECT material_id,quantity,reversed
