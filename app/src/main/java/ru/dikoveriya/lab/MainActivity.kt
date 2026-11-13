@@ -52,7 +52,7 @@ fun DikoveriyaApp() {
         "collection","variety"->"Коллекция"
         "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
         "tasks"->"Главная"
-        else->if(tab=="Аналитика")"Ещё" else tab
+        else->if(tab=="Среды")"Ещё" else tab
     }
     fun openRoute(next:String) {
         // The Collection tab itself is already a level: do not insert it twice.
@@ -61,6 +61,7 @@ fun DikoveriyaApp() {
     fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
+    var quickMenu by rememberSaveable { mutableStateOf(false) }
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var photoCultureId by remember { mutableStateOf<Long?>(null) }
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
@@ -207,33 +208,24 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
+    BackHandler(enabled=!quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
 
     DikoveriyaTheme {
         Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
-            NavigationBar(containerColor=Lab07Palette.DeepForest,tonalElevation=0.dp) {
-                listOf("Главная","Коллекция","Среды","Ещё").forEachIndexed{index, name->
-                    val icon=when(index){0->Icons.Outlined.Home;1->Icons.Outlined.LocalFlorist;2->Icons.Outlined.Science;else->Icons.Outlined.Menu}
-                    NavigationBarItem(
-                        selected=activeNavigationTab==name,
-                        onClick={
-                            if(name=="Главная")tabHistory=emptyList() else if(tab!=name)tabHistory=tabHistory+tab
-                            tab=name;subsection="";routeStack=emptyList()
-                        },
-                        icon={Icon(icon,contentDescription=null)},
-                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Растения";else->name},maxLines=1)},
-                        colors=NavigationBarItemDefaults.colors(
-                            selectedIconColor=Lab07Palette.Brass,
-                            selectedTextColor=Lab07Palette.Champagne,
-                            indicatorColor=Lab07Palette.Forest,
-                            unselectedIconColor=Color(0xFFCCD4C8),
-                            unselectedTextColor=Color(0xFFCCD4C8))
-                    )
-                }
-            }
+            Lab10BottomNav(
+                selectedTab=activeNavigationTab,
+                onSelect={name->
+                    if(name=="Главная") tabHistory=emptyList()
+                    else if(tab!=name) tabHistory=tabHistory+tab
+                    tab=name
+                    subsection=""
+                    routeStack=emptyList()
+                },
+                onCreate={quickMenu=true}
+            )
         }){ padding ->
             if(currentRoute!=null || tab=="Коллекция") {
                 val route=currentRoute ?: Lab07Navigation.COLLECTION
@@ -342,7 +334,18 @@ fun DikoveriyaApp() {
                     }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
-                            items(listOf("Аналитика","Маточники","Задачи","Группы контейнеров","Места хранения","Склад","Оборудование","Инциденты","Эксперименты","Продажи","Резервные копии","О программе")){label->
+                            item { Text("Лаборатория",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
+                            items(listOf("Питательные среды","Маточники","Группы контейнеров","Места хранения","Склад","Оборудование")){label->
+                                TextEntryRow(label){openSection(label)}
+                                HorizontalDivider()
+                            }
+                            item { Text("Работа",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
+                            items(listOf("Задачи","Инциденты","Эксперименты","Продажи")){label->
+                                TextEntryRow(label){openSection(label)}
+                                HorizontalDivider()
+                            }
+                            item { Text("Данные и приложение",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
+                            items(listOf("Резервные копии","О программе")){label->
                                 TextEntryRow(label){openSection(label)}
                                 HorizontalDivider()
                             }
@@ -383,7 +386,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.8.0 · локальная база SQLite v10. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v10. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -393,6 +396,22 @@ fun DikoveriyaApp() {
                 }
             }
             }
+            }
+            if(quickMenu) {
+                Lab10QuickActions(
+                    onDismiss={quickMenu=false},
+                    onNewPlant={quickMenu=false;dialog="addPlant"},
+                    onNewCulture={quickMenu=false;preselectedPlantId=null;dialog="newCulture"},
+                    onScan={quickMenu=false;scan()},
+                    onChooseOperation={
+                        quickMenu=false
+                        tab="Коллекция"
+                        routeStack=emptyList()
+                        subsection=""
+                        Toast.makeText(context,"Открой контейнер и выбери «Операции»",Toast.LENGTH_SHORT).show()
+                    },
+                    onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)}
+                )
             }
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
