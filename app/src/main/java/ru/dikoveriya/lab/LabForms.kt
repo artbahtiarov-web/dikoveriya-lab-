@@ -206,7 +206,8 @@ fun AddMaterialDialog(onClose:()->Unit,onSave:(String,String,Double,Double,Doubl
     var qty by remember{mutableStateOf("")};var min by remember{mutableStateOf("0")};var cost by remember{mutableStateOf("0")}
     DialogForm("Новый материал",onClose,onSave={onSave(name,unit,qty.replace(',','.').toDoubleOrNull()?:-1.0,min.replace(',','.').toDoubleOrNull()?:-1.0,cost.replace(',','.').toDoubleOrNull()?:-1.0,category)}){
         Field("Название",name,{name=it})
-        PickOne("Категория",listOf("Реактивы","Расходники","Инвентарь","Другое"),category,{category=it})
+        PickOne("Категория",(listOf("Реактивы","Расходники","Инвентарь","Другое")+
+            customCategories).distinct(),category,{category=it})
         PickOne("Единица",listOf("г","мл","шт.","л","кг"),unit,{unit=it})
         Field("Начальный остаток",qty,{qty=it},numeric=true)
         Field("Минимальный запас",min,{min=it},numeric=true)
