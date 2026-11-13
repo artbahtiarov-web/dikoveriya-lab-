@@ -105,9 +105,9 @@ internal fun Lab11FinanceScreen(
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
                     Lab11FinanceTile("Получено",kopecks11(stats.income),
-                        "Поступления",onClick={view="Операции"},Modifier.weight(1f))
+                        "Поступления",onClick={view="Операции"},modifier=Modifier.weight(1f))
                     Lab11FinanceTile("Оплачено",kopecks11(stats.paid),
-                        "Денежные выплаты",onClick={view="Операции"},Modifier.weight(1f))
+                        "Денежные выплаты",onClick={view="Операции"},modifier=Modifier.weight(1f))
                 }
             }
             item{
@@ -119,7 +119,7 @@ internal fun Lab11FinanceScreen(
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
                     Lab11FinanceTile("Материалы на складе",kopecks11(stats.inventory),
-                        "Текущая оценка остатков",onClick=onMaterial,Modifier.weight(1f))
+                        "Текущая оценка остатков",onClick=onMaterial,modifier=Modifier.weight(1f))
                     Lab11FinanceTile("Оборудование",kopecks11(stats.assets),
                         "Сумма покупок, не рыночная оценка",onClick={view="Закупки"},
                         modifier=Modifier.weight(1f))
