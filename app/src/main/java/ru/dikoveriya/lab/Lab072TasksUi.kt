@@ -74,6 +74,11 @@ fun Lab072TasksScreen(
             Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАБОЧИЙ ПЛАН",
                 "Задачи","Что требуется сделать и когда. Приоритет указан человеком, не вычисляется автоматически.",onBack)
         }
+        item(key="calendar"){
+            Lab10TaskCalendar(db,revision,onDay={date->
+                period="Открытые";fromText=date;toText=date;pages=1
+            })
+        }
         item(key="new"){
             Button(onClick={createDialog=true},
                 modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
