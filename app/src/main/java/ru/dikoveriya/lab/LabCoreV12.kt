@@ -65,6 +65,9 @@ internal object LabCoreV12 {
             notes TEXT NOT NULL DEFAULT '',
             favorite INTEGER NOT NULL DEFAULT 0,
             cover_filename TEXT,
+            cover_zoom REAL NOT NULL DEFAULT 1.0,
+            cover_pan_x REAL NOT NULL DEFAULT 0.0,
+            cover_pan_y REAL NOT NULL DEFAULT 0.0,
             updated_at INTEGER NOT NULL
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS item_events(
