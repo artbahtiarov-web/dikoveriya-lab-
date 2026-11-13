@@ -1,5 +1,7 @@
 package ru.dikoveriya.lab
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -31,6 +36,7 @@ fun LabDatabase.materialHistory10(id:Long):List<Lab10MaterialMove> =
 internal fun Lab10ResourcesScreen(
     materials:List<MaterialRecord>,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNew:()->Unit,onMove:(Long)->Unit,
+    onChanged:()->Unit={},onError:(String)->Unit={},
     modifier:Modifier=Modifier
 ){
     var search by rememberSaveable{mutableStateOf("")}
@@ -38,6 +44,19 @@ internal fun Lab10ResourcesScreen(
     var onlyCritical by rememberSaveable{mutableStateOf(false)}
     var filterOpen by remember{mutableStateOf(false)}
     var detailId by remember{mutableStateOf<Long?>(null)}
+    var pendingPhoto by rememberSaveable{mutableStateOf<Long?>(null)}
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val scope=rememberCoroutineScope()
+    val imagePicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->
+        val id=pendingPhoto
+        pendingPhoto=null
+        if(id!=null && uri!=null)scope.launch{
+            try{
+                withContext(Dispatchers.IO){db.attachMedia11(context,"material",id,uri)}
+                onChanged()
+            }catch(e:Exception){onError(e.message?:"Не удалось сохранить фото товара")}
+        }
+    }
     val visible=remember(materials,search,appliedCategory,onlyCritical){
         materials.filter{m->
             m.name.contains(search,true) &&
@@ -167,6 +186,12 @@ internal fun Lab10ResourcesScreen(
         val material=materials.firstOrNull{it.id==id}
         if(material!=null){
             val moves=remember(id,revision){db.materialHistory10(id)}
+            val meta=remember(id,revision){db.materialMeta11(id)}
+            var editing by remember(id){mutableStateOf(false)}
+            var manufacturer by remember(id,revision){mutableStateOf(meta?.manufacturer?:"")}
+            var supplier by remember(id,revision){mutableStateOf(meta?.supplier?:"")}
+            var link by remember(id,revision){mutableStateOf(meta?.url?:"")}
+            var productNotes by remember(id,revision){mutableStateOf(meta?.notes?:"")}
             ModalBottomSheet(onDismissRequest={detailId=null}){
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(horizontal=20.dp,vertical=10.dp),
@@ -176,6 +201,40 @@ internal fun Lab10ResourcesScreen(
                         " "+material.unit)
                     Text("Минимальный запас: "+
                         RecipeCalculator.formatAmount(material.minQuantity)+" "+material.unit)
+                    if(meta?.photo!=null)
+                        Lab11ItemCover(meta.photo,
+                            modifier=Modifier.fillMaxWidth().height(160.dp),
+                            kind="Материал")
+                    OutlinedButton(onClick={pendingPhoto=id;imagePicker.launch("image/*")},
+                        modifier=Modifier.fillMaxWidth()){
+                        Icon(Icons.Outlined.AddPhotoAlternate,null)
+                        Spacer(Modifier.width(7.dp))
+                        Text("Фото упаковки")
+                    }
+                    Text("Средневзвешенная цена: "+
+                        kopecks11(decimalMinor11(material.costPerUnit))+" / "+material.unit,
+                        style=MaterialTheme.typography.bodySmall)
+                    if(!editing){
+                        if(meta!=null){
+                            Text("Производитель: "+meta.manufacturer.ifBlank{"Не указан"})
+                            Text("Поставщик: "+meta.supplier.ifBlank{"Не указан"})
+                            if(meta.url.isNotBlank())Text("Где купить: "+meta.url)
+                            if(meta.notes.isNotBlank())Text(meta.notes)
+                        }
+                        TextButton(onClick={editing=true}){Text("Изменить карточку товара")}
+                    }else{
+                        Field("Производитель",manufacturer,{manufacturer=it})
+                        Field("Где куплено",supplier,{supplier=it})
+                        Field("Ссылка на покупку",link,{link=it})
+                        Field("Характеристики / примечания",productNotes,
+                            {productNotes=it},single=false)
+                        Button(onClick={
+                            try{
+                                db.updateMaterialMeta11(id,manufacturer,supplier,link,productNotes)
+                                editing=false;onChanged()
+                            }catch(e:Exception){onError(e.message?:"Не удалось сохранить карточку")}
+                        },modifier=Modifier.fillMaxWidth()){Text("Сохранить карточку")}
+                    }
                     Button(onClick={detailId=null;onMove(id)},modifier=Modifier.fillMaxWidth()){
                         Icon(Icons.Outlined.SwapHoriz,null)
                         Spacer(Modifier.width(8.dp));Text("Приход или расход")
