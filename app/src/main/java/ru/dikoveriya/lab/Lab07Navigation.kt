@@ -16,6 +16,7 @@ object Lab07Navigation {
     fun medium(cultureId: Long): String = "medium:$cultureId"
     fun operations(cultureId: Long): String = "operations:$cultureId"
     fun history(cultureId: Long): String = "history:$cultureId"
+    fun label(cultureId:Long):String="label:$cultureId"
     fun work(mode:String):String{
         require(mode in setOf("vitro","attention","growth","all"))
         return "work:$mode"
@@ -42,14 +43,14 @@ object Lab07Navigation {
         if(route.startsWith("work:group:") || route.startsWith("work:plant:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
-        return group in setOf("variety","container","growth","medium","operations","history") &&
+        return group in setOf("variety","container","growth","medium","operations","history","label") &&
             id != null && id > 0
     }
 
     fun parentFor(route: String, plantId: Long?): String? = when(route.substringBefore(':')) {
         "variety" -> COLLECTION
         "container" -> plantId?.let { variety(it) }
-        "growth","medium","operations","history" -> route.substringAfter(':').toLongOrNull()?.let { container(it) }
+        "growth","medium","operations","history","label" -> route.substringAfter(':').toLongOrNull()?.let { container(it) }
         else -> null
     }
 }
