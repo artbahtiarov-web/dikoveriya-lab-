@@ -38,12 +38,14 @@ internal fun Lab11FinanceScreen(
     db:LabDatabase,revision:Int,
     onBack:()->Unit,onSales:()->Unit,onMaterial:()->Unit,
     onOpenItem:(Long)->Unit,onOpenCulture:(Long)->Unit,
+    onVariety:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     initialView:String="Обзор",initialAction:String="",modifier:Modifier=Modifier
 ){
     var month by rememberSaveable{mutableStateOf(YearMonth.now().toString())}
     var scope by rememberSaveable{mutableStateOf("Всё время")}
     var view by rememberSaveable(initialView){mutableStateOf(initialView)}
+    var cashCategory by rememberSaveable{mutableStateOf("")}
     var purchase by remember{mutableStateOf(initialAction=="Покупка")}
     var expense by remember{mutableStateOf(initialAction=="Расход")}
     var selectedCash by remember{mutableStateOf<Lab11CashRow?>(null)}
@@ -54,7 +56,9 @@ internal fun Lab11FinanceScreen(
         .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()-1 else Long.MAX_VALUE
     val stats=remember(revision,from,to){db.financeSummary11(from,to)}
     val allCash=remember(revision){db.cashRows11(800)}
-    val cash=remember(allCash,from,to){allCash.filter{it.date in from..to}}
+    val cash=remember(allCash,from,to,cashCategory){allCash.filter{
+        it.date in from..to && (cashCategory.isBlank()||it.category==cashCategory)
+    }}
     val purchases=remember(revision){db.purchases11()}
     LazyColumn(modifier=modifier,contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -95,7 +99,7 @@ internal fun Lab11FinanceScreen(
         }
         item{
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                listOf("Обзор","Операции","Закупки").forEach{label->
+                listOf("Обзор","Операции","Закупки","Отчёты").forEach{label->
                     FilterChip(selected=view==label,onClick={view=label},
                         label={Text(label)})
                 }
@@ -147,7 +151,17 @@ internal fun Lab11FinanceScreen(
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        if(view=="Отчёты")item{
+            Lab11FinancialReportsUi(db,revision,
+                onCashCategory={cashCategory=it;view="Операции"},
+                onVariety=onVariety)
+        }
         if(view=="Операции"){
+            if(cashCategory.isNotBlank())item{
+                OutlinedButton(onClick={cashCategory=""}){
+                    Text("Категория: "+cashCategory+" · Сбросить")
+                }
+            }
             item{Text("Движение денег · "+cash.size,
                 style=MaterialTheme.typography.titleLarge)}
             if(cash.isEmpty())item{Text("За выбранный период движений нет")}
