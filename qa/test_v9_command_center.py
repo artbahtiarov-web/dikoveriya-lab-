@@ -152,8 +152,11 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn("last_shoots DESC",REG)
         self.assertIn("last_plants DESC",REG)
         main=(SRC/"MainActivity.kt").read_text("utf-8")
-        self.assertIn("db.findCulture072(code)",main)
-        self.assertIn("db.itemIdByCode11(code)",main)
+        self.assertRegex(main,r"db\.findCulture072\((?:code|it)\)")
+        self.assertRegex(main,r"db\.itemIdByCode11\((?:code|it)\)")
+        for prefix in ("LAB-","PLT-","MAT-","ГР-","LOC-","AST-"):
+            self.assertIn('code.startsWith("'+prefix+'")',main)
+        self.assertIn("не найден",main)
 
     def test_four_action_cards_have_clear_names_and_real_routes(self):
         for title in ("В пробирках","Требуют внимания","Растут","Задачи"):
