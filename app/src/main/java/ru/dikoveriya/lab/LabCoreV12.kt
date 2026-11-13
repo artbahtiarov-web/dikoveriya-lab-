@@ -15,7 +15,7 @@ internal object LabCoreV12 {
         "item_photos", "custom_field_definitions", "custom_field_values",
         "operation_templates", "purchases", "cash_ledger", "direct_costs",
         "stock_usage", "equipment_assets", "asset_events", "light_profiles",
-        "location_layouts", "item_storage_history", "recurring_task_rules",
+        "location_layouts", "item_storage_history", "recurring_task_rules", "task_links",
         "sale_details", "item_sales"
     )
 
@@ -219,6 +219,11 @@ internal object LabCoreV12 {
             next_due_at INTEGER NOT NULL,
             last_generated_due INTEGER,
             active INTEGER NOT NULL DEFAULT 1
+        )""")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS task_links(
+            task_id INTEGER PRIMARY KEY REFERENCES tasks(id),
+            entity_kind TEXT NOT NULL,
+            entity_id INTEGER NOT NULL
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS sale_details(
             sale_id INTEGER PRIMARY KEY REFERENCES sales(id),
