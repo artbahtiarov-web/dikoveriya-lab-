@@ -93,12 +93,11 @@ jobs:
             adb logcat -d -v time -s AndroidRuntime:E ActivityTaskManager:W > screenshots/launch-logcat.txt || true
             adb shell screencap -p /sdcard/launch.png
             adb pull /sdcard/launch.png screenshots/launch.png
-            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/launch-activity.txt; then
-              echo '::error::The real application did not remain in the foreground after cold launch.'
-              grep -E 'FATAL EXCEPTION|Process: ru.dikoveriya.lab|Caused by|Exception' screenshots/launch-logcat.txt || true
-              grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' screenshots/launch-activity.txt || true
-              exit 1
-            fi
+            grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/launch-activity.txt || { echo '::error::No resumed LAB activity on cold launch'; cat screenshots/launch-logcat.txt; exit 1; }
+            adb shell input tap 330 70
+            sleep 2
+            adb shell screencap -p /sdcard/launch-main.png
+            adb pull /sdcard/launch-main.png screenshots/launch-main.png
       - name: Archive launch diagnostics even after failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -151,13 +150,13 @@ jobs:
             adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-360.png
+            adb shell input tap 302 70
+            sleep 2
+            adb shell screencap -p /sdcard/v1-360.png
             adb pull /sdcard/v1-360.png screenshots/v1-360.png
             adb shell dumpsys activity activities > screenshots/foreground-360.txt
             adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-360.txt || true
-            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-360.txt; then
-              echo '::error::App not foreground at 360dp'; cat screenshots/logcat-360.txt
-              exit 1
-            fi
+            grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-360.txt || { echo '::error::App not foreground at 360dp'; cat screenshots/logcat-360.txt; exit 1; }
             adb shell am force-stop ru.dikoveriya.lab
             adb shell wm size 393x852
             adb shell wm density 160
@@ -170,13 +169,13 @@ jobs:
             adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-393.png
+            adb shell input tap 330 70
+            sleep 2
+            adb shell screencap -p /sdcard/v1-393.png
             adb pull /sdcard/v1-393.png screenshots/v1-393.png
             adb shell dumpsys activity activities > screenshots/foreground-393.txt
             adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-393.txt || true
-            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-393.txt; then
-              echo '::error::App not foreground at 393dp'; cat screenshots/logcat-393.txt
-              exit 1
-            fi
+            grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-393.txt || { echo '::error::App not foreground at 393dp'; cat screenshots/logcat-393.txt; exit 1; }
             adb shell am force-stop ru.dikoveriya.lab
             adb shell wm size 430x900
             adb shell wm density 160
@@ -189,13 +188,13 @@ jobs:
             adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-430.png
+            adb shell input tap 364 70
+            sleep 2
+            adb shell screencap -p /sdcard/v1-430.png
             adb pull /sdcard/v1-430.png screenshots/v1-430.png
             adb shell dumpsys activity activities > screenshots/foreground-430.txt
             adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-430.txt || true
-            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-430.txt; then
-              echo '::error::App not foreground at 430dp'; cat screenshots/logcat-430.txt
-              exit 1
-            fi
+            grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-430.txt || { echo '::error::App not foreground at 430dp'; cat screenshots/logcat-430.txt; exit 1; }
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
