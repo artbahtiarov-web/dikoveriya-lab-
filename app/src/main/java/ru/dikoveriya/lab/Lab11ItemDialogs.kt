@@ -1,5 +1,8 @@
 package ru.dikoveriya.lab
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -143,10 +146,22 @@ internal fun Lab11ActionDialog(
     var customAnswers by remember{mutableStateOf(emptyMap<String,String>())}
     var kind by rememberSaveable{mutableStateOf(allowed.first())}
     val fields=remember(kind){
-        templates.firstOrNull{it.title==kind}?.let{template->
-            val array=org.json.JSONArray(template.fields)
-            (0 until array.length()).map{array.getString(it)}
-        }?:emptyList()
+        templates.firstOrNull{it.title==kind}
+            ?.let{parseTemplateFields11(it.fields)}?:emptyList()
+    }
+    val context=LocalContext.current
+    var pendingTemplatePhoto by remember{mutableStateOf<String?>(null)}
+    val photoPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->
+        val target=pendingTemplatePhoto
+        pendingTemplatePhoto=null
+        if(uri!=null && target!=null){
+            try{
+                db.addItemPhoto11(context,item.id,uri,"Операция: "+kind)
+                val filename=db.itemPhotos11(item.id).firstOrNull()?.first
+                    ?:error("Фотография не сохранена")
+                customAnswers=customAnswers+(target to filename)
+            }catch(e:Exception){onError(e.message?:"Не удалось сохранить фото")}
+        }
     }
     var date by rememberSaveable{mutableStateOf(dateText11())}
     var stage by rememberSaveable{mutableStateOf("Не менять")}
@@ -198,8 +213,32 @@ internal fun Lab11ActionDialog(
                 }
             }
             fields.forEach{field->
-                Field(field,customAnswers[field]?:"",
-                    {value->customAnswers=customAnswers+(field to value)},single=false)
+                val label=field.name+(if(field.unit.isNotBlank())" ("+field.unit+")" else "")+
+                    (if(field.required)" *" else "")
+                val value=customAnswers[field.name].orEmpty()
+                when(field.kind){
+                    "date"->Lab11DateField(label,value,
+                        {v->customAnswers=customAnswers+(field.name to v)})
+                    "boolean"->Row(verticalAlignment=Alignment.CenterVertically){
+                        Checkbox(value=="true",onCheckedChange={checked->
+                            customAnswers=customAnswers+(field.name to checked.toString())
+                        })
+                        Text(label)
+                    }
+                    "choice"->PickOne(label,field.choices,
+                        value.ifEmpty{field.choices.firstOrNull().orEmpty()},
+                        {v->customAnswers=customAnswers+(field.name to v)})
+                    "photo"->OutlinedButton(onClick={
+                        pendingTemplatePhoto=field.name
+                        photoPicker.launch("image/*")
+                    },modifier=Modifier.fillMaxWidth()){
+                        Text(if(value.isNotBlank())"Фото прикреплено · "+label
+                            else "Добавить фото · "+label)
+                    }
+                    else->Field(label,value,
+                        {v->customAnswers=customAnswers+(field.name to v)},
+                        single=field.kind!="text")
+                }
             }
             Field("Что сделано / результат",note,{note=it},single=false)
             if(isClosed)Text("Этот экземпляр закрыт. Для восстановления потребуется корректирующая операция.",
@@ -223,7 +262,9 @@ internal fun Lab11ActionDialog(
                             newSubstrate=substrate.takeIf{it.isNotBlank()},
                             stimulant=stimulant.takeIf{it.isNotBlank()},
                             materialId=materialId,materialQty=amount,
-                            customFields=customAnswers.filterKeys{it in fields})
+                            customFields=customAnswers.filterKeys{
+                                key->fields.any{it.name==key}
+                            })
                         onSaved()
                     }catch(e:Exception){onError(e.message?:"Не удалось записать действие")}
                 }){Text("Записать")}

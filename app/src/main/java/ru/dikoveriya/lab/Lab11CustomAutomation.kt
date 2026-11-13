@@ -98,7 +98,12 @@ internal fun LabDatabase.archiveField11(id:Long){
 internal fun LabDatabase.addTemplate11(name:String,applicable:String,fieldsJson:String):Long{
     require(name.trim().length in 2..100)
     require(applicable in setOf("Все","in vitro","Горшечное","Черенок","Маточник","Другое"))
-    require(JSONArray(fieldsJson).length()<=30){"Слишком много полей"}
+    parseTemplateFields11(fieldsJson) // full schema, unique labels and kinds validated
+    require(name.trim() !in setOf("Посадка","Пересадка","Полив","Подкормка",
+        "Обработка","Осмотр","Черенкование","Укоренение","Субкультивирование",
+        "Измерение","Потеря","Утилизация","Перемещение","Обрезка")){
+        "Стандартные операции нельзя переопределять"
+    }
     return writableDatabase.insertOrThrow("operation_templates",null,ContentValues().apply{
         put("name",name.trim());put("applicable_kind",applicable)
         put("fields_json",fieldsJson)

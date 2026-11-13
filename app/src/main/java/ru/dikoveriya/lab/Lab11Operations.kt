@@ -37,6 +37,14 @@ internal fun LabDatabase.performItemAction11(
             listOf(c.getString(0),c.getString(1),c.getString(2),
                 c.getString(3),c.getString(4),c.getString(5))
         }
+        val selectedTemplate=templates11().firstOrNull{it.title==kind}
+        if(selectedTemplate!=null){
+            require(selectedTemplate.applicable=="Все" ||
+                selectedTemplate.applicable==before[5]){
+                "Шаблон не предназначен для этого типа растения"
+            }
+            validateTemplateAnswers11(parseTemplateFields11(selectedTemplate.fields),customFields)
+        }else require(customFields.isEmpty()){"Нельзя добавлять посторонние поля"}
         require(before[0] !in setOf("Утилизирован","Продан") || kind=="Исправление"){
             "Закрытый экземпляр нельзя изменять обычной операцией"
         }

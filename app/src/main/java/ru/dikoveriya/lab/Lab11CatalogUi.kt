@@ -127,6 +127,12 @@ private fun Lab11CatalogAddDialog(db:LabDatabase,tab:String,defaultDomain:String
     var choices by rememberSaveable{mutableStateOf("")}
     var required by rememberSaveable{mutableStateOf(false)}
     var applies by rememberSaveable{mutableStateOf("Все")}
+    var templateFields by remember{mutableStateOf(emptyList<Lab11TemplateField>())}
+    var newField by rememberSaveable{mutableStateOf("")}
+    var newFieldKind by rememberSaveable{mutableStateOf("text")}
+    var newUnit by rememberSaveable{mutableStateOf("")}
+    var newChoices by rememberSaveable{mutableStateOf("")}
+    var newRequired by rememberSaveable{mutableStateOf(false)}
     AlertDialog(onDismissRequest=onClose,
         title={Text("Новый справочник · "+tab)},
         text={Column(Modifier.verticalScroll(rememberScrollState()),
@@ -153,8 +159,41 @@ private fun Lab11CatalogAddDialog(db:LabDatabase,tab:String,defaultDomain:String
                 else->{
                     PickOne("Применяется для",listOf("Все","in vitro","Горшечное",
                         "Черенок","Маточник","Другое"),applies,{applies=it})
-                    Field("Дополнительные поля через запятую",choices,{choices=it})
-                    Text("Поля добавятся в форму наблюдения. Шаблон не может списывать биоматериал без встроенной проверенной операции.",
+                    Field("Название поля",newField,{newField=it})
+                    PickOne("Тип поля",listOf("text","number","date","boolean",
+                        "choice","unit","photo","url"),newFieldKind,{newFieldKind=it})
+                    if(newFieldKind=="unit")
+                        Field("Единица измерения (например, мл)",newUnit,{newUnit=it})
+                    if(newFieldKind=="choice")
+                        Field("Варианты через запятую",newChoices,{newChoices=it})
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Checkbox(newRequired,{newRequired=it})
+                        Text("Обязательное поле")
+                    }
+                    OutlinedButton(onClick={
+                        try{
+                            val f=Lab11TemplateField(newField.trim(),newFieldKind,
+                                newRequired,newUnit.trim(),
+                                newChoices.split(',').map{it.trim()}.filter{it.isNotEmpty()})
+                            templateFieldsJson11(templateFields+f)
+                            templateFields=templateFields+f
+                            newField="";newUnit="";newChoices="";newRequired=false
+                        }catch(e:Exception){onError(e.message?:"Проверь поле")}
+                    },modifier=Modifier.fillMaxWidth()){
+                        Text("Добавить поле в шаблон")
+                    }
+                    templateFields.forEach{f->
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                            Text(f.name+" · "+f.kind+
+                                (if(f.unit.isNotBlank())" · "+f.unit else ""),
+                                modifier=Modifier.weight(1f),
+                                style=MaterialTheme.typography.bodySmall)
+                            TextButton(onClick={templateFields=templateFields-f}){
+                                Text("Убрать")
+                            }
+                        }
+                    }
+                    Text("Поля шаблона не могут менять количество биоматериала или склад без встроенной проверенной операции.",
                         style=MaterialTheme.typography.bodySmall)
                 }
             }
@@ -167,8 +206,7 @@ private fun Lab11CatalogAddDialog(db:LabDatabase,tab:String,defaultDomain:String
                         "Поля"->db.defineField11(entity,name,type,required,
                             choices.split(',').map{it.trim()}.filter{it.isNotEmpty()})
                         else->db.addTemplate11(name,applies,
-                            JSONArray(choices.split(',').map{it.trim()}
-                                .filter{it.isNotEmpty()}).toString())
+                            templateFieldsJson11(templateFields))
                     }
                     onSaved()
                 }catch(e:Exception){onError(e.message?:"Не удалось сохранить справочник")}
