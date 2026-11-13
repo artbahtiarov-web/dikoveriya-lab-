@@ -546,7 +546,9 @@ fun Lab080LabelEditor(
         if(savedNotice.isNotBlank())Text(savedNotice,
             color=Lab07Palette.Forest,
             style=MaterialTheme.typography.bodyMedium)
-        Text("Считывание QR зависит от реальной печати, бумаги и камеры. Прямая Bluetooth-печать отсутствует.",
+        HorizontalDivider()
+        Lab09PrintPanel(values=values,layout=layout,onError=onError)
+        Text("Официальное приложение NIIMBOT может отсутствовать в меню Android Share. Встроенная печать выше подключается к принтеру напрямую по Bluetooth. Экспорт PNG остаётся запасным вариантом.",
             style=MaterialTheme.typography.bodySmall,
             color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
