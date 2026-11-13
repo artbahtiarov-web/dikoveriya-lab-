@@ -34,9 +34,18 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
 class MainActivity : ComponentActivity() {
+    var reminderIntentVersion by mutableIntStateOf(0)
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { DikoveriyaApp() }
+    }
+
+    override fun onNewIntent(intent:android.content.Intent){
+        super.onNewIntent(intent)
+        setIntent(intent)
+        reminderIntentVersion++
     }
 }
 
@@ -73,7 +82,8 @@ fun DikoveriyaApp() {
         routeStack=Lab07Navigation.enter(routeStack,next)
     }
     fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
-    LaunchedEffect(context){
+    val reminderIntentVersion=(context as? MainActivity)?.reminderIntentVersion ?: 0
+    LaunchedEffect(context,reminderIntentVersion){
         val fromReminder=(context as? MainActivity)?.intent?.getBooleanExtra("open_tasks",false)==true
         if(fromReminder){
             tab="Главная"
