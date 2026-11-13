@@ -57,6 +57,12 @@ class Lab10PlantVisualContracts(unittest.TestCase):
                      'GridCells.Fixed(2)','Lab10PlantFolder('):
             self.assertIn(term,COL)
 
+    def test_gallery_return_keeps_target_after_modal_dismiss(self):
+        self.assertIn("pendingCoverPlantId by rememberSaveable",COL)
+        self.assertIn("val id=pendingCoverPlantId",COL)
+        self.assertIn('pendingCoverPlantId=id;picker.launch("image/*")',COL)
+        self.assertIn("db.setPlantCover10(context,id,uri)",COL)
+
     def test_filters_are_separate_form_not_inline(self):
         self.assertIn('Lab10RegistryFilterSheet(',REG)
         self.assertNotIn('if(advanced)item(key="advanced")',REG)
