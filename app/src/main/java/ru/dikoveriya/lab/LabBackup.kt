@@ -83,7 +83,7 @@ object LabBackup {
                 }
                 if(root.getInt("schema")>=12){
                     val tables=root.getJSONObject("tables")
-                    listOf("item_photos" to "filename","plant_items" to "cover_filename",
+                    listOf("materials" to "photo_filename", "item_photos" to "filename","plant_items" to "cover_filename",
                         "purchases" to "receipt_filename","equipment_assets" to "photo_filename")
                         .forEach{(table,column)->
                             val rows=tables.getJSONArray(table)
