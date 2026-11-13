@@ -480,11 +480,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             val saleId=insertOrThrow("sales",null,cv("culture_id" to cultureId,
                 "quantity" to quantity,"price" to total,"sold_at" to soldAt,"note" to notes))
             val amountMinor=decimalMinor11(total)
-            val directCosts=rawQuery("""SELECT COALESCE(SUM(amount_minor),0)
-                FROM direct_costs WHERE entity_kind='culture' AND entity_id=?""",
-                arrayOf(cultureId.toString())).use{it.moveToFirst();it.getLong(0)}
-            val costSnapshot=if(directCosts>0)
-                (directCosts.toDouble()*quantity/c.quantity).toLong() else null
+            val hasBasis=hasCultureCostEvidence11(cultureId)
+            val allocated=if(hasBasis)allocateCultureCost11(cultureId,c.quantity,
+                listOf(Lab11CostPart(null,quantity,"Продажа")),
+                saleId=saleId,at=soldAt) else 0L
+            val costSnapshot=if(hasBasis)allocated else null
             insertOrThrow("sale_details",null,cv("sale_id" to saleId,
                 "cogs_minor" to costSnapshot))
             insertOrThrow("cash_ledger",null,cv("direction" to "Доход",
@@ -785,6 +785,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 changeSnapshot(this,group,child,null,part.produced,LabTerms.IN_CULTURE)
                 event(this,child,"Происхождение","Из ${source.code}; исходных объектов ${part.used}, получено ${part.produced}. $note",null,part.produced,part.batchId,group,occurredAt)
             }
+            allocateCultureCost11(sourceId,source.quantity,
+                createdChildren.mapIndexed{index,child->
+                    Lab11CostPart(child,destinations[index].used,"Разделение")
+                }+(if(lost>0)listOf(Lab11CostPart(null,lost,"Потеря")) else emptyList()),
+                operationId=group,at=occurredAt)
             // All daughters in this operation have a verified common parent.
             // Group by the actual split event, not by guessed genetic provenance.
             if(createdChildren.size>1) {
@@ -839,6 +844,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 val rest=remains[index]
                 changeCount(this,c,rest,if(rest==0)LabTerms.TRANSFERRED else c.status,"Объединение","В ${parent.plantName}: использовано $consumed для нового контейнера; ${if(!certain)"происхождение смешанное. " else ""}$note",group,occurredAt)
                 insertOrThrow("culture_links",null,cv("parent_culture_id" to c.id,"child_culture_id" to child,"used_qty" to consumed,"result_qty" to produced,"event_group" to group))
+                allocateCultureCost11(c.id,c.quantity,
+                    listOf(Lab11CostPart(child,consumed,"Объединение")),
+                    operationId=group,at=occurredAt)
             }
             event(this,child,"Происхождение","Объединены источники: ${sources.joinToString { it.code }}. Маркировка: $origin. $note",null,produced,batchId,group,occurredAt)
         }
@@ -878,6 +886,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             val rest=LabOperationRules.remainingAfterLoss(c.quantity,count)
             val group=newOperation(this,"Потери", "$cause. $explanation",occurredAt)
             insertOrThrow("operation_losses",null,cv("operation_id" to group,"culture_id" to cultureId,"quantity" to count,"reason" to cause))
+            allocateCultureCost11(cultureId,c.quantity,
+                listOf(Lab11CostPart(null,count,"Потеря")),
+                operationId=group,at=occurredAt)
             changeCount(this,c,rest,if(rest==0)LabTerms.DISPOSED else c.status,"Потери","Потеряно: $count; причина: $cause. $explanation",group,occurredAt)
         }
     }
