@@ -1,5 +1,7 @@
 package ru.dikoveriya.lab
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,18 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
     onBack:()->Unit,onChanged:()->Unit,onError:(String)->Unit,
     initialAssetId:Long?=null,modifier:Modifier=Modifier
 ){
+    val context=androidx.compose.ui.platform.LocalContext.current
+    var pendingLabel by remember{mutableStateOf<Long?>(null)}
+    val saveQr=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/png")){uri->
+        val id=pendingLabel
+        pendingLabel=null
+        if(uri!=null && id!=null)runCatching{
+            context.contentResolver.openOutputStream(uri)?.use{
+                it.write(LabQr.png("AST-%06d".format(Locale.US,id)))
+            }?:error("Файл не создан")
+        }.onFailure{onError(it.message?:"Ошибка сохранения QR оборудования")}
+    }
     val assets=remember(revision){db.assets11()}
     val lights=remember(revision){db.lightProfiles11()}
     val thisMonth=YearMonth.now()
@@ -107,7 +121,14 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
                     Text(asset.name,style=MaterialTheme.typography.headlineSmall)
-                    Text("Инвентарный QR: AST-%06d".format(Locale.US,asset.id))
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Text("Инвентарный QR: AST-%06d".format(Locale.US,asset.id),
+                            modifier=Modifier.weight(1f))
+                        TextButton(onClick={
+                            pendingLabel=asset.id
+                            saveQr.launch("AST-%06d.png".format(Locale.US,asset.id))
+                        }){Text("Этикетка")}
+                    }
                     Text(asset.category+" · "+asset.status)
                     Text("Стоимость приобретения: "+kopecks11(asset.cost))
                     Text("Поставщик: "+asset.supplier)
