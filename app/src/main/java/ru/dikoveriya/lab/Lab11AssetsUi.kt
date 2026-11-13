@@ -20,13 +20,13 @@ import java.util.Locale
 @Composable
 internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
     onBack:()->Unit,onChanged:()->Unit,onError:(String)->Unit,
-    modifier:Modifier=Modifier
+    initialAssetId:Long?=null,modifier:Modifier=Modifier
 ){
     val assets=remember(revision){db.assets11()}
     val lights=remember(revision){db.lightProfiles11()}
     val thisMonth=YearMonth.now()
     var add by remember{mutableStateOf(false)}
-    var detail by remember{mutableStateOf<Long?>(null)}
+    var detail by remember(initialAssetId){mutableStateOf(initialAssetId)}
     var retire by remember{mutableStateOf<Long?>(null)}
     var configureLight by remember{mutableStateOf<Long?>(null)}
     var reason by remember{mutableStateOf("")}
