@@ -327,6 +327,84 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
         return resultId
     }
+    /**
+     * One transaction creates N independent QR-addressable culture containers,
+     * one shared production group, exact biological unit and recipe history.
+     * Existing cultures and their lineage are never overwritten.
+     */
+    fun createCulturesBulk11(
+        plantId:Long,counts:List<Int>,quantityKind:String,passage:Int,
+        stage:String,recipeId:Long?,motherId:Long?,
+        locationId:Long?,location:String,occurredAt:Long,note:String
+    ):List<Long>{
+        require(counts.size in 1..200 && counts.all{it in 1..1000000}){
+            "Укажи от 1 до 200 контейнеров и положительное количество биоматериала"
+        }
+        require(quantityKind in LabTerms.quantityKinds.drop(1)){"Укажи единицу биоматериала"}
+        require(passage in 0..999 && stage in LabTerms.stages)
+        require(occurredAt in 1..(System.currentTimeMillis()+86400000L))
+        require(plants().any{it.id==plantId}){"Сорт не найден"}
+        if(motherId!=null)verifyMother(plantId,motherId)
+        if(recipeId!=null){
+            val r=recipes().firstOrNull{it.id==recipeId}?:error("Среда не найдена")
+            require(r.status=="Утверждена" && (r.plantId==null || r.plantId==plantId)){
+                "Выбери утверждённую среду для этого сорта"
+            }
+        }
+        val created=mutableListOf<Long>()
+        writableDatabase.tx {
+            val realLocation=locationId?.let{key->
+                rawQuery("SELECT full_path FROM storage_locations WHERE id=?",
+                    arrayOf(key.toString())).use{c->
+                    require(c.moveToFirst()){"Место не найдено"};c.getString(0)
+                }
+            }?:location
+            val operation=newOperation(this,"Массовое создание","Контейнеров: "+counts.size+
+                " · "+note,occurredAt)
+            val groupId=insertOrThrow("production_groups",null,cv(
+                "code" to "TMP-"+UUID.randomUUID(),"title" to "Партия от "+formatDate(occurredAt),
+                "plant_id" to plantId,"mother_id" to motherId,
+                "note" to note,"created_at" to occurredAt))
+            update("production_groups",cv("code" to "ГР-%06d".format(Locale.US,groupId)),
+                "id=?",arrayOf(groupId.toString()))
+            counts.forEach{qty->
+                val id=createCultureInDb(this,plantId,qty,LabTerms.IN_CULTURE,
+                    passage,stage,realLocation,null,motherId,note,operation,occurredAt,quantityKind)
+                if(locationId!=null)insertOrThrow("culture_storage",null,cv(
+                    "culture_id" to id,"location_id" to locationId,
+                    "assigned_at" to occurredAt))
+                insertOrThrow("culture_groups",null,cv("culture_id" to id,
+                    "group_id" to groupId,"linked_at" to occurredAt))
+                insertOrThrow("group_history",null,cv(
+                    "culture_id" to id,"new_group_id" to groupId,
+                    "recorded_at" to occurredAt,"reason" to "Массовая партия"))
+                if(recipeId!=null){
+                    update("cultures",cv("medium_recipe_id" to recipeId),
+                        "id=?",arrayOf(id.toString()))
+                    insertOrThrow("culture_recipe_history",null,cv(
+                        "culture_id" to id,"recipe_id" to recipeId,
+                        "applied_at" to occurredAt,"note" to "Первоначальное назначение"))
+                }
+                changeSnapshot(this,operation,id,null,qty,LabTerms.IN_CULTURE)
+                created.add(id)
+            }
+        }
+        return created
+    }
+    /** Existing operation engine verifies material balance and lineage atomically. */
+    fun splitCulturesBulk11(
+        sourceId:Long,usedPerChild:List<Int>,producedPerChild:List<Int>,
+        stage:String,kind:String,recipeId:Long?,location:String?,lost:Int,note:String,
+        occurredAt:Long=System.currentTimeMillis()
+    ){
+        require(usedPerChild.size==producedPerChild.size && usedPerChild.size in 1..25)
+        val parts=usedPerChild.indices.map{index->
+            TransferDestination(usedPerChild[index],producedPerChild[index],
+                stage,null,location,kind,recipeId)
+        }
+        splitCulture(sourceId,parts,lost,note,occurredAt)
+    }
+
     fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String, recipeId: Long? = null, recipeChosen: Boolean = false) {
         require(status in LabTerms.statuses || status == LabTerms.TRANSFERRED) { "Некорректный статус" }
         val reason=checkText(note,2000)
