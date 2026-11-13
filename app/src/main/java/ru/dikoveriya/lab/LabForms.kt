@@ -199,7 +199,8 @@ fun AddTaskDialog(cultures:List<CultureRecord>,onClose:()->Unit,onSave:(String,L
     }
 }
 @Composable
-fun AddMaterialDialog(onClose:()->Unit,onSave:(String,String,Double,Double,Double,String)->Unit){
+fun AddMaterialDialog(onClose:()->Unit,onSave:(String,String,Double,Double,Double,String)->Unit,
+    customCategories:List<String> = emptyList()){
     var name by remember{mutableStateOf("")};var unit by remember{mutableStateOf("г")}
     var category by remember{mutableStateOf("Расходники")}
     var qty by remember{mutableStateOf("")};var min by remember{mutableStateOf("0")};var cost by remember{mutableStateOf("0")}
