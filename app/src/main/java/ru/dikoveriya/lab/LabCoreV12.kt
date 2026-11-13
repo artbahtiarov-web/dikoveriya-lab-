@@ -13,7 +13,7 @@ internal object LabCoreV12 {
     val backupTables = listOf(
         "custom_categories", "plant_items", "item_events", "item_measurements", "item_links",
         "item_photos", "custom_field_definitions", "custom_field_values",
-        "operation_templates", "purchases", "cash_ledger", "direct_costs",
+        "operation_templates", "purchases", "cash_ledger", "direct_costs", "culture_cost_transfers",
         "stock_usage", "equipment_assets", "asset_events", "light_profiles",
         "location_layouts", "item_storage_history", "recurring_task_rules", "task_links",
         "sale_details", "item_sales"
@@ -174,6 +174,22 @@ internal object LabCoreV12 {
             note TEXT NOT NULL DEFAULT '',
             reversed INTEGER NOT NULL DEFAULT 0
         )""")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS culture_cost_transfers(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_culture_id INTEGER NOT NULL REFERENCES cultures(id),
+            child_culture_id INTEGER REFERENCES cultures(id),
+            operation_id TEXT REFERENCES lab_operations(id),
+            sale_id INTEGER REFERENCES sales(id),
+            kind TEXT NOT NULL CHECK(kind IN ('Разделение','Объединение','Потеря','Продажа')),
+            amount_minor INTEGER NOT NULL CHECK(amount_minor>=0),
+            quantity_used INTEGER NOT NULL DEFAULT 0 CHECK(quantity_used>=0),
+            recorded_at INTEGER NOT NULL,
+            reversed INTEGER NOT NULL DEFAULT 0
+        )""")
+        db.execSQL("""CREATE INDEX IF NOT EXISTS idx_cost_transfer_parent
+            ON culture_cost_transfers(parent_culture_id,reversed)""")
+        db.execSQL("""CREATE INDEX IF NOT EXISTS idx_cost_transfer_child
+            ON culture_cost_transfers(child_culture_id,reversed)""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS stock_usage(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             material_id INTEGER NOT NULL REFERENCES materials(id),
