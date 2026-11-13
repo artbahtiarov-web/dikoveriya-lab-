@@ -1,5 +1,10 @@
 package ru.dikoveriya.lab
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +29,15 @@ fun Lab072TasksScreen(
     onNavigate:(String)->Unit,onChanged:()->Unit,
     onError:(String)->Unit,modifier:Modifier=Modifier
 ){
+    val localContext=LocalContext.current
+    var notificationsEnabled by remember{mutableStateOf(
+        Lab11Reminders.permitted(localContext))}
+    val grantReminders=rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()){allowed->
+            notificationsEnabled=allowed
+            if(allowed)runCatching{Lab11Reminders.sync(localContext,db)}
+                .onFailure{onError(it.message?:"Не удалось включить напоминания")}
+        }
     var period by rememberSaveable{mutableStateOf("Открытые")}
     var priority by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
@@ -82,6 +96,16 @@ fun Lab072TasksScreen(
                 priority="";kind="";plantId=null;recipeId=null;search=""
             })
         }
+        if(Build.VERSION.SDK_INT>=33 && !notificationsEnabled)
+            item(key="permissions"){
+                OutlinedButton(
+                    onClick={grantReminders.launch(Manifest.permission.POST_NOTIFICATIONS)},
+                    modifier=Modifier.fillMaxWidth()){
+                    Icon(Icons.Outlined.NotificationsActive,contentDescription=null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Включить напоминания о задачах")
+                }
+            }
         item(key="new"){
             Button(onClick={createDialog=true},
                 modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
