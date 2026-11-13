@@ -96,7 +96,7 @@ fun Lab09PrintPanel(values:LabelValues,layout:LabelDesign,
         SectionTitle("Прямая печать NIIMBOT")
         Text("Это прямое Bluetooth-подключение, а не меню «Поделиться». Для D11/D110 используется 203 dpi; D11_H — 300 dpi. Поддержка определяется по ответу принтера.",
             style=MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick={checkAndScan},enabled=!busy,
+        OutlinedButton(onClick={checkAndScan()},enabled=!busy,
             modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
             Icon(Icons.Outlined.BluetoothSearching,null)
             Spacer(Modifier.width(8.dp))
