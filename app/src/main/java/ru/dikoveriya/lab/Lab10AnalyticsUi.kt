@@ -23,7 +23,7 @@ private data class Lab10AnalyticsData(
     val active:Int,
     val control:Int,
     val operations:Int,
-    val revenue:Double,
+    val revenue:Long,
     val stages:List<Pair<String,Int>>
 )
 
@@ -36,9 +36,15 @@ private fun LabDatabase.analytics10(since:Long?):Lab10AnalyticsData{
     val control=count("SELECT COUNT(*) FROM cultures WHERE status IN ('На контроле','Карантин')")
     val query=if(since==null)"SELECT COUNT(*) FROM lab_operations WHERE status='Проведена'"
         else "SELECT COUNT(*) FROM lab_operations WHERE status='Проведена' AND occurred_at>=?"
-    val operations=count(query,if(since==null)emptyArray() else arrayOf(since.toString()))
-    val revenue=db.rawQuery("SELECT COALESCE(SUM(price),0) FROM sales",null)
-        .use{c->if(c.moveToFirst())c.getDouble(0)else 0.0}
+    val operationsLegacy=count(query,if(since==null)emptyArray() else arrayOf(since.toString()))
+    val extraQuery=if(since==null)
+        "SELECT COUNT(*) FROM item_events WHERE cancelled=0 AND kind NOT IN ('Создание','Отмена')"
+        else "SELECT COUNT(*) FROM item_events WHERE cancelled=0 AND kind NOT IN ('Создание','Отмена') AND event_at>=?"
+    val operations=operationsLegacy+count(extraQuery,
+        if(since==null)emptyArray() else arrayOf(since.toString()))
+    val revenue=db.rawQuery("""SELECT COALESCE(SUM(amount_minor),0) FROM cash_ledger
+        WHERE direction='Доход' AND category='Продажа'""",null)
+        .use{c->if(c.moveToFirst())c.getLong(0)else 0L}
     val stages=db.rawQuery("""
         SELECT stage,COUNT(*) FROM cultures
         WHERE status IN ('В культуре','На контроле','Карантин')
@@ -96,7 +102,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                     Lab10StatCard("На контроле",data.control.toString(),
                         Icons.Outlined.ReportProblem,Modifier.weight(1f)){onMetric("attention")}
                     Lab10StatCard("Выручка по записям",
-                        String.format(Locale("ru"),"%.0f ₽",data.revenue),
+                        kopecks11(data.revenue),
                         Icons.Outlined.Payments,Modifier.weight(1f)){onMetric("sales")}
                 }
             }
