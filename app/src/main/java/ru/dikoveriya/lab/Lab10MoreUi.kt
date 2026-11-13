@@ -14,28 +14,34 @@ import androidx.compose.ui.unit.dp
 
 private data class Lab10MoreAction(val title:String,val hint:String,val icon:ImageVector)
 private val lab10MoreSections=listOf(
-    "Лаборатория" to listOf(
-        Lab10MoreAction("Питательные среды","Рецептуры, партии, компоненты",Icons.Outlined.Science),
-        Lab10MoreAction("Маточники","Источники и линии растений",Icons.Outlined.Spa),
-        Lab10MoreAction("Группы контейнеров","Производственные партии",Icons.Outlined.Folder),
-        Lab10MoreAction("Места хранения","Стеллажи и адреса",Icons.Outlined.Place),
-        Lab10MoreAction("Склад","Реактивы и расходники",Icons.Outlined.Inventory2),
-        Lab10MoreAction("Оборудование","Состояние и обслуживание",Icons.Outlined.Build)
-    ),
     "Работа" to listOf(
-        Lab10MoreAction("Операции","Журнал с историей и результатами",Icons.Outlined.History),
-        Lab10MoreAction("Задачи","План на день и поручения",Icons.Outlined.EventNote),
-        Lab10MoreAction("Инциденты","Проблемы и решения",Icons.Outlined.ReportProblem),
-        Lab10MoreAction("Эксперименты","Опыты и наблюдения",Icons.Outlined.Science),
-        Lab10MoreAction("Продажи","Учёт реализованных растений",Icons.Outlined.LocalOffer)
+        Lab10MoreAction("Операции","Журнал действий и происхождения",Icons.Outlined.History),
+        Lab10MoreAction("Задачи","Календарь, напоминания и планирование",Icons.Outlined.EventNote),
+        Lab10MoreAction("Инциденты","Проблемы и корректирующие действия",Icons.Outlined.ReportProblem),
+        Lab10MoreAction("Эксперименты","Сравнение результатов",Icons.Outlined.Science)
+    ),
+    "Ресурсы" to listOf(
+        Lab10MoreAction("Склад","Запасы, покупки и история материалов",Icons.Outlined.Inventory2),
+        Lab10MoreAction("Места хранения","Интерактивные стеллажи и позиции",Icons.Outlined.Warehouse),
+        Lab10MoreAction("Оборудование","Многоразовое имущество и освещение",Icons.Outlined.Build)
+    ),
+    "Финансы" to listOf(
+        Lab10MoreAction("Финансы","Деньги, стоимость и экономический результат",Icons.Outlined.AccountBalanceWallet),
+        Lab10MoreAction("Продажи","Детальные продажи и история растений",Icons.Outlined.LocalOffer),
+        Lab10MoreAction("Закупки","Покупки и цены поставщиков",Icons.Outlined.ShoppingCart)
     ),
     "Справочники" to listOf(
-        Lab10MoreAction("База знаний","Свои протоколы и методики",Icons.Outlined.MenuBook)
+        Lab10MoreAction("Мои растения","Горшечные растения, черенки и маточники",Icons.Outlined.Spa),
+        Lab10MoreAction("Питательные среды","Рецептуры, партии, компоненты",Icons.Outlined.Science),
+        Lab10MoreAction("Группы контейнеров","Производственные партии",Icons.Outlined.Folder),
+        Lab10MoreAction("Маточники","Источники культур in vitro",Icons.Outlined.Yard),
+        Lab10MoreAction("Пользовательские справочники","Категории, поля и операции",Icons.Outlined.Tune),
+        Lab10MoreAction("База знаний","Методики, протоколы и исследования",Icons.Outlined.MenuBook)
     ),
-    "Данные и приложение" to listOf(
-        Lab10MoreAction("Настройки","Профиль и внешний вид",Icons.Outlined.Settings),
-        Lab10MoreAction("Резервные копии","Сохранение и восстановление",Icons.Outlined.CloudDownload),
-        Lab10MoreAction("О программе","Версия, справка, ограничения",Icons.Outlined.Info)
+    "Система" to listOf(
+        Lab10MoreAction("Настройки","Внешний вид и параметры",Icons.Outlined.Settings),
+        Lab10MoreAction("Резервные копии","Сохранение, импорт и восстановление",Icons.Outlined.CloudDownload),
+        Lab10MoreAction("О программе","Версия, справка и ограничения",Icons.Outlined.Info)
     )
 )
 
