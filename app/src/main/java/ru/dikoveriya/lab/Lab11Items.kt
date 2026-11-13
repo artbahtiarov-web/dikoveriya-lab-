@@ -46,7 +46,7 @@ private fun SQLiteDatabase.newItemRow11(
     plantId:Long,kind:String,acquiredAt:Long,supplier:String,costMinor:Long,
     parentItemId:Long?,parentCultureId:Long?,locationId:Long?,
     locationText:String,substrate:String,rooting:String,stimulant:String,
-    potMl:Int?,note:String
+    potMl:Int?,note:String,customKind:String=""
 ):Long{
     require(isExisting11("plants",plantId)){"Сорт не найден"}
     require(kind in itemKinds11){"Неизвестный тип растения"}
