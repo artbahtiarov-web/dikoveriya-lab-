@@ -26,6 +26,8 @@ class Lab11CoreAcceptanceInstrumentedTest {
             val p=plant(db)
             val item=db.addPlantItem11(p,"Горшечное",note="QA")
             val name="QA substrate "+UUID.randomUUID()
+            // Custom material categories are validated: prepare the test fixture explicitly.
+            db.addCategory11("Материалы","Субстраты")
             db.addMaterial(name,"л",0.0,0.0,0.0,"Субстраты")
             val material=db.materials().first{it.name==name}
             val from=System.currentTimeMillis()-1000
