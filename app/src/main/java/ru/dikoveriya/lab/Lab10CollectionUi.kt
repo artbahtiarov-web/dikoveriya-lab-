@@ -167,6 +167,7 @@ internal fun Lab10CollectionScreen(
     var compact by rememberSaveable{mutableStateOf(false)}
     var filterSheet by remember{mutableStateOf(false)}
     var styleId by remember{mutableStateOf<Long?>(null)}
+    var pendingCoverPlantId by rememberSaveable{mutableStateOf<Long?>(null)}
     var localReload by remember{mutableIntStateOf(0)}
     val visuals=remember(revision,localReload){db.plantVisuals10()}
     val counts=remember(revision){db.plantCounts072()}
@@ -176,12 +177,13 @@ internal fun Lab10CollectionScreen(
         else list.sortedBy{it.name.lowercase()}
     }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->
-        val id=styleId
+        val id=pendingCoverPlantId
+        pendingCoverPlantId=null
         if(uri!=null && id!=null){
             scope.launch{
                 try{
                     withContext(Dispatchers.IO){db.setPlantCover10(context,id,uri)}
-                    localReload++;onChanged()
+                    localReload++;onChanged();styleId=null
                 }catch(e:Exception){onError(e.message?:"Не удалось сохранить обложку")}
             }
         }
@@ -329,7 +331,7 @@ internal fun Lab10CollectionScreen(
                     },modifier=Modifier.fillMaxWidth()){
                         Text("Сохранить оформление")
                     }
-                    OutlinedButton(onClick={picker.launch("image/*")},
+                    OutlinedButton(onClick={pendingCoverPlantId=id;picker.launch("image/*")},
                         modifier=Modifier.fillMaxWidth()){
                         Icon(Icons.Outlined.AddPhotoAlternate,null)
                         Text("Выбрать обложку из галереи")
