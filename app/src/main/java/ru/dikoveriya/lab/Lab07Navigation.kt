@@ -12,6 +12,8 @@ object Lab07Navigation {
     const val ITEMS = "items"
     fun item(id:Long):String="item:$id"
     fun losses(plantId:Long):String="losses:$plantId"
+    fun location(id:Long):String="location:$id"
+    fun asset(id:Long):String="asset:$id"
 
     fun variety(plantId: Long): String = "variety:$plantId"
     fun container(cultureId: Long): String = "container:$cultureId"
@@ -51,7 +53,7 @@ object Lab07Navigation {
         if(route.startsWith("work:group:") || route.startsWith("work:plant:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
-        return group in setOf("variety","container","growth","medium","operations","history","label","item","losses") &&
+        return group in setOf("variety","container","growth","medium","operations","history","label","item","losses","location","asset") &&
             id != null && id > 0
     }
 
