@@ -62,7 +62,10 @@ class BotanicalNavigation07(unittest.TestCase):
 
     def test_layout_has_responsive_actions_and_real_data_graph(self):
         self.assertIn("Lab07Metric(",WIDGETS)
-        self.assertIn("Lab07QuickAction(\"Сканировать контейнер\"",WIDGETS)
+        quick=(SRC/"Lab10NavigationUi.kt").read_text(encoding="utf-8")
+        self.assertIn('Lab10QuickRow("Сканировать QR"',quick)
+        self.assertNotIn('Lab07QuickAction("Сканировать контейнер"',WIDGETS)
+        self.assertIn('onMetric("tasks")',WIDGETS)
         self.assertIn("Lab07ObservationPlot(samples,plotted)",SCREEN)
         self.assertIn("value?.let{sample.date to it}",WIDGETS)
         self.assertIn("Для графика нужны минимум два измерения",WIDGETS)
