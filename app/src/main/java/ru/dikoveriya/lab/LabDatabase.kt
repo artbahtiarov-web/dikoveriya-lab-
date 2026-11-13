@@ -158,7 +158,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         db.insertOrThrow("events", null, cv("culture_id" to id, "kind" to type, "note" to note, "created_at" to System.currentTimeMillis(), "before_qty" to before, "after_qty" to after, "medium_batch_id" to batch, "event_group" to group, "occurred_at" to occurredAt))
     }
     private fun Cursor.optLong(index: Int): Long? = if (isNull(index)) null else getLong(index)
-    fun plants(): List<PlantRecord> = readableDatabase.rawQuery("SELECT id,name,description FROM plants ORDER BY name COLLATE NOCASE", null).use { c ->
+    fun plants(): List<PlantRecord> = readableDatabase.rawQuery("SELECT id,name,description FROM plants WHERE NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='plant' AND a.entity_id=plants.id) ORDER BY name COLLATE NOCASE", null).use { c ->
         buildList { while(c.moveToNext()) add(PlantRecord(c.getLong(0),c.getString(1),c.getString(2))) }
     }
     fun addPlant(name: String, notes: String = "") {
@@ -189,11 +189,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),
             c.getString(13),c.getString(14),c.optLong(15))else null
     }
-    fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
+    fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? AND NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='photo' AND a.entity_id=culture_photos.id) ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(CulturePhoto(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4))) }
     }
     fun addPhoto(context: Context, cultureId: Long, uri: Uri, caption: String) {
-        require(cultures().any { it.id==cultureId }) { "Контейнер не найден" }
+        require(cultureById(cultureId)!=null) { "Контейнер не найден" }
         val folder=File(context.filesDir,"culture_photos").apply { mkdirs() }
         val mime=context.contentResolver.getType(uri)
         val ext=when(mime) {"image/png"->"png";"image/webp"->"webp";"image/jpeg"->"jpg";"image/heic","image/heif"->"heic";else->throw IllegalArgumentException("Поддерживаются JPEG, PNG, WebP и HEIC") }
