@@ -278,7 +278,15 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Ещё" && subsection=="Склад") {
+            if(tab=="Ещё" && subsection=="Операции") {
+                Lab10OperationsScreen(db,refresh,
+                    onBack={subsection=""},
+                    onOpenCulture={id->
+                        subsection=""
+                        tab="Коллекция"
+                        openRoute(Lab07Navigation.container(id))
+                    },modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Склад") {
                 Lab10ResourcesScreen(materials=materials,db=db,revision=refresh,
                     onBack={subsection=""},
                     onNew={dialog="newMaterial"},
