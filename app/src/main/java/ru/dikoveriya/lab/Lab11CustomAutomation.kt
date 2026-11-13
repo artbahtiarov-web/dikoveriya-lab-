@@ -60,6 +60,7 @@ internal fun LabDatabase.saveFieldValue11(
 ){
     val f=fields11(entityKind).firstOrNull{it.id==fieldId}?:error("Поле не найдено")
     require(value.length<=4000)
+    require(f.type!="photo"){"Для фото используй загрузку изображения"}
     require(!f.required || value.isNotBlank()){"Заполни поле "+f.label}
     if(value.isNotBlank()){
         when(f.type){
