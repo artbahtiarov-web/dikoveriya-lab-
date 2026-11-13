@@ -146,16 +146,22 @@ fun DikoveriyaApp() {
                 }
                 val output=context.contentResolver.openOutputStream(uri)
                     ?:error("Файл недоступен")
+                val mothersById=db.mothers().associateBy{it.id}
                 java.util.zip.ZipOutputStream(output).use{zip->
                     ids.forEach{id->
                         val c=db.cultureById(id) ?:error("Контейнер не найден")
                         val medium=db.currentMedium(id)
                         val info=medium?.let{it.name+" · v"+it.version}.orEmpty()
-                        val spec=LabLabelSpec(c.code,c.plantName,c.passage,info,
-                            showMedium=true,dpi=203)
+                        val values=LabelValues(
+                            c.code,c.plantName,c.passage,info,
+                            java.text.SimpleDateFormat("dd.MM.yy",java.util.Locale("ru"))
+                                .format(java.util.Date(c.createdAt)),
+                            c.motherId?.let{mothersById[it]?.code}.orEmpty(),
+                            c.notes.take(150))
+                        val design=db.labelForCulture080(id)?:LabelDesign.initial()
                         val safeCode=c.code.replace(Regex("[^A-Za-z0-9_-]"),"_")
                         zip.putNextEntry(java.util.zip.ZipEntry("$safeCode-40x12.png"))
-                        zip.write(LabLabel40.png(spec))
+                        zip.write(LabLabelDesigner.png(values,design))
                         zip.closeEntry()
                     }
                 }
