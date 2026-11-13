@@ -124,6 +124,7 @@ internal object LabCoreV12 {
             entity_id INTEGER NOT NULL,
             value_json TEXT NOT NULL,
             changed_at INTEGER NOT NULL,
+            photo_filename TEXT,
             UNIQUE(field_id,entity_kind,entity_id)
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS operation_templates(
