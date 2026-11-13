@@ -278,7 +278,13 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Ещё" && subsection=="Настройки") {
+            if(tab=="Ещё" && subsection=="Склад") {
+                Lab10ResourcesScreen(materials=materials,db=db,revision=refresh,
+                    onBack={subsection=""},
+                    onNew={dialog="newMaterial"},
+                    onMove={materialId=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Настройки") {
                 Lab10SettingsScreen(darkTheme=darkTheme,
                     onDarkTheme={value->
                         darkTheme=value
@@ -435,7 +441,7 @@ fun DikoveriyaApp() {
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
-                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c->if(act{db.addMaterial(n,u,q,m,c)})dialog=""})
+                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""})
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
                 "newIncident" -> AddIncidentDialog(cultures,onClose={dialog=""},onSave={t,n,c->if(act{db.addIncident(t,n,c)})dialog=""})
                 "newExperiment" -> AddExperimentDialog(onClose={dialog=""},onSave={t,h->if(act{db.addExperiment(t,h)})dialog=""})
