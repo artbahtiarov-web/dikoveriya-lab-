@@ -257,7 +257,7 @@ class Lab11CoreAcceptanceInstrumentedTest {
             val saved=db.itemEvents11(item).first{it.id==event}
             assertTrue(saved.details.contains("Объём"))
             assertTrue(saved.details.contains("Сезон"))
-            val legacy=parseTemplateFields11("[\\\"Отметка\\\"]")
+            val legacy=parseTemplateFields11("""["Отметка"]""")
             assertEquals("text",legacy.single().kind)
         }finally{db.close()}
     }
