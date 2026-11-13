@@ -181,13 +181,52 @@ fun DikoveriyaApp() {
         labelsForExport=emptyList()
     }
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
-        if(result.contents!=null) {
+        if(result.contents!=null){
             val code=LabQr.getCode(result.contents)
-            val id=code?.let{db.findCulture072(it)}
-            if(id!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
+            when {
+                code==null->error="Это не QR-код Диковерия LAB"
+                code.startsWith("LAB-")->{
+                    val id=db.findCulture072(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.container(id))}
+                    else error="Контейнер "+code+" не найден"
+                }
+                code.startsWith("PLT-")->{
+                    val id=db.itemIdByCode11(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.item(id))}
+                    else error="Растение "+code+" не найдено"
+                }
+                code.startsWith("MAT-")->{
+                    val m=db.mothers().firstOrNull{it.code==code}
+                    if(m!=null)dialog="motherInfo:"+m.id
+                    else error="Маточник "+code+" не найден"
+                }
+                code.startsWith("ГР-")->{
+                    val id=db.groupIdByCode11(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.groupWork(id))}
+                    else error="Партия "+code+" не найдена"
+                }
+                code.startsWith("LOC-")->{
+                    val id=code.removePrefix("LOC-").toLongOrNull()
+                    if(id!=null && db.locationExists11(id)){
+                        tab="Коллекция";routeStack=listOf(Lab07Navigation.PLACES)
+                    }else error="Место "+code+" не найдено"
+                }
+                code.startsWith("AST-")->{
+                    val id=code.removePrefix("AST-").toLongOrNull()
+                    if(id!=null && db.assets11().any{it.id==id}){
+                        tab="Ещё";subsection="Оборудование";routeStack=emptyList()
+                    }else error="Оборудование "+code+" не найдено"
+                }
+                else->error="Этот QR-код пока не связан с поддерживаемым объектом"
+            }
         }
     }
-    val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
+    val scan={
+        scanner.launch(ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt("Наведите камеру на QR растения, контейнера или места")
+            .setBeepEnabled(false).setOrientationLocked(false))
+    }
     val openSection: (String)->Unit = {section->
         when(section){
             "Задачи"->openRoute(Lab07Navigation.TASKS)
