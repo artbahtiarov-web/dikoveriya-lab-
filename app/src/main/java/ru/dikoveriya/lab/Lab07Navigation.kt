@@ -24,6 +24,10 @@ object Lab07Navigation {
         require(mode in setOf("vitro","attention","growth","active","all"))
         return "work:$mode"
     }
+    fun stageWork(stage:String):String{
+        require(stage in LabTerms.stages)
+        return "work:stage:"+stage
+    }
     fun groupWork(id:Long):String="work:group:$id"
     fun plantWork(id:Long):String="work:plant:$id"
     const val TASKS="tasks"
@@ -43,6 +47,7 @@ object Lab07Navigation {
     fun isKnown(route: String): Boolean {
         if(route in setOf(COLLECTION,ITEMS,TASKS,GROUPS,PLACES)) return true
         if(route in setOf("work:vitro","work:attention","work:growth","work:active","work:all")) return true
+        if(route.startsWith("work:stage:"))return route.substringAfter("work:stage:") in LabTerms.stages
         if(route.startsWith("work:group:") || route.startsWith("work:plant:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
