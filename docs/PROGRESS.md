@@ -167,3 +167,23 @@
 - **Тесты:** `qa` (включая синтетическую SQLite базу 20k), Gradle `:app:testDebugUnitTest`/`:app:assembleDebug`; Android UI при 360/430 dp + увеличенные шрифты; `Lab080LabelInstrumentedTest` проверяет ZXing QR и pHYs 203/300, отсутствие QR/кода, isolated SQLite `9→10`; `Lab080EditorInstrumentedTest` проверяет Undo/Redo и сохранение макета. CI статус **на момент записи ожидается** для последнего HEAD, поэтому **не объявлять готовой подписанной 0.8.0**.
 - **Риски:** не проверена физическая термоэтикетка NIIMBOT и реальное обновление БД владельца; Bluetooth direct отсутствует. Устаревшие редкие системные формы и реставрация JSON >50MB требуют дальнейшей проработки. Главное релизное требование — не терять историю и не выдумывать научные факты, подписной certificate менять нельзя.
 - **Следующий конкретный шаг:** проверить оба PR #18 CI для последнего SHA, исправить все Kotlin/Instrumentation/SQLite ошибки **в том же PR**, только после green и low-risk additive migration выполнить squash merge, после чего проверить actual push Actions постоянной подписи, SHA, сертификат и published signed APK artifact. Обратную связь о физической печати и installed DB фиксировать отдельно. Полное содержание `docs/RELEASE_0_8_0.md`.
+
+
+## 2026-11-13 UTC — разработка комплекса 0.9.0 / Issue #19 / PR #20
+
+**Исходная основа:** main SHA `714673e9182b4ab6f6538f90714f56674747ec65`, установленная v0.8.0, SQLite v10. **Ветка:** `release/0.9.0-editor-niimbot`. **PR (пока DRAFT):** https://github.com/artbahtiarov-web/dikoveriya-lab-/pull/20.
+
+**В коде**: 
+- Редактор: изменения размеров элементов жестами и за четыре угла с областью касания 48dp; ±10%, отдельный масштаб просмотра, блокировки, Undo/Redo; QR квадрат и границы 40×12 мм.
+- Макеты JSON v2 читает старые JSON v1 из 0.8.0; новые `italic`, `underline`, `letterSpacingMm`, `locked` имеют безопасные значения по умолчанию. B/I/U и сочетания сохраняются и печатаются в одном Bitmap-рендерере.
+- Каталог 28 различных кириллических OFL-шрифтов: `scripts/label_fonts_manifest.json` с закреплённым коммитом upstream Google Fonts, Git blob SHA и лицензиями; `scripts/prepare_label_fonts.py` проверяет и упаковывает в APK; `LabApp` и `LabelFontCatalog` обеспечивают использование без интернета после установки. Старые 0.8.0 шрифты остаются.
+- Android BLE transport, packet/stream parser NIIMBOT, model lookup, 203/300 dpi, поворот растровых строк, статус и очередь до 200 разных контейнеров, QR-preflight каждого, печать из редактора/списка, без попытки выдавать Android Share за прямое подключение.
+- Права Bluetooth для новых/старых Android, отдельный RC workflow без секретов в PR: `.github/workflows/build-niimbot-rc.yml`. Не менялись release applicationId и постоянный сертификат.
+- Тесты instrumented: `Lab09EditorAndPrinterInstrumentedTest` (JSON migration, типографика, реальные bitmap, BLE framed decoder, печатная геометрия).
+- Подробное описание: `docs/RELEASE_0_9_0_RC.md`.
+
+**CI на предыдущем кодовом SHA** `cd43a746eee0067fdb377e5bd421bdce738261de`: https://github.com/artbahtiarov-web/dikoveriya-lab-/actions/runs/43411906655 — **success** (Python/SQLite, JVM tests, debug APK и 28 pinned fonts). Android UI job был отменён при следующем коммите с документацией, поэтому его состояние нельзя считать success. Ранее компиляция нашла проблему Compose `checkAndScan` и исправлена в том же PR. Текущий последний SHA и UI CI нужно проверить по GitHub, не полагаться на запись журнала.
+
+**Блокер выпуска**: физическая печать на реальной ревизии NIIMBOT пользователя не проверена. Нельзя объявлять стабильный 0.9.0 или сливать неподтверждённый драйвер в main. Нужен permanently signed `0.9.0-rc1` через branch-push release workflow (запускается только после файла `docs/RC_READY_0_9.md`). После проверки APK подписи предоставить ссылку на него для бумажного теста; после успешного physical print/QR/ориентации/10 уникальных этикеток разрешить дальнейшее объединение и выпуск v0.9.0. PR debug APK не устанавливать поверх signed v0.8.0.
+
+**Следующий шаг**: дождаться последнего PR CI `:app:testDebugUnitTest`, `:app:assembleDebug` и UI 360/430dp; исправить ошибки в том же PR. При success создать RC_READY и проверить signed branch APK, его сертификат и artifact. Дополнительно тест реальной базы/принтера только на телефоне пользователя, отчёт о неизвестных состояниях и ошибках сохранять.
