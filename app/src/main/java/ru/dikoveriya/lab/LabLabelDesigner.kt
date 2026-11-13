@@ -40,6 +40,30 @@ data class LabelLayer(
         y=(y+dy).coerceIn(0f,12f-height)
     )
     /** Scale the physical object; QR remains square, text size scales with its box. */
+    /**
+     * corner: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
+     * The opposite corner stays fixed. QR never loses its 1:1 aspect ratio.
+     */
+    fun resizedFromCorner(corner:Int,dx:Float,dy:Float):LabelLayer{
+        if(locked||corner !in 0..3||!dx.isFinite()||!dy.isFinite())return this
+        val leftCorner=corner==0||corner==2
+        val topCorner=corner==0||corner==1
+        val minW=if(kind=="qr")8.8f else 2f
+        val minH=if(kind=="qr")8.8f else .8f
+        val originalRight=x+width
+        val originalBottom=y+height
+        val left=if(leftCorner)(x+dx).coerceIn(0f,originalRight-minW)else x
+        val right=if(leftCorner)originalRight else (originalRight+dx).coerceIn(x+minW,40f)
+        val top=if(topCorner)(y+dy).coerceIn(0f,originalBottom-minH)else y
+        val bottom=if(topCorner)originalBottom else (originalBottom+dy).coerceIn(y+minH,12f)
+        var w=right-left
+        var h=bottom-top
+        if(kind=="qr"){val side=minOf(w,h);w=side;h=side}
+        val nextX=if(leftCorner)right-w else left
+        val nextY=if(topCorner)bottom-h else top
+        return copy(x=nextX,y=nextY,width=w,height=h)
+    }
+
     fun scaled(factor:Float):LabelLayer {
         if(locked||!factor.isFinite()||factor<=0f)return this
         val minWidth=if(kind=="qr")8.8f else 2f
