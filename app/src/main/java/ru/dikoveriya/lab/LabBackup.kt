@@ -73,8 +73,12 @@ object LabBackup {
                 if(root.getInt("schema")>=11){
                     val covers=root.getJSONObject("tables").getJSONArray("plant_visuals")
                     for(i in 0 until covers.length()){
-                        val filename=covers.getJSONObject(i).optString("cover_filename","")
-                        if(filename.isNotBlank())add(filename)
+                        val row=covers.getJSONObject(i)
+                        if(!row.isNull("cover_filename")){
+                            val filename=row.getString("cover_filename")
+                            require(filename.isNotBlank()){"Пустое имя обложки"}
+                            add(filename)
+                        }
                     }
                 }
             }
