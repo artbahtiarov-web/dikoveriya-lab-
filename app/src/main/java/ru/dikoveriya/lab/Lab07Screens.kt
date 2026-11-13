@@ -333,6 +333,9 @@ private fun Lab07GrowthScreen(
     var note by rememberSaveable { mutableStateOf("") }
     var plotted by rememberSaveable { mutableStateOf("Побеги") }
     var saved by rememberSaveable { mutableStateOf("") }
+    var suggestControl by rememberSaveable { mutableStateOf(false) }
+    var controlDialog by rememberSaveable { mutableStateOf(false) }
+    var lastContaminated by rememberSaveable { mutableIntStateOf(0) }
     val samples=remember(culture.id,revision){db.growthSamples(culture.id)}
     val closed=culture.status in setOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.ANNULLED,LabTerms.TRANSFERRED)
     fun parseCount(text:String):Int? = if(text.isBlank())null else text.toIntOrNull() ?: error("Некорректное число")
@@ -357,9 +360,12 @@ private fun Lab07GrowthScreen(
             item(key="save") {
                 Button(onClick={
                     try {
+                        val count=parseCount(infected)
                         db.addGrowthSample(culture.id,
                             parseCount(explants),parseCount(shoots),
-                            parseCount(plants),parseCount(infected),note)
+                            parseCount(plants),count,note)
+                        lastContaminated=count?:0
+                        if(lastContaminated>0)suggestControl=true
                         explants="";shoots="";plants="";infected="";note=""
                         saved="Сохранено · ${formatDate(System.currentTimeMillis())}"
                         onChanged()
@@ -399,6 +405,19 @@ private fun Lab07GrowthScreen(
             }
         }
     }
+    if(suggestControl)AlertDialog(onDismissRequest={suggestControl=false},
+        title={Text("Заражение зарегистрировано")},
+        text={Text("В осмотре отмечено заражённых: $lastContaminated. Назначить контроль? Осмотр уже сохранён, статус автоматически не меняется.")},
+        confirmButton={Button(onClick={suggestControl=false;controlDialog=true}){
+            Text("Назначить проверку")
+        }},
+        dismissButton={TextButton(onClick={suggestControl=false}){Text("Не сейчас")}})
+    if(controlDialog)Lab072BulkDialog(
+        "control",listOf(culture.id),db,db.locations072(),db.recipes(),
+        onClose={controlDialog=false},
+        onSaved={controlDialog=false;onChanged()},
+        onError=onError,
+        initialReason="Обнаружено заражённых при осмотре: $lastContaminated")
 }
 
 data class Lab07MediumUse(val id:Long,val name:String,val version:Int,val date:Long,val reason:String)
