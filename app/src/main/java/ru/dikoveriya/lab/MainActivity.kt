@@ -370,7 +370,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.7.2 · локальная база SQLite v9. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.8.0 · локальная база SQLite v10. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -458,7 +458,11 @@ fun DikoveriyaApp() {
             photoCultureId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071PhotosDialog(culture,db.photos(id),context.filesDir,
                     onClose={photoCultureId=null},
-                    onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")})
+                    onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")},
+                    onEdit={photo,caption,reason->
+                        act{db.changePhotoCaption080(photo,caption,reason)}
+                    },
+                    onArchive={photo,reason->act{db.archivePhoto080(photo,reason)}})
             }}
             labelCultureId?.let{id->db.cultureById(id)?.let{culture->
                 val medium=recipes.firstOrNull{it.id==culture.recipeId}
