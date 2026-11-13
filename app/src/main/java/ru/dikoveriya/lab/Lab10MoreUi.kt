@@ -32,6 +32,7 @@ private val lab10MoreSections=listOf(
         Lab10MoreAction("База знаний","Свои протоколы и методики",Icons.Outlined.MenuBook)
     ),
     "Данные и приложение" to listOf(
+        Lab10MoreAction("Настройки","Профиль и внешний вид",Icons.Outlined.Settings),
         Lab10MoreAction("Резервные копии","Сохранение и восстановление",Icons.Outlined.CloudDownload),
         Lab10MoreAction("О программе","Версия, справка, ограничения",Icons.Outlined.Info)
     )
