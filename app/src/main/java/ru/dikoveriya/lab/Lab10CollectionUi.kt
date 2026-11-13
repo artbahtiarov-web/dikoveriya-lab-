@@ -321,3 +321,49 @@ internal fun Lab10CollectionScreen(
         }
     }
 }
+
+
+@Composable
+internal fun Lab10VarietyHeader(
+    plant:PlantRecord,visual:Lab10PlantVisual,count:Int,
+    onBack:()->Unit,onNew:(()->Unit)?
+){
+    Column(verticalArrangement=Arrangement.spacedBy(9.dp)){
+        Row(verticalAlignment=Alignment.CenterVertically){
+            IconButton(onClick=onBack){Icon(Icons.Outlined.ArrowBack,"Назад")}
+            Text("ПАСПОРТ СОРТА",color=Lab07Palette.InkBrass,
+                style=MaterialTheme.typography.labelLarge)
+        }
+        Card(shape=RoundedCornerShape(21.dp),
+            colors=CardDefaults.cardColors(containerColor=Lab07Palette.DeepForest),
+            border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.6f))){
+            Row(verticalAlignment=Alignment.CenterVertically,
+                modifier=Modifier.fillMaxWidth().padding(12.dp)){
+                PlantCover10(visual.coverFilename,visual.iconKey,visual.colorKey,
+                    Modifier.size(width=100.dp,height=116.dp).clip(RoundedCornerShape(16.dp)))
+                Column(Modifier.weight(1f).padding(start=12.dp),
+                    verticalArrangement=Arrangement.spacedBy(7.dp)){
+                    Text(plant.name,color=Lab07Palette.Champagne,
+                        style=MaterialTheme.typography.titleLarge,maxLines=3)
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        PlantIcon10(visual.iconKey,modifier=Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Контейнеров: "+count,color=Lab07Palette.Champagne,
+                            style=MaterialTheme.typography.bodyMedium)
+                    }
+                    if(plant.description.isNotBlank())
+                        Text(plant.description,color=Lab07Palette.Champagne.copy(alpha=.85f),
+                            maxLines=2,overflow=TextOverflow.Ellipsis,
+                            style=MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        if(onNew!=null){
+            Button(onClick=onNew,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.AddCircleOutline,null)
+                Spacer(Modifier.width(6.dp))
+                Text("Новый контейнер этого сорта")
+            }
+        }
+    }
+}
