@@ -1035,6 +1035,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 db.rawQuery(sql,null).use{c->
                     val photoIndex=when(table){
                         "culture_photos"->c.getColumnIndex("filename")
+                        "materials"->c.getColumnIndex("photo_filename")
                         "plant_visuals"->c.getColumnIndex("cover_filename")
                         "plant_items"->c.getColumnIndex("cover_filename")
                         "item_photos"->c.getColumnIndex("filename")
