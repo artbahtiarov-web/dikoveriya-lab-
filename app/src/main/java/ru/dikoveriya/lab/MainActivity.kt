@@ -60,7 +60,7 @@ fun DikoveriyaApp() {
     val stateHolder=rememberSaveableStateHolder()
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
-        "collection","variety"->"Коллекция"
+        "collection","items","item","losses","variety"->"Коллекция"
         "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
         "tasks"->"Главная"
         else->if(tab=="Среды")"Ещё" else tab
@@ -248,6 +248,7 @@ fun DikoveriyaApp() {
                         onNavigate={openRoute(it)},
                         onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
+                        onNewItem={dialog="newItem"},
                         onEditPlant={dialog="plantInfo:$it"},
                         onEdit={cultureId=it},
                         onLabel={openRoute(Lab07Navigation.label(it))},
@@ -415,6 +416,10 @@ fun DikoveriyaApp() {
             }
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
+                "newItem" -> Lab11NewItemDialog(db,plants,
+                    onClose={dialog=""},onSaved={id->
+                        dialog="";refresh++;openRoute(Lab07Navigation.item(id))
+                    },onError={error=it})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
                 "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,preselectedPlantId,onClose={dialog="";preselectedRecipeId=null;preselectedPlantId=null},
                     onSaved={id->dialog="";preselectedRecipeId=null;preselectedPlantId=null;refresh++;openRoute(Lab07Navigation.container(id))},onChanged={refresh++})
