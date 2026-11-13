@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,7 +27,8 @@ import java.io.File
 
 @Composable
 internal fun Lab11ItemCover(
-    filename:String?,modifier:Modifier=Modifier,kind:String="Горшечное"
+    filename:String?,modifier:Modifier=Modifier,kind:String="Горшечное",
+    zoom:Float=1f,panX:Float=0f,panY:Float=0f
 ){
     val context=androidx.compose.ui.platform.LocalContext.current
     val bmp by produceState<Bitmap?>(null,filename){
@@ -45,11 +48,15 @@ internal fun Lab11ItemCover(
             }
         }
     }
-    Box(modifier.background(Lab07Palette.Forest),
+    Box(modifier.clipToBounds().background(Lab07Palette.Forest),
         contentAlignment=Alignment.Center){
         if(bmp!=null)Image(bmp!!.asImageBitmap(),
             contentDescription="Фото растения",
-            modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+            modifier=Modifier.fillMaxSize().graphicsLayer {
+                scaleX=zoom;scaleY=zoom
+                translationX=panX*size.width
+                translationY=panY*size.height
+            },contentScale=ContentScale.Crop)
         else Icon(if(kind=="Черенок")Icons.Outlined.Grass
                   else Icons.Outlined.Spa,contentDescription=null,
             tint=Lab07Palette.Brass,modifier=Modifier.size(42.dp))
@@ -217,7 +224,8 @@ private fun Lab11ItemTile(
             Column(Modifier.fillMaxWidth(),
                 verticalArrangement=Arrangement.spacedBy(6.dp)){
                 Lab11ItemCover(item.cover,
-                    modifier=Modifier.fillMaxWidth().height(128.dp),kind=item.kind)
+                    modifier=Modifier.fillMaxWidth().height(128.dp),kind=item.kind,
+                    zoom=item.coverZoom,panX=item.coverPanX,panY=item.coverPanY)
                 Column(Modifier.fillMaxWidth().padding(10.dp),
                     verticalArrangement=Arrangement.spacedBy(5.dp)){
                     Text(item.plantName,style=MaterialTheme.typography.titleSmall,
@@ -237,7 +245,8 @@ private fun Lab11ItemTile(
                 verticalAlignment=Alignment.CenterVertically){
                 Lab11ItemCover(item.cover,
                     modifier=Modifier.size(width=92.dp,height=95.dp),
-                    kind=item.kind)
+                    kind=item.kind,zoom=item.coverZoom,
+                    panX=item.coverPanX,panY=item.coverPanY)
                 Column(Modifier.weight(1f).padding(start=12.dp),
                     verticalArrangement=Arrangement.spacedBy(4.dp)){
                     Text(item.plantName,style=MaterialTheme.typography.titleMedium,
