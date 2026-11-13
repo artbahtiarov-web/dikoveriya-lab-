@@ -70,6 +70,7 @@ internal object LabCoreV12 {
             leaves INTEGER,
             roots INTEGER,
             note TEXT NOT NULL DEFAULT '',
+            cancelled INTEGER NOT NULL DEFAULT 0,
             CHECK(height_mm IS NULL OR height_mm>=0),
             CHECK(leaves IS NULL OR leaves>=0),
             CHECK(roots IS NULL OR roots>=0)
