@@ -138,7 +138,15 @@ internal fun Lab11ActionDialog(
         else listOf("Посадка","Пересадка","Полив","Подкормка",
             "Обработка","Обрезка","Прищипка","Осмотр","Измерение",
             "Перемещение","Потеря","Утилизация","Другое")
-    val custom=remember{db.templates11().map{it.title}}
+    val templates=remember{db.templates11()}
+    val custom=templates.map{it.title}
+    var customAnswers by remember{mutableStateOf(emptyMap<String,String>())}
+    val fields=remember(kind){
+        templates.firstOrNull{it.title==kind}?.let{template->
+            val array=org.json.JSONArray(template.fields)
+            (0 until array.length()).map{array.getString(it)}
+        }?:emptyList()
+    }
     var kind by rememberSaveable{mutableStateOf(allowed.first())}
     var date by rememberSaveable{mutableStateOf(dateText11())}
     var stage by rememberSaveable{mutableStateOf("Не менять")}
@@ -189,6 +197,10 @@ internal fun Lab11ActionDialog(
                     Field("Сколько использовано (в единице склада)",qty,{qty=it})
                 }
             }
+            fields.forEach{field->
+                Field(field,customAnswers[field]?:"",
+                    {value->customAnswers=customAnswers+(field to value)},single=false)
+            }
             Field("Что сделано / результат",note,{note=it},single=false)
             if(isClosed)Text("Этот экземпляр закрыт. Для восстановления потребуется корректирующая операция.",
                 color=MaterialTheme.colorScheme.error)
@@ -210,7 +222,8 @@ internal fun Lab11ActionDialog(
                             newLocation=newLocation.takeIf{it.isNotBlank()},
                             newSubstrate=substrate.takeIf{it.isNotBlank()},
                             stimulant=stimulant.takeIf{it.isNotBlank()},
-                            materialId=materialId,materialQty=amount)
+                            materialId=materialId,materialQty=amount,
+                            customFields=customAnswers.filterKeys{it in fields})
                         onSaved()
                     }catch(e:Exception){onError(e.message?:"Не удалось записать действие")}
                 }){Text("Записать")}
