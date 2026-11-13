@@ -206,6 +206,9 @@ internal fun Lab11ItemPassport(
                     }
                 }
                 item{
+                    Lab11CustomFieldsSection(db,"item",id,revision,onChanged,onError)
+                }
+                item{
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
                         horizontalArrangement=Arrangement.SpaceBetween){
                         Column{
