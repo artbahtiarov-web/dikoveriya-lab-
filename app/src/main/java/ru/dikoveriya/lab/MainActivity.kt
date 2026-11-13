@@ -62,8 +62,9 @@ fun DikoveriyaApp() {
     val stateHolder=rememberSaveableStateHolder()
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
-        "collection","items","item","losses","variety"->"Коллекция"
+        "collection","items","item","losses","location","variety"->"Коллекция"
         "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
+        "asset"->"Ещё"
         "tasks"->"Главная"
         else->if(tab=="Среды")"Ещё" else tab
     }
@@ -218,13 +219,13 @@ fun DikoveriyaApp() {
                 code.startsWith("LOC-")->{
                     val id=code.removePrefix("LOC-").toLongOrNull()
                     if(id!=null && db.locationExists11(id)){
-                        tab="Коллекция";routeStack=listOf(Lab07Navigation.PLACES)
+                        tab="Коллекция";routeStack=listOf(Lab07Navigation.location(id))
                     }else error="Место "+code+" не найдено"
                 }
                 code.startsWith("AST-")->{
                     val id=code.removePrefix("AST-").toLongOrNull()
                     if(id!=null && db.assets11().any{it.id==id}){
-                        tab="Ещё";subsection="Оборудование";routeStack=emptyList()
+                        tab="Ещё";subsection="";routeStack=listOf(Lab07Navigation.asset(id))
                     }else error="Оборудование "+code+" не найдено"
                 }
                 else->error="Этот QR-код пока не связан с поддерживаемым объектом"
