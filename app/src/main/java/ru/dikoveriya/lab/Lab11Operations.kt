@@ -18,7 +18,8 @@ internal fun LabDatabase.performItemAction11(
     itemId:Long,kind:String,at:Long,
     note:String="",newStage:String?=null,newKind:String?=null,newLocation:String?=null,
     newSubstrate:String?=null,stimulant:String?=null,
-    materialId:Long?=null,materialQty:Double=0.0
+    materialId:Long?=null,materialQty:Double=0.0,
+    customFields:Map<String,String> = emptyMap()
 ):Long{
     require(kind in standardOps11 || templates11().any{it.title==kind}){
         "Неизвестная операция. Добавь её через шаблон."
@@ -49,6 +50,12 @@ internal fun LabDatabase.performItemAction11(
         if(newLocation!=null)details.put("new_location",newLocation)
         if(newSubstrate!=null)details.put("new_substrate",newSubstrate)
         if(stimulant!=null)details.put("new_stimulant",stimulant)
+        if(customFields.isNotEmpty()){
+            require(customFields.size<=30 && customFields.all{
+                it.key.length in 1..100 && it.value.length<=2000
+            }){"Некорректные дополнительные поля"}
+            details.put("user_fields",JSONObject(customFields))
+        }
         val eventId=db.insertOrThrow("item_events",null,ContentValues().apply{
             put("item_id",itemId);put("kind",kind)
             put("event_at",at);put("recorded_at",System.currentTimeMillis())
