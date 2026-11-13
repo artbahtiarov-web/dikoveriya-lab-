@@ -56,6 +56,7 @@ internal fun Lab11ItemPassport(
     var showSale by remember{mutableStateOf(false)}
     var showMeasure by remember{mutableStateOf(false)}
     var showRepeat by remember{mutableStateOf(false)}
+    var coverSettings by remember{mutableStateOf(false)}
     var menu by remember{mutableStateOf(false)}
     var cancelEvent by remember{mutableStateOf<Long?>(null)}
     var cancelReason by remember{mutableStateOf("")}
@@ -82,7 +83,7 @@ internal fun Lab11ItemPassport(
     }
     val history=remember(id,revision){db.itemEvents11(id)}
     val measurements=remember(id,revision){db.itemGrowth11(id)}
-    val photos=remember(id,revision){db.itemPhotos11(id)}
+    val photos=remember(id,revision){db.itemPhotoEntries11(id)}
     val lineage=remember(id,revision){db.itemLineage11(id)}
     val direct=remember(id,revision){db.directCost11("item",id)}
     val closed=item.status in setOf("Продан","Утилизирован")
@@ -111,6 +112,8 @@ internal fun Lab11ItemPassport(
                     DropdownMenu(expanded=menu,onDismissRequest={menu=false}){
                         DropdownMenuItem(text={Text("Добавить фотографию")},
                             onClick={menu=false;picker.launch("image/*")})
+                        if(item.cover!=null)DropdownMenuItem(text={Text("Масштаб и положение обложки")},
+                            onClick={menu=false;coverSettings=true})
                         DropdownMenuItem(text={Text("Сохранить QR (PNG)")},
                             onClick={menu=false;qrSaver.launch(item.code+".png")})
                         DropdownMenuItem(text={Text("Создать черенок")},
@@ -129,7 +132,8 @@ internal fun Lab11ItemPassport(
                 border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.6f))){
                 Row(Modifier.fillMaxWidth().padding(13.dp),
                     verticalAlignment=Alignment.CenterVertically){
-                    Lab11ItemCover(item.cover,Modifier.size(100.dp),item.kind)
+                    Lab11ItemCover(item.cover,Modifier.size(100.dp),item.kind,
+                        zoom=item.coverZoom,panX=item.coverPanX,panY=item.coverPanY)
                     Column(Modifier.weight(1f).padding(start=14.dp),
                         verticalArrangement=Arrangement.spacedBy(7.dp)){
                         Text(item.plantName,color=Lab07Palette.Champagne,
@@ -222,11 +226,14 @@ internal fun Lab11ItemPassport(
                     }
                 }
                 item{Text("Фотографии · "+photos.size,style=MaterialTheme.typography.titleMedium)}
-                items(photos.take(12),key={it.first}){(file,caption)->
+                items(photos,key={it.filename}){photo->
                     Row(verticalAlignment=Alignment.CenterVertically){
-                        Lab11ItemCover(file,Modifier.size(86.dp))
+                        Lab11ItemCover(photo.filename,Modifier.size(86.dp))
                         Column(Modifier.padding(start=12.dp)){
-                            Text(caption.ifBlank{"Фотография растения"})
+                            Text(formatDate(photo.addedAt),
+                                style=MaterialTheme.typography.labelSmall,
+                                color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(photo.caption.ifBlank{"Фотография растения"})
                         }
                     }
                 }
@@ -302,6 +309,8 @@ internal fun Lab11ItemPassport(
         onSaved={showSale=false;onChanged()},onError=onError)
     if(showMeasure)Lab11MeasureDialog(item,db,onClose={showMeasure=false},
         onSaved={showMeasure=false;onChanged()},onError=onError)
+    if(coverSettings)Lab11CoverDialog(item,db,onClose={coverSettings=false},
+        onSaved={coverSettings=false;onChanged()},onError=onError)
     if(showRepeat)Lab11RecurrenceDialog(item,db,onClose={showRepeat=false},
         onSaved={showRepeat=false;onChanged()},onError=onError)
     cancelEvent?.let{eventId->
@@ -413,4 +422,35 @@ private fun Lab11RecurrenceDialog(item:Lab11PlantItem,db:LabDatabase,
             }catch(e:Exception){onError(e.message?:"Не удалось создать повторение")}
         }){Text("Сохранить")}},
         dismissButton={TextButton(onClick=onClose){Text("Отмена")}})
+}
+
+
+@Composable
+private fun Lab11CoverDialog(item:Lab11PlantItem,db:LabDatabase,
+    onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit){
+    var zoom by rememberSaveable(item.id){mutableFloatStateOf(item.coverZoom)}
+    var panX by rememberSaveable(item.id){mutableFloatStateOf(item.coverPanX)}
+    var panY by rememberSaveable(item.id){mutableFloatStateOf(item.coverPanY)}
+    AlertDialog(onDismissRequest=onClose,
+        title={Text("Положение обложки")},
+        text={
+            Column(verticalArrangement=Arrangement.spacedBy(9.dp)){
+                Lab11ItemCover(item.cover,Modifier.fillMaxWidth().height(155.dp),
+                    item.kind,zoom,panX,panY)
+                Text("Масштаб",style=MaterialTheme.typography.labelMedium)
+                Slider(zoom,{zoom=it},valueRange=1f..3f)
+                Text("Смещение по горизонтали",
+                    style=MaterialTheme.typography.labelMedium)
+                Slider(panX,{panX=it},valueRange=-1f..1f)
+                Text("Смещение по вертикали",
+                    style=MaterialTheme.typography.labelMedium)
+                Slider(panY,{panY=it},valueRange=-1f..1f)
+            }
+        },
+        confirmButton={Button(onClick={
+            try{db.updateItemCover11(item.id,zoom,panX,panY);onSaved()}
+            catch(e:Exception){onError(e.message?:"Не удалось настроить обложку")}
+        }){Text("Сохранить")}},
+        dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
+    )
 }
