@@ -61,8 +61,8 @@ class BotanicalNavigation07(unittest.TestCase):
         self.assertIn('min=48.dp',SCREEN.replace('minWidth=48.dp','min=48.dp'))
 
     def test_layout_has_responsive_actions_and_real_data_graph(self):
-        self.assertIn("BoxWithConstraints",WIDGETS)
-        self.assertIn("maxWidth<380.dp",WIDGETS)
+        self.assertIn("Lab07Metric(",WIDGETS)
+        self.assertIn("Lab07QuickAction(\"Сканировать контейнер\"",WIDGETS)
         self.assertIn("Lab07ObservationPlot(samples,plotted)",SCREEN)
         self.assertIn("value?.let{sample.date to it}",WIDGETS)
         self.assertIn("Для графика нужны минимум два измерения",WIDGETS)
