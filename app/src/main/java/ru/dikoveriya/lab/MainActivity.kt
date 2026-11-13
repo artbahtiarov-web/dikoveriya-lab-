@@ -10,6 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -66,6 +69,7 @@ fun DikoveriyaApp() {
     var taskCultureId by remember { mutableStateOf<Long?>(null) }
     var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
     var labelsForExport by remember { mutableStateOf(emptyList<Long>()) }
+    var labelsForPrint by remember { mutableStateOf(emptyList<Long>()) }
     var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
     var actionCultureId by remember { mutableStateOf<Long?>(null) }
     var actionPreferredMode by rememberSaveable { mutableStateOf("") }
@@ -254,6 +258,9 @@ fun DikoveriyaApp() {
                         onExportLabels={ids->
                             labelsForExport=ids
                             exportLabelsZip.launch("dikoveriya-etiketki-40x12.zip")
+                        },
+                        onPrintLabels={ids->
+                            labelsForPrint=ids.distinct().take(200)
                         },
                         modifier=Modifier.fillMaxSize().padding(padding)
                     )
@@ -526,6 +533,45 @@ fun DikoveriyaApp() {
             experimentId?.let{id->experiments.firstOrNull{it.id==id}?.let{e->
                 ExperimentDialog(e,cultures,onClose={experimentId=null},onAdd={c,g->if(act{db.enrollExperiment(id,c,g)})experimentId=null})
             }}
+            if(labelsForPrint.isNotEmpty()){
+                val printJobs=remember(labelsForPrint,refresh){
+                    val mothersById=db.mothers().associateBy{it.id}
+                    labelsForPrint.mapNotNull{id->
+                        db.cultureById(id)?.let{c->
+                            val medium=db.currentMedium(id)?.let{
+                                it.name+" · v"+it.version
+                            }.orEmpty()
+                            val created=java.text.SimpleDateFormat(
+                                "dd.MM.yy",java.util.Locale("ru"))
+                                .format(java.util.Date(c.createdAt))
+                            val values=LabelValues(c.code,c.plantName,c.passage,
+                                medium,created,
+                                c.motherId?.let{mothersById[it]?.code}.orEmpty(),
+                                c.notes.take(150))
+                            values to (db.labelForCulture080(id)?:LabelDesign.initial())
+                        }
+                    }
+                }
+                Dialog(onDismissRequest={labelsForPrint=emptyList()}){
+                    Card(Modifier.fillMaxWidth().heightIn(max=700.dp)){
+                        Column(Modifier.padding(14.dp)
+                            .verticalScroll(rememberScrollState()),
+                            verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            Text("Печать группы · "+printJobs.size+" контейнеров",
+                                style=MaterialTheme.typography.titleLarge)
+                            if(printJobs.isNotEmpty()){
+                                Lab09PrintPanel(printJobs.first().first,
+                                    printJobs.first().second,
+                                    onError={error=it},batchJobs=printJobs)
+                            }
+                            OutlinedButton(onClick={labelsForPrint=emptyList()},
+                                modifier=Modifier.fillMaxWidth()){
+                                Text("Закрыть окно печати")
+                            }
+                        }
+                    }
+                }
+            }
             restoreUri?.let{uri->AlertDialog(onDismissRequest={restoreUri=null},title={Text("Заменить все данные?")},text={Text("Это удалит текущие записи и заменит их содержимым копии. Отменить после восстановления нельзя. Сделай текущую копию перед продолжением.")},confirmButton={TextButton(onClick={
                 if(act{context.contentResolver.openInputStream(uri)?.use{LabBackup.restore(context,db,it)}?:throw IllegalStateException("Файл недоступен")}) { restoreUri=null }
             }){Text("Да, восстановить",color=MaterialTheme.colorScheme.error)}},dismissButton={TextButton(onClick={restoreUri=null}){Text("Отмена")}})}
