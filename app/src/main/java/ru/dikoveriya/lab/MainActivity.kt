@@ -213,7 +213,7 @@ fun DikoveriyaApp() {
                             tab=name;subsection="";routeStack=emptyList()
                         },
                         icon={Icon(icon,contentDescription=null)},
-                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Коллекция";else->name},maxLines=1)},
+                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Растения";else->name},maxLines=1)},
                         colors=NavigationBarItemDefaults.colors(
                             selectedIconColor=Lab07Palette.Brass,
                             selectedTextColor=Lab07Palette.Champagne,
