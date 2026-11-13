@@ -9,6 +9,9 @@ package ru.dikoveriya.lab
  */
 object Lab07Navigation {
     const val COLLECTION = "collection"
+    const val ITEMS = "items"
+    fun item(id:Long):String="item:$id"
+    fun losses(plantId:Long):String="losses:$plantId"
 
     fun variety(plantId: Long): String = "variety:$plantId"
     fun container(cultureId: Long): String = "container:$cultureId"
@@ -18,7 +21,7 @@ object Lab07Navigation {
     fun history(cultureId: Long): String = "history:$cultureId"
     fun label(cultureId:Long):String="label:$cultureId"
     fun work(mode:String):String{
-        require(mode in setOf("vitro","attention","growth","all"))
+        require(mode in setOf("vitro","attention","growth","active","all"))
         return "work:$mode"
     }
     fun groupWork(id:Long):String="work:group:$id"
@@ -38,17 +41,19 @@ object Lab07Navigation {
     fun current(stack: List<String>): String? = stack.lastOrNull()
 
     fun isKnown(route: String): Boolean {
-        if(route in setOf(COLLECTION,TASKS,GROUPS,PLACES)) return true
-        if(route in setOf("work:vitro","work:attention","work:growth","work:all")) return true
+        if(route in setOf(COLLECTION,ITEMS,TASKS,GROUPS,PLACES)) return true
+        if(route in setOf("work:vitro","work:attention","work:growth","work:active","work:all")) return true
         if(route.startsWith("work:group:") || route.startsWith("work:plant:"))return route.substringAfterLast(':').toLongOrNull()?.let{it>0}?:false
         val group=route.substringBefore(':')
         val id=route.substringAfter(':',"").toLongOrNull()
-        return group in setOf("variety","container","growth","medium","operations","history","label") &&
+        return group in setOf("variety","container","growth","medium","operations","history","label","item","losses") &&
             id != null && id > 0
     }
 
     fun parentFor(route: String, plantId: Long?): String? = when(route.substringBefore(':')) {
         "variety" -> COLLECTION
+        "item" -> ITEMS
+        "losses" -> null
         "container" -> plantId?.let { variety(it) }
         "growth","medium","operations","history","label" -> route.substringAfter(':').toLongOrNull()?.let { container(it) }
         else -> null
