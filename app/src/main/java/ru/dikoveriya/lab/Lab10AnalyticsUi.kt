@@ -158,7 +158,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
 @Composable
 private fun Lab10StatCard(label:String,value:String,
     icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier){
-    Card(modifier,heightInColor(),shape=RoundedCornerShape(18.dp),
+    Card(modifier=modifier,colors=heightInColor(),shape=RoundedCornerShape(18.dp),
         border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.28f))){
         Column(Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement=Arrangement.spacedBy(7.dp)){
