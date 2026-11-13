@@ -105,13 +105,27 @@ internal fun LabDatabase.lineEconomy11(plantId:Long):Lab11LineEconomy{
         FROM direct_costs d JOIN cultures c ON c.id=d.entity_id
         WHERE d.entity_kind='culture' AND c.plant_id=? AND d.reversed=0""",
         arrayOf(plantId.toString())).use{c->c.moveToFirst();c.getLong(0)}
-    val active=db.rawQuery("""SELECT COUNT(*) FROM cultures
+    val itemDirect=db.rawQuery("""SELECT COALESCE(SUM(d.amount_minor),0)
+        FROM direct_costs d JOIN plant_items i ON i.id=d.entity_id
+        WHERE d.entity_kind='item' AND i.plant_id=? AND d.reversed=0""",
+        arrayOf(plantId.toString())).use{c->c.moveToFirst();c.getLong(0)}
+    val activeCultures=db.rawQuery("""SELECT COUNT(*) FROM cultures
         WHERE plant_id=? AND status IN ('В культуре','На контроле','Карантин')""",
         arrayOf(plantId.toString())).use{c->c.moveToFirst();c.getInt(0)}
-    val sales=db.rawQuery("""SELECT COALESCE(SUM(s.quantity),0),
+    val activeItems=db.rawQuery("""SELECT COUNT(*) FROM plant_items
+        WHERE plant_id=? AND status='Активен'""",
+        arrayOf(plantId.toString())).use{c->c.moveToFirst();c.getInt(0)}
+    val vitroSales=db.rawQuery("""SELECT COALESCE(SUM(s.quantity),0),
         COALESCE(SUM(s.price),0) FROM sales s JOIN cultures c ON c.id=s.culture_id
         WHERE c.plant_id=?""",arrayOf(plantId.toString())).use{c->
         c.moveToFirst();c.getInt(0) to decimalMinor11(c.getDouble(1))
     }
-    return Lab11LineEconomy(plantId,name,init,direct,active,sales.first,sales.second)
+    val itemSales=db.rawQuery("""SELECT COUNT(*),COALESCE(SUM(s.amount_minor),0)
+        FROM item_sales s JOIN plant_items i ON i.id=s.item_id
+        WHERE i.plant_id=?""",arrayOf(plantId.toString())).use{c->
+        c.moveToFirst();c.getInt(0) to c.getLong(1)
+    }
+    return Lab11LineEconomy(plantId,name,init,direct+itemDirect,
+        activeCultures+activeItems,vitroSales.first+itemSales.first,
+        vitroSales.second+itemSales.second)
 }
