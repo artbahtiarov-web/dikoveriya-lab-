@@ -58,7 +58,10 @@ fun Lab07RouteScreen(
         "tasks" -> Lab072TasksScreen(db,revision,plants,recipes,
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
-        "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
+        "places" -> Lab11StorageScreen(db,revision,onBack,
+            onItem={onNavigate(Lab07Navigation.item(it))},
+            onCulture={onNavigate(Lab07Navigation.container(it))},
+            onChanged=onChanged,onError=onError,modifier=modifier)
         "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,
             onChanged,onError,onOpenItems={onNavigate(Lab07Navigation.ITEMS)},modifier=modifier)
         "items" -> Lab11ItemsScreen(db,revision,onBack,onNewItem,
