@@ -119,12 +119,6 @@ fun DikoveriyaApp() {
     val incidents=remember(refresh){db.incidents()}
     val experiments=remember(refresh){db.experiments()}
     val sales=remember(refresh){db.sales()}
-    val metrics=remember(refresh,tab){if(tab=="Аналитика")db.recipeMetrics() else emptyList()}
-    val cultivarResults=remember(refresh,tab){if(tab=="Аналитика")db.plantResults() else emptyList()}
-    val mediumResults=remember(refresh,tab){if(tab=="Аналитика")db.mediumResults() else emptyList()}
-    val running=cultures.filter{it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
-    val attention=running.count{it.status!=LabTerms.IN_CULTURE}
-    val dueTasks=dashboardCounts.tasksDue
 
     val saveBackup=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
         if(uri!=null) act { context.contentResolver.openOutputStream(uri)?.use{LabBackup.save(context,db,it)} ?: throw IllegalStateException("Нет доступа к файлу") }
@@ -347,33 +341,6 @@ fun DikoveriyaApp() {
                             )
                         }
                     }
-                    "Аналитика" -> {
-                        item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
-                        item { Text("Активных: ${running.size} · на контроле: $attention · завершённых: ${cultures.size-running.size}") }
-                        item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
-                        item { SectionTitle("Последние замеры активных контейнеров по сортам") }
-                        item { Text("Это показатели наблюдений, а не текущие складские остатки. Пустые измерения не означают измеренный ноль.",style=MaterialTheme.typography.bodySmall) }
-                        items(cultivarResults,key={"results-${it.plantId}"}) { r ->
-                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}")
-                        }
-                        item { SectionTitle("Зарегистрированные измерения по рецептурам") }
-                        item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
-                        items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
-                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
-                        }
-                        item { SectionTitle("Архивные наблюдения по партиям") }
-                        item { Text("Только по зарегистрированным измерениям. Без повторностей сравнение предварительное.",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall) }
-                        if(metrics.isEmpty()) item { Text("Нет измерений из прежнего журнала партий. Новый журнал находится в карточке контейнера → Рост и результаты.") }
-                        items(metrics,key={"metric-${it.recipe}"}){m->
-                            Lab07ReadOnlyCard(m.recipe,"Осмотров: ${m.count} · исходных объектов: ${m.input} · архивная категория «здоровых»: ${m.healthy} · заражённых: ${m.infected}. Без коэффициента размножения: тип материала не подтверждён.")
-                        }
-                        item { SectionTitle("По сортам") }
-                        items(plants,key={"stat-${it.id}"}){p->
-                            val subset=cultures.filter{it.plantId==p.id}
-                            Lab07ReadOnlyCard(p.name,"Контейнеров: ${subset.size}. Остатки в разных единицах нельзя складывать; смотри каждый контейнер.")
-                        }
-                        item { Text("Показатели по рецептам не являются доказательством причинно-следственной связи: нужен сопоставимый опыт.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
                             item{Lab10MoreMenu(onSection={openSection(it)})}
@@ -386,10 +353,6 @@ fun DikoveriyaApp() {
                                     items(mothers,key={"mother-${it.id}"}){m->
                                         SmallCard(m.plantName,"${m.code} · ${m.origin} · ${m.status}"){dialog="motherInfo:${m.id}"}
                                     }
-                                }
-                                "Склад" -> {
-                                    item { Button(onClick={dialog="newMaterial"}){Text("+ Материал")}}
-                                    items(materials,key={"material-${it.id}"}){m->SmallCard(m.name,"Остаток: ${RecipeCalculator.formatAmount(m.quantity)} ${m.unit}; минимум ${RecipeCalculator.formatAmount(m.minQuantity)}") {materialId=m.id}}
                                 }
                                 "Оборудование" -> {
                                     item{Button(onClick={dialog="newEquipment"}){Text("+ Оборудование")}}
