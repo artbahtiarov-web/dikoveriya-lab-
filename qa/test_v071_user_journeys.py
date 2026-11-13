@@ -28,10 +28,21 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertIn('applicationId = "ru.dikoveriya.lab"',GRADLE)
         self.assertIn('file("signing/dikoveriya.p12")',GRADLE)
 
-    def test_four_root_tabs_not_five_parallel_workflows(self):
-        self.assertIn('listOf("Главная","Коллекция","Среды","Ещё")',MAIN)
-        self.assertNotIn('listOf("Главная","Коллекция","Работа","Аналитика","Ещё")',MAIN)
-        self.assertIn('"Аналитика","Маточники","Задачи"',MAIN)
+    def test_approved_five_slot_navigation_with_single_quick_action(self):
+        shell=read("Lab10NavigationUi.kt")
+        self.assertIn('Lab10BottomNav(',MAIN)
+        self.assertIn('Lab10QuickActions(',MAIN)
+        for label in ('"Главная" to Icons.Outlined.Home',
+                      '"Коллекция" to Icons.Outlined.LocalFlorist',
+                      '"Аналитика" to Icons.Outlined.BarChart',
+                      '"Ещё" to Icons.Outlined.Menu'):
+            self.assertIn(label,shell)
+        self.assertIn('onClick=onCreate',shell)
+        self.assertIn('selected=false',shell) # plus is action, not a root tab
+        self.assertIn('onScan={quickMenu=false;scan()}',MAIN)
+        self.assertIn('onNewCulture={quickMenu=false;preselectedPlantId=null;dialog="newCulture"}',MAIN)
+        self.assertIn('onChooseOperation=',MAIN)
+        self.assertIn('"Питательные среды","Маточники"',MAIN)
         self.assertIn('Lab071MediumCatalog(',MAIN)
         self.assertIn('Text("Добавить сорт")',SCREENS)
         self.assertIn('Lab072RegistryScreen(mode="all"',SCREENS)
