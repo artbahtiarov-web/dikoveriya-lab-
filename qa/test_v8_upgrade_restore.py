@@ -108,7 +108,7 @@ class UpgradeRestoreRehearsal(unittest.TestCase):
         self.assertIn('BACKUP_ORDER_V7=BACKUP_ORDER_V6+listOf("culture_measurements","culture_recipe_history")',DB)
         self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
         self.assertIn('7->BACKUP_ORDER_V7',DB)
-        self.assertIn('root.optInt("schema") in 4..11',DB)
+        self.assertIn('root.optInt("schema") in 4..12',DB)
         self.assertIn('delete("culture_audit",null,null)',DB)
         self.assertIn('LabCoreV10.validate(this)',DB)
 
