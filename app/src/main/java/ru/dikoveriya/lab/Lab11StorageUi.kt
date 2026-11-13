@@ -20,13 +20,19 @@ import androidx.compose.ui.unit.dp
 internal fun Lab11StorageScreen(
     db:LabDatabase,revision:Int,
     onBack:()->Unit,onItem:(Long)->Unit,onCulture:(Long)->Unit,
-    onChanged:()->Unit,onError:(String)->Unit,modifier:Modifier=Modifier
+    onChanged:()->Unit,onError:(String)->Unit,
+    initialFocusId:Long?=null,modifier:Modifier=Modifier
 ){
     val racks=remember(revision){db.racks11()}
-    var roomRack by rememberSaveable{mutableStateOf<Long?>(null)}
+    val focusedRack=remember(initialFocusId,revision){
+        racks.firstOrNull{rack->rack.shelves.any{sh->
+            sh.id==initialFocusId || sh.slots.any{it.id==initialFocusId}
+        }}?.id
+    }
+    var roomRack by rememberSaveable(initialFocusId){mutableStateOf(focusedRack)}
     var searched by rememberSaveable{mutableStateOf("")}
-    var highlighted by rememberSaveable{mutableStateOf<Long?>(null)}
-    var selected by remember{mutableStateOf<Long?>(null)}
+    var highlighted by rememberSaveable(initialFocusId){mutableStateOf(initialFocusId)}
+    var selected by remember(initialFocusId){mutableStateOf(initialFocusId)}
     var newRack by remember{mutableStateOf(false)}
     var legacy by remember{mutableStateOf(false)}
     val showing=racks.firstOrNull{it.id==roomRack}?:racks.firstOrNull()
