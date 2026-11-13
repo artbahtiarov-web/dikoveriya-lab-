@@ -122,29 +122,55 @@ fun Lab07Dashboard(
     val controls=counts?.attention ?: active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
     val growth=counts?.growing ?: active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
     val due=counts?.tasksDue ?: tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
-    Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
-        SectionTitle("Состояние лаборатории")
-        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement=Arrangement.spacedBy(14.dp)){
+        Lab07BrandHero("Моя лаборатория",
+            "Растения, наблюдения, операции и задачи — в одном месте.",
+            "ДИКОВЕРИЯ LAB · ЦЕНТР УПРАВЛЕНИЯ")
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge,
+                modifier=Modifier.weight(1f))
+            Icon(Icons.Outlined.Tune,null,tint=Lab07Palette.InkBrass,
+                modifier=Modifier.size(20.dp))
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",
                 Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
             Lab07Metric("Требуют внимания",controls.toString(),"контейнеров",
                 Lab07Palette.Danger,Modifier.weight(1f)){onMetric("attention")}
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Lab07Metric("Растут",growth.toString(),"адаптация / доращивание",
+        Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
+            Lab07Metric("Растут",growth.toString(),"адаптация и доращивание",
                 Lab07Palette.Moss,Modifier.weight(1f)){onMetric("growth")}
             Lab07Metric("Задачи",due.toString(),"к выполнению",
                 Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
         }
-        SectionTitle("Быстрые действия")
-        Lab07QuickAction("Новый контейнер",
-            {Icon(Icons.Outlined.AddCircleOutline,null)},true,
-            onClick=onNewContainer)
-        Lab07QuickAction("Сканировать контейнер",
-            {Icon(Icons.Outlined.QrCodeScanner,null)},onClick=onScan)
-        Text("Растения — во вкладке «Растения», рецептуры — во вкладке «Среды».",
-            style=MaterialTheme.typography.bodySmall,
-            color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Сделать сейчас",style=MaterialTheme.typography.titleLarge)
+        Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
+            Lab07QuickAction("Новый контейнер",
+                {Icon(Icons.Outlined.AddCircleOutline,null)},true,Modifier.weight(1f),
+                onClick=onNewContainer)
+            Lab07QuickAction("Сканировать контейнер",
+                {Icon(Icons.Outlined.QrCodeScanner,null)},
+                modifier=Modifier.weight(1f),onClick=onScan)
+        }
+        OutlinedCard(onClick={onMetric("tasks")},
+            colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.surface),
+            shape=RoundedCornerShape(17.dp)){
+            Row(Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                Icon(Icons.Outlined.EventNote,null,tint=Lab07Palette.Forest,
+                    modifier=Modifier.size(28.dp))
+                Column(Modifier.weight(1f)){
+                    Text("План на сегодня",style=MaterialTheme.typography.titleMedium)
+                    Text(if(due==0)"Просроченных и сегодняшних задач нет"
+                        else "Задач к выполнению: "+due,
+                        style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.Outlined.ChevronRight,null,tint=Lab07Palette.InkBrass)
+            }
+        }
     }
 }
 
