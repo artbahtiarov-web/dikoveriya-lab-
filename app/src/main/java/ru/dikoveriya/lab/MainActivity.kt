@@ -42,6 +42,8 @@ class MainActivity : ComponentActivity() {
 fun DikoveriyaApp() {
     val context=androidx.compose.ui.platform.LocalContext.current
     val db=remember{LabDatabase(context.applicationContext)}
+    val labPreferences=remember{context.getSharedPreferences("dikoveriya_lab_preferences",0)}
+    var darkTheme by rememberSaveable{mutableStateOf(labPreferences.getBoolean("dark_theme",true))}
     var refresh by remember { mutableIntStateOf(0) }
     var tab by rememberSaveable { mutableStateOf("Главная") }
     var tabHistory by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -214,7 +216,7 @@ fun DikoveriyaApp() {
         goBack()
     }
 
-    DikoveriyaTheme {
+    DikoveriyaTheme(dark=darkTheme) {
         Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
             Lab10BottomNav(
                 selectedTab=activeNavigationTab,
@@ -276,7 +278,13 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Аналитика") {
+            if(tab=="Ещё" && subsection=="Настройки") {
+                Lab10SettingsScreen(darkTheme=darkTheme,
+                    onDarkTheme={value->
+                        darkTheme=value
+                        labPreferences.edit().putBoolean("dark_theme",value).apply()
+                    },onBack={subsection=""},modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Аналитика") {
                 Lab10AnalyticsScreen(db,refresh,modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="База знаний") {
                 Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
@@ -378,7 +386,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v10. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v11. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
