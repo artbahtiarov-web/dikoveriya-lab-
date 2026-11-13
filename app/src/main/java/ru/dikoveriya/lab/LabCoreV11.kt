@@ -10,10 +10,19 @@ import java.util.UUID
 
 /** Additive schema: user-selected covers, icon accents and offline knowledge notes. */
 object LabCoreV11 {
-    val backupTables=listOf("plant_visuals","knowledge_notes")
+    val backupTables=listOf("plant_visuals","knowledge_notes","knowledge_revisions")
     fun create(db:SQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS plant_visuals (plant_id INTEGER PRIMARY KEY NOT NULL REFERENCES plants(id), icon_key TEXT NOT NULL DEFAULT 'leaf', color_key TEXT NOT NULL DEFAULT 'forest', cover_filename TEXT, changed_at INTEGER NOT NULL DEFAULT 0)")
-        db.execSQL("CREATE TABLE IF NOT EXISTS knowledge_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL, body TEXT NOT NULL, source_url TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, created_at INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS knowledge_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL, body TEXT NOT NULL, source_url TEXT NOT NULL DEFAULT '', plant_id INTEGER REFERENCES plants(id), tags TEXT NOT NULL DEFAULT '', protocol_version INTEGER NOT NULL DEFAULT 1, archived INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, created_at INTEGER NOT NULL)")
+        val fields=db.rawQuery("PRAGMA table_info(knowledge_notes)",null).use{c->
+            buildSet{while(c.moveToNext())add(c.getString(1))}
+        }
+        if("plant_id" !in fields)db.execSQL("ALTER TABLE knowledge_notes ADD COLUMN plant_id INTEGER REFERENCES plants(id)")
+        if("tags" !in fields)db.execSQL("ALTER TABLE knowledge_notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        if("protocol_version" !in fields)db.execSQL("ALTER TABLE knowledge_notes ADD COLUMN protocol_version INTEGER NOT NULL DEFAULT 1")
+        if("archived" !in fields)db.execSQL("ALTER TABLE knowledge_notes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("CREATE TABLE IF NOT EXISTS knowledge_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER NOT NULL REFERENCES knowledge_notes(id), old_title TEXT NOT NULL, old_body TEXT NOT NULL, old_source_url TEXT NOT NULL, old_tags TEXT NOT NULL, revised_at INTEGER NOT NULL)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_knowledge_revisions ON knowledge_revisions(note_id,revised_at)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_notes(category,updated_at)")
         val categoryExists=db.rawQuery("PRAGMA table_info(materials)",null).use{c->
             var found=false
@@ -127,33 +136,90 @@ fun LabDatabase.removePlantCover10(context:Context,plantId:Long){
     if(previous.startsWith("plcover_"))File(context.filesDir,"culture_photos/"+previous).delete()
 }
 
-data class Lab10KnowledgeNote(val id:Long,val title:String,val category:String,
-    val body:String,val sourceUrl:String,val updatedAt:Long)
+data class Lab10KnowledgeNote(
+    val id:Long,val title:String,val category:String,val body:String,
+    val sourceUrl:String,val updatedAt:Long,val plantId:Long?=null,
+    val tags:String="",val version:Int=1
+)
 
 fun LabDatabase.knowledgeNotes10(search:String=""):List<Lab10KnowledgeNote>{
     val q=search.trim().take(80)
-    val sql=if(q.isEmpty())"SELECT id,title,category,body,source_url,updated_at FROM knowledge_notes ORDER BY updated_at DESC LIMIT 200"
-        else "SELECT id,title,category,body,source_url,updated_at FROM knowledge_notes WHERE title LIKE ? OR body LIKE ? OR category LIKE ? ORDER BY updated_at DESC LIMIT 200"
-    val args=if(q.isEmpty())null else arrayOf("%"+q+"%","%"+q+"%","%"+q+"%")
+    val selection=if(q.isEmpty())"" else
+        " AND (n.title LIKE ? OR n.body LIKE ? OR n.category LIKE ? OR n.tags LIKE ? OR p.name LIKE ?)"
+    val sql="""SELECT n.id,n.title,n.category,n.body,n.source_url,n.updated_at,
+        n.plant_id,n.tags,n.protocol_version
+        FROM knowledge_notes n LEFT JOIN plants p ON p.id=n.plant_id
+        WHERE n.archived=0"""+selection+" ORDER BY n.updated_at DESC LIMIT 300"
+    val args=if(q.isEmpty())null else Array(5){"%"+q+"%"}
     return readableDatabase.rawQuery(sql,args).use{c->buildList{
-        while(c.moveToNext())add(Lab10KnowledgeNote(c.getLong(0),c.getString(1),
-            c.getString(2),c.getString(3),c.getString(4),c.getLong(5)))
+        while(c.moveToNext())add(Lab10KnowledgeNote(
+            c.getLong(0),c.getString(1),c.getString(2),
+            c.getString(3),c.getString(4),c.getLong(5),
+            if(c.isNull(6))null else c.getLong(6),c.getString(7),c.getInt(8)))
     }}
 }
 
-fun LabDatabase.addKnowledge10(title:String,category:String,body:String,source:String){
+private fun knowledgeFields10(title:String,category:String,body:String,
+                              source:String,tags:String):ContentValues{
     require(title.trim().length in 2..150){"Название: 2–150 символов"}
     require(category in setOf("Протокол","Среда","Растение","Проблема","Заметка")){"Неизвестная категория"}
     require(body.trim().length in 2..20000){"Укажи содержание"}
     require(source.length<=1000){"Адрес источника слишком длинный"}
-    val now=System.currentTimeMillis()
-    val values=ContentValues().apply{
-        put("title",title.trim());put("category",category);put("body",body.trim())
-        put("source_url",source.trim());put("updated_at",now);put("created_at",now)
+    require(tags.length<=400){"Метки слишком длинные"}
+    return ContentValues().apply{
+        put("title",title.trim());put("category",category)
+        put("body",body.trim());put("source_url",source.trim())
+        put("tags",tags.trim());put("updated_at",System.currentTimeMillis())
     }
+}
+
+fun LabDatabase.addKnowledge10(
+    title:String,category:String,body:String,source:String,
+    plantId:Long?=null,tags:String=""
+) {
+    val values=knowledgeFields10(title,category,body,source,tags)
+    val now=System.currentTimeMillis()
+    if(plantId!=null)require(readableDatabase.rawQuery(
+        "SELECT 1 FROM plants WHERE id=?",arrayOf(plantId.toString())).use{it.moveToFirst()}) {
+        "Сорт не найден"
+    }
+    values.put("plant_id",plantId)
+    values.put("protocol_version",1)
+    values.put("created_at",now)
     writableDatabase.insertOrThrow("knowledge_notes",null,values)
 }
 
+fun LabDatabase.updateKnowledge10(
+    id:Long,title:String,category:String,body:String,source:String,
+    plantId:Long?,tags:String
+) {
+    val values=knowledgeFields10(title,category,body,source,tags)
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        db.rawQuery("SELECT title,body,source_url,tags,protocol_version FROM knowledge_notes WHERE id=? AND archived=0",
+            arrayOf(id.toString())).use{c->
+            require(c.moveToFirst()){"Заметка не найдена"}
+            val old=ContentValues().apply{
+                put("note_id",id);put("old_title",c.getString(0))
+                put("old_body",c.getString(1));put("old_source_url",c.getString(2))
+                put("old_tags",c.getString(3));put("revised_at",System.currentTimeMillis())
+            }
+            db.insertOrThrow("knowledge_revisions",null,old)
+            values.put("protocol_version",c.getInt(4)+1)
+        }
+        values.put("plant_id",plantId)
+        require(db.update("knowledge_notes",values,"id=? AND archived=0",
+            arrayOf(id.toString()))==1){"Не удалось обновить"}
+        db.setTransactionSuccessful()
+    }finally{db.endTransaction()}
+}
+
+/** Archive without losing the revision trail or orphaning related records. */
 fun LabDatabase.deleteKnowledge10(id:Long){
-    require(writableDatabase.delete("knowledge_notes","id=?",arrayOf(id.toString()))==1){"Запись не найдена"}
+    val values=ContentValues().apply{
+        put("archived",1);put("updated_at",System.currentTimeMillis())
+    }
+    require(writableDatabase.update("knowledge_notes",values,"id=? AND archived=0",
+        arrayOf(id.toString()))==1){"Запись уже архивирована"}
 }
