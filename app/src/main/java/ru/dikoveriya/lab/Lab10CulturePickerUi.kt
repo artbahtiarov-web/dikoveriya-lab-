@@ -81,7 +81,7 @@ internal fun Lab10CulturePicker(
                     OutlinedCard(onClick={onSelect(culture.id)},
                         modifier=Modifier.fillMaxWidth().heightIn(min=68.dp)){
                         Row(Modifier.padding(10.dp),verticalAlignment=Alignment.CenterVertically){
-                            Icon(Icons.Outlined.Science,null,tint=Lab07Palette.Forest)
+                            Icon(Icons.Outlined.Science,null,tint=MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)){
                                 Text(culture.code,style=MaterialTheme.typography.labelLarge)
