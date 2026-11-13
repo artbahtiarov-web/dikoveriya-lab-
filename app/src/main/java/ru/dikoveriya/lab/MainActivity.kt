@@ -122,6 +122,8 @@ fun DikoveriyaApp() {
         else db.tasks()
     }
     val dashboardCounts=remember(refresh){db.dashboard072()}
+    val mainFinance=remember(refresh){db.financeSummary11()}
+    val recentEvents=remember(refresh){db.recentEvents11(4)}
     val materials=remember(refresh){db.materials()}
     val equipment=remember(refresh){db.equipment()}
     val incidents=remember(refresh){db.incidents()}
@@ -444,7 +446,15 @@ fun DikoveriyaApp() {
                                 onScan=scan,
                                 counts=dashboardCounts,
                                 onMetric={key->if(key=="tasks")openRoute(Lab07Navigation.TASKS)
-                                    else openRoute(Lab07Navigation.work(key))}
+                                    else openRoute(Lab07Navigation.work(key))},
+                                financeNetMinor=mainFinance.income-mainFinance.paid,
+                                onFinance={openSection("Финансы")},
+                                recent=recentEvents,
+                                onRecent={type,id->
+                                    tab="Коллекция"
+                                    openRoute(if(type=="item")Lab07Navigation.item(id)
+                                        else Lab07Navigation.container(id))
+                                }
                             )
                         }
                     }
