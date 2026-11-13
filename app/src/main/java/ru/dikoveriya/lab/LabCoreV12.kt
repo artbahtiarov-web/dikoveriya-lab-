@@ -20,6 +20,21 @@ internal object LabCoreV12 {
     )
 
     fun create(db:SQLiteDatabase){
+        // Legacy materials keep their IDs and balances. Metadata is strictly additive.
+        val materialColumns=db.rawQuery("PRAGMA table_info(materials)",null).use{c->
+            buildSet{while(c.moveToNext())add(c.getString(1))}
+        }
+        mapOf(
+            "photo_filename" to "TEXT",
+            "manufacturer" to "TEXT NOT NULL DEFAULT ''",
+            "supplier" to "TEXT NOT NULL DEFAULT ''",
+            "supplier_url" to "TEXT NOT NULL DEFAULT ''",
+            "product_notes" to "TEXT NOT NULL DEFAULT ''",
+            "purchased_at" to "INTEGER"
+        ).forEach{(column,ddl)->
+            if(column !in materialColumns)
+                db.execSQL("ALTER TABLE materials ADD COLUMN "+column+" "+ddl)
+        }
         db.execSQL("""CREATE TABLE IF NOT EXISTS custom_categories(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             domain TEXT NOT NULL,
