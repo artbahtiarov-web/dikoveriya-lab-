@@ -38,7 +38,7 @@ data class RecipeRecord(val id: Long, val family: String, val version: Int, val 
 data class RecipePart(val id: Long, val recipeId: Long, val name: String, val perLiter: Double, val unit: String, val includesSugar: Boolean, val includesAgar: Boolean, val stockMgPerMl: Double)
 data class BatchRecord(val id: Long, val code: String, val recipeId: Long, val recipeName: String, val version: Int, val volumeMl: Int, val preparedAt: Long, val status: String, val note: String)
 data class TaskRecord(val id: Long, val cultureId: Long?, val title: String, val dueAt: Long, val done: Boolean)
-data class MaterialRecord(val id: Long, val name: String, val unit: String, val quantity: Double, val minQuantity: Double, val costPerUnit: Double)
+data class MaterialRecord(val id: Long, val name: String, val unit: String, val quantity: Double, val minQuantity: Double, val costPerUnit: Double, val category: String = "Расходники")
 data class EquipmentRecord(val id: Long, val name: String, val location: String, val status: String, val nextCheck: Long?)
 data class IncidentRecord(val id: Long, val title: String, val note: String, val time: Long, val status: String)
 data class ExperimentRecord(val id: Long, val title: String, val hypothesis: String, val startedAt: Long, val status: String)

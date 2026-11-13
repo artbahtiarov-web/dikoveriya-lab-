@@ -104,13 +104,13 @@ class LabV9Migration(unittest.TestCase):
                          ("Старый свободный текст","Не уточнено"))
 
     def test_v9_backup_is_parent_first_and_previous_json_supported(self):
-        self.assertIn('null, 10)',DB)
-        self.assertIn('put("schema",10)',DB)
+        self.assertIn('null, 11)',DB)
+        self.assertIn('put("schema",11)',DB)
         self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
         self.assertIn('BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables',DB)
         self.assertIn('8->BACKUP_ORDER_V8',DB)
-        self.assertIn('root.optInt("schema") in 4..10',DB)
-        self.assertIn('root.getInt("schema") in 4..10',BACKUP)
+        self.assertIn('root.optInt("schema") in 4..11',DB)
+        self.assertIn('root.getInt("schema") in 4..11',BACKUP)
         self.assertIn('LabCoreV9.create(db)',DB)
         self.assertIn('if (oldVersion < 9) {',DB)
         self.assertIn('LabCoreV9.create(db)',DB)

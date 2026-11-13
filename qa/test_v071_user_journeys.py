@@ -22,9 +22,9 @@ GRADLE=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class UnifiedJourneys071(unittest.TestCase):
     def test_version_keeps_db_and_certificate(self):
-        self.assertIn('versionName = "0.9.0-rc1"',GRADLE)
-        self.assertIn('versionCode = 90000 +',GRADLE)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10)',DB)
+        self.assertIn('versionName = "1.0.0"',GRADLE)
+        self.assertIn('versionCode = 100000 +',GRADLE)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11)',DB)
         self.assertIn('applicationId = "ru.dikoveriya.lab"',GRADLE)
         self.assertIn('file("signing/dikoveriya.p12")',GRADLE)
 
@@ -42,7 +42,8 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertIn('onScan={quickMenu=false;scan()}',MAIN)
         self.assertIn('onNewCulture={quickMenu=false;preselectedPlantId=null;dialog="newCulture"}',MAIN)
         self.assertIn('onChooseOperation=',MAIN)
-        self.assertIn('"Питательные среды","Маточники"',MAIN)
+        self.assertIn('Lab10MoreMenu(',MAIN)
+        self.assertIn('"Питательные среды"',(SRC/"Lab10MoreUi.kt").read_text(encoding="utf-8"))
         self.assertIn('Lab071MediumCatalog(',MAIN)
         self.assertIn('Text("Добавить сорт")',SCREENS)
         self.assertIn('Lab072RegistryScreen(mode="all"',SCREENS)

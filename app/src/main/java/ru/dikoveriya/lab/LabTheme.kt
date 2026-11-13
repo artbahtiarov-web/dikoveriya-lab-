@@ -17,16 +17,16 @@ import androidx.compose.ui.unit.sp
  * Android system serif/sans are used instead of bundling unlicensed brand font files.
  */
 object Lab07Palette {
-    val DeepForest = Color(0xFF102820)
-    val Forest = Color(0xFF1B3A2E)
-    val Fern = Color(0xFF315943)
-    val Moss = Color(0xFF526947)
-    val Brass = Color(0xFFE0B777)
-    val InkBrass = Color(0xFF7B592C)
-    val Champagne = Color(0xFFFAE9DB)
-    val Paper = Color(0xFFF9F4EB)
-    val Sand = Color(0xFFEBD9BF)
-    val Ink = Color(0xFF183127)
+    val DeepForest = Color(0xFF0B2E20)
+    val Forest = Color(0xFF144B31)
+    val Fern = Color(0xFF2E6046)
+    val Moss = Color(0xFF5C7C53)
+    val Brass = Color(0xFFC9A864)
+    val InkBrass = Color(0xFF725222)
+    val Champagne = Color(0xFFF5E9D6)
+    val Paper = Color(0xFFF3EDE1)
+    val Sand = Color(0xFFEFE6D3)
+    val Ink = Color(0xFF1A1D1B)
     val Muted = Color(0xFF4D6054)
     val Stroke = Color(0xFFCCC4B7)
     val Teal = Color(0xFF245D60)
@@ -60,10 +60,41 @@ private val BotanicalLight = lightColorScheme(
     onErrorContainer=Color(0xFF672323)
 )
 
+/**
+ * Dark museum/laboratory theme is the approved 1.0 flagship look.
+ * Keep a light option for outdoor use, microscopy work and readability.
+ */
+private val BotanicalDark = darkColorScheme(
+    primary=Lab07Palette.Brass,
+    onPrimary=Lab07Palette.DeepForest,
+    primaryContainer=Lab07Palette.Fern,
+    onPrimaryContainer=Lab07Palette.Champagne,
+    secondary=Color(0xFF98BE8B),
+    onSecondary=Lab07Palette.DeepForest,
+    secondaryContainer=Lab07Palette.Forest,
+    onSecondaryContainer=Lab07Palette.Champagne,
+    tertiary=Lab07Palette.Brass,
+    onTertiary=Lab07Palette.DeepForest,
+    tertiaryContainer=Lab07Palette.Fern,
+    onTertiaryContainer=Lab07Palette.Champagne,
+    background=Lab07Palette.DeepForest,
+    onBackground=Lab07Palette.Champagne,
+    surface=Lab07Palette.Forest,
+    onSurface=Lab07Palette.Champagne,
+    surfaceVariant=Lab07Palette.Fern,
+    onSurfaceVariant=Color(0xFFE2E6D9),
+    outline=Lab07Palette.Brass.copy(alpha=0.76f),
+    outlineVariant=Lab07Palette.Brass.copy(alpha=0.40f),
+    error=Color(0xFFFFAEA9),
+    onError=Lab07Palette.DeepForest,
+    errorContainer=Color(0xFF79342B),
+    onErrorContainer=Color(0xFFFFDDD6)
+)
+
 @Composable
-fun DikoveriyaTheme(content: @Composable ()->Unit) {
+fun DikoveriyaTheme(dark:Boolean=false,content: @Composable ()->Unit) {
     MaterialTheme(
-        colorScheme=BotanicalLight,
+        colorScheme=if(dark)BotanicalDark else BotanicalLight,
         typography=Typography(
             headlineMedium=TextStyle(fontFamily=FontFamily.Serif,fontSize=29.sp,
                 fontWeight=FontWeight.Normal,lineHeight=36.sp),

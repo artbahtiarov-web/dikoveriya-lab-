@@ -42,6 +42,17 @@ class MainActivity : ComponentActivity() {
 fun DikoveriyaApp() {
     val context=androidx.compose.ui.platform.LocalContext.current
     val db=remember{LabDatabase(context.applicationContext)}
+    val labPreferences=remember{context.getSharedPreferences("dikoveriya_lab_preferences",0)}
+    var darkTheme by rememberSaveable{mutableStateOf(labPreferences.getBoolean("dark_theme",true))}
+    val updatedInstall=remember{
+        runCatching{
+            val pkg=context.packageManager.getPackageInfo(context.packageName,0)
+            pkg.lastUpdateTime-pkg.firstInstallTime>1500L
+        }.getOrDefault(true)
+    }
+    var showOnboarding by rememberSaveable {
+        mutableStateOf(!labPreferences.getBoolean("onboarding_done",false) && !updatedInstall)
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var tab by rememberSaveable { mutableStateOf("Главная") }
     var tabHistory by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -62,6 +73,7 @@ fun DikoveriyaApp() {
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var quickMenu by rememberSaveable { mutableStateOf(false) }
+    var quickOperationPicker by rememberSaveable { mutableStateOf(false) }
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var photoCultureId by remember { mutableStateOf<Long?>(null) }
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
@@ -90,7 +102,7 @@ fun DikoveriyaApp() {
     val plants=remember(refresh){db.plants()}
     val mothers=remember(refresh){db.mothers()}
     val cultures=remember(refresh,tab,currentRoute,actionCultureId,dialog,experimentId) {
-        if(tab=="Аналитика" || actionCultureId!=null || experimentId!=null ||
+        if(actionCultureId!=null || experimentId!=null ||
             dialog in setOf("newIncident","newTask"))db.cultures()
         else db.cultures(limit=5)
     }
@@ -107,12 +119,6 @@ fun DikoveriyaApp() {
     val incidents=remember(refresh){db.incidents()}
     val experiments=remember(refresh){db.experiments()}
     val sales=remember(refresh){db.sales()}
-    val metrics=remember(refresh,tab){if(tab=="Аналитика")db.recipeMetrics() else emptyList()}
-    val cultivarResults=remember(refresh,tab){if(tab=="Аналитика")db.plantResults() else emptyList()}
-    val mediumResults=remember(refresh,tab){if(tab=="Аналитика")db.mediumResults() else emptyList()}
-    val running=cultures.filter{it.status in listOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
-    val attention=running.count{it.status!=LabTerms.IN_CULTURE}
-    val dueTasks=dashboardCounts.tasksDue
 
     val saveBackup=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
         if(uri!=null) act { context.contentResolver.openOutputStream(uri)?.use{LabBackup.save(context,db,it)} ?: throw IllegalStateException("Нет доступа к файлу") }
@@ -208,13 +214,18 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=!quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
+    BackHandler(enabled=!showOnboarding && !quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
 
-    DikoveriyaTheme {
-        Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
+    DikoveriyaTheme(dark=darkTheme) {
+        if(showOnboarding){
+            Lab10OnboardingScreen(onFinish={
+                showOnboarding=false
+                labPreferences.edit().putBoolean("onboarding_done",true).apply()
+            })
+        }else Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
             Lab10BottomNav(
                 selectedTab=activeNavigationTab,
                 onSelect={name->
@@ -275,7 +286,32 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            if(tab=="Ещё" && subsection=="Операции") {
+                Lab10OperationsScreen(db,refresh,
+                    onBack={subsection=""},
+                    onOpenCulture={id->
+                        subsection=""
+                        tab="Коллекция"
+                        openRoute(Lab07Navigation.container(id))
+                    },modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Склад") {
+                Lab10ResourcesScreen(materials=materials,db=db,revision=refresh,
+                    onBack={subsection=""},
+                    onNew={dialog="newMaterial"},
+                    onMove={materialId=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Настройки") {
+                Lab10SettingsScreen(darkTheme=darkTheme,
+                    onDarkTheme={value->
+                        darkTheme=value
+                        labPreferences.edit().putBoolean("dark_theme",value).apply()
+                    },onBack={subsection=""},modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Аналитика") {
+                Lab10AnalyticsScreen(db,refresh,modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="База знаний") {
+                Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 item {
                     Row(verticalAlignment=Alignment.CenterVertically){
                         Icon(painterResource(R.drawable.ic_dikoveriya_logo),contentDescription=null,
@@ -305,50 +341,9 @@ fun DikoveriyaApp() {
                             )
                         }
                     }
-                    "Аналитика" -> {
-                        item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
-                        item { Text("Активных: ${running.size} · на контроле: $attention · завершённых: ${cultures.size-running.size}") }
-                        item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
-                        item { SectionTitle("Последние замеры активных контейнеров по сортам") }
-                        item { Text("Это показатели наблюдений, а не текущие складские остатки. Пустые измерения не означают измеренный ноль.",style=MaterialTheme.typography.bodySmall) }
-                        items(cultivarResults,key={"results-${it.plantId}"}) { r ->
-                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}")
-                        }
-                        item { SectionTitle("Зарегистрированные измерения по рецептурам") }
-                        item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
-                        items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
-                            Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
-                        }
-                        item { SectionTitle("Архивные наблюдения по партиям") }
-                        item { Text("Только по зарегистрированным измерениям. Без повторностей сравнение предварительное.",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall) }
-                        if(metrics.isEmpty()) item { Text("Нет измерений из прежнего журнала партий. Новый журнал находится в карточке контейнера → Рост и результаты.") }
-                        items(metrics,key={"metric-${it.recipe}"}){m->
-                            Lab07ReadOnlyCard(m.recipe,"Осмотров: ${m.count} · исходных объектов: ${m.input} · архивная категория «здоровых»: ${m.healthy} · заражённых: ${m.infected}. Без коэффициента размножения: тип материала не подтверждён.")
-                        }
-                        item { SectionTitle("По сортам") }
-                        items(plants,key={"stat-${it.id}"}){p->
-                            val subset=cultures.filter{it.plantId==p.id}
-                            Lab07ReadOnlyCard(p.name,"Контейнеров: ${subset.size}. Остатки в разных единицах нельзя складывать; смотри каждый контейнер.")
-                        }
-                        item { Text("Показатели по рецептам не являются доказательством причинно-следственной связи: нужен сопоставимый опыт.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
                     "Ещё" -> {
                         if(subsection.isEmpty()){
-                            item { Text("Лаборатория",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Питательные среды","Маточники","Группы контейнеров","Места хранения","Склад","Оборудование")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
-                            item { Text("Работа",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Задачи","Инциденты","Эксперименты","Продажи")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
-                            item { Text("Данные и приложение",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Резервные копии","О программе")){label->
-                                TextEntryRow(label){openSection(label)}
-                                HorizontalDivider()
-                            }
+                            item{Lab10MoreMenu(onSection={openSection(it)})}
                         } else {
                             item{TextButton(onClick={subsection=""}){Text("‹ Ко всем разделам")}}
                             when(subsection){
@@ -358,10 +353,6 @@ fun DikoveriyaApp() {
                                     items(mothers,key={"mother-${it.id}"}){m->
                                         SmallCard(m.plantName,"${m.code} · ${m.origin} · ${m.status}"){dialog="motherInfo:${m.id}"}
                                     }
-                                }
-                                "Склад" -> {
-                                    item { Button(onClick={dialog="newMaterial"}){Text("+ Материал")}}
-                                    items(materials,key={"material-${it.id}"}){m->SmallCard(m.name,"Остаток: ${RecipeCalculator.formatAmount(m.quantity)} ${m.unit}; минимум ${RecipeCalculator.formatAmount(m.minQuantity)}") {materialId=m.id}}
                                 }
                                 "Оборудование" -> {
                                     item{Button(onClick={dialog="newEquipment"}){Text("+ Оборудование")}}
@@ -386,7 +377,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v10. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v11. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -405,12 +396,21 @@ fun DikoveriyaApp() {
                     onScan={quickMenu=false;scan()},
                     onChooseOperation={
                         quickMenu=false
-                        tab="Коллекция"
-                        routeStack=emptyList()
-                        subsection=""
-                        Toast.makeText(context,"Открой контейнер и выбери «Операции»",Toast.LENGTH_SHORT).show()
+                        quickOperationPicker=true
                     },
                     onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)}
+                )
+            }
+            if(quickOperationPicker) {
+                Lab10CulturePicker(
+                    db=db,revision=refresh,
+                    onDismiss={quickOperationPicker=false},
+                    onSelect={id->
+                        quickOperationPicker=false
+                        actionPreferredMode=""
+                        actionCultureId=id
+                    },
+                    onScan={quickOperationPicker=false;scan()}
                 )
             }
             when(dialog){
@@ -426,7 +426,7 @@ fun DikoveriyaApp() {
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
-                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c->if(act{db.addMaterial(n,u,q,m,c)})dialog=""})
+                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""})
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
                 "newIncident" -> AddIncidentDialog(cultures,onClose={dialog=""},onSave={t,n,c->if(act{db.addIncident(t,n,c)})dialog=""})
                 "newExperiment" -> AddExperimentDialog(onClose={dialog=""},onSave={t,h->if(act{db.addExperiment(t,h)})dialog=""})

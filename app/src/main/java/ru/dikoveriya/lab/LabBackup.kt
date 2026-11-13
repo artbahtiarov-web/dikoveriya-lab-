@@ -66,9 +66,22 @@ object LabBackup {
             }
             val data=json?:error("В архиве отсутствует база данных")
             val root=JSONObject(data)
-            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..10){"Неподдерживаемая версия копии"}
+            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..11){"Неподдерживаемая версия копии"}
             val photoRows=root.getJSONObject("tables").getJSONArray("culture_photos")
-            val expected=buildSet{for(i in 0 until photoRows.length())add(photoRows.getJSONObject(i).getString("filename"))}
+            val expected=buildSet{
+                for(i in 0 until photoRows.length())add(photoRows.getJSONObject(i).getString("filename"))
+                if(root.getInt("schema")>=11){
+                    val covers=root.getJSONObject("tables").getJSONArray("plant_visuals")
+                    for(i in 0 until covers.length()){
+                        val row=covers.getJSONObject(i)
+                        if(!row.isNull("cover_filename")){
+                            val filename=row.getString("cover_filename")
+                            require(filename.isNotBlank()){"Пустое имя обложки"}
+                            add(filename)
+                        }
+                    }
+                }
+            }
             require(expected==found){"В архиве нет части фотографий или есть лишние фотографии"}
             // Swap only after the entire ZIP has been validated and extracted.
             hadOld=photosDir.exists()
