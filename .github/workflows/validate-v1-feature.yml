@@ -144,7 +144,11 @@ jobs:
             adb shell wm density 160
             adb shell settings put system font_scale 1.5
             gradle --no-daemon :app:connectedDebugAndroidTest --stacktrace
-            adb shell am start -n ru.dikoveriya.lab/.MainActivity
+            # connectedDebugAndroidTest uninstalls the target package on cleanup.
+            # Install again before taking a *real* application screenshot.
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-360.png
             adb pull /sdcard/v1-360.png screenshots/v1-360.png
@@ -159,7 +163,11 @@ jobs:
             adb shell wm density 160
             adb shell settings put system font_scale 1.4
             gradle --no-daemon :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
-            adb shell am start -n ru.dikoveriya.lab/.MainActivity
+            # connectedDebugAndroidTest uninstalls the target package on cleanup.
+            # Install again before taking a *real* application screenshot.
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-393.png
             adb pull /sdcard/v1-393.png screenshots/v1-393.png
@@ -174,7 +182,11 @@ jobs:
             adb shell wm density 160
             adb shell settings put system font_scale 1.6
             gradle --no-daemon :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
-            adb shell am start -n ru.dikoveriya.lab/.MainActivity
+            # connectedDebugAndroidTest uninstalls the target package on cleanup.
+            # Install again before taking a *real* application screenshot.
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
             sleep 3
             adb shell screencap -p /sdcard/v1-430.png
             adb pull /sdcard/v1-430.png screenshots/v1-430.png
