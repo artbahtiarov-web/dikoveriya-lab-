@@ -82,7 +82,7 @@ fun Lab07Metric(title:String,value:String,qualifier:String,accent:Color,
                 Text(title,color=MaterialTheme.colorScheme.onSurfaceVariant,
                     style=MaterialTheme.typography.bodySmall,maxLines=2)
             Icon(Icons.Outlined.ChevronRight,contentDescription="Открыть: $title",
-                tint=Lab07Palette.InkBrass,modifier=Modifier.size(16.dp))
+                tint=MaterialTheme.colorScheme.tertiary,modifier=Modifier.size(16.dp))
             }
             Text(value,style=MaterialTheme.typography.headlineMedium,
                 color=MaterialTheme.colorScheme.onSurface)
@@ -96,7 +96,7 @@ fun Lab07Metric(title:String,value:String,qualifier:String,accent:Color,
 fun Lab07QuickAction(text:String,icon:@Composable ()->Unit,primary:Boolean=false,
                      modifier:Modifier=Modifier,onClick:()->Unit) {
     val bg=if(primary) Lab07Palette.Forest else MaterialTheme.colorScheme.surface
-    val fg=if(primary) Lab07Palette.Champagne else Lab07Palette.Forest
+    val fg=if(primary) Lab07Palette.Champagne else MaterialTheme.colorScheme.onSurface
     Card(onClick=onClick,modifier=modifier.heightIn(min=58.dp),
         shape=RoundedCornerShape(14.dp),
         colors=CardDefaults.cardColors(containerColor=bg),
@@ -129,7 +129,7 @@ fun Lab07Dashboard(
         Row(verticalAlignment=Alignment.CenterVertically) {
             Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge,
                 modifier=Modifier.weight(1f))
-            Icon(Icons.Outlined.Tune,null,tint=Lab07Palette.InkBrass,
+            Icon(Icons.Outlined.Tune,null,tint=MaterialTheme.colorScheme.tertiary,
                 modifier=Modifier.size(20.dp))
         }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
@@ -159,7 +159,7 @@ fun Lab07Dashboard(
             Row(Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                Icon(Icons.Outlined.EventNote,null,tint=Lab07Palette.Forest,
+                Icon(Icons.Outlined.EventNote,null,tint=MaterialTheme.colorScheme.primary,
                     modifier=Modifier.size(28.dp))
                 Column(Modifier.weight(1f)){
                     Text("План на сегодня",style=MaterialTheme.typography.titleMedium)
@@ -168,7 +168,7 @@ fun Lab07Dashboard(
                         style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Icon(Icons.Outlined.ChevronRight,null,tint=Lab07Palette.InkBrass)
+                Icon(Icons.Outlined.ChevronRight,null,tint=MaterialTheme.colorScheme.tertiary)
             }
         }
     }
@@ -183,7 +183,7 @@ fun Lab07ScreenHeader(kicker:String,title:String,subtitle:String="",onBack:()->U
                 Icon(Icons.Outlined.ArrowBack,contentDescription="Назад на один уровень",
                     tint=MaterialTheme.colorScheme.primary)
             }
-            Text(kicker.uppercase(),color=Lab07Palette.InkBrass,
+            Text(kicker.uppercase(),color=MaterialTheme.colorScheme.tertiary,
                 style=MaterialTheme.typography.labelLarge,maxLines=2,
                 modifier=Modifier.weight(1f))
         }
@@ -208,13 +208,13 @@ fun Lab07CultureRow(culture:CultureRecord,onClick:()->Unit) {
                 Icon(Icons.Outlined.Spa,null,tint=Lab07Palette.Brass)
             }
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                Text(culture.code,style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest)
+                Text(culture.code,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
                 Text(culture.plantName,style=MaterialTheme.typography.bodyMedium,
                     maxLines=2,overflow=TextOverflow.Ellipsis)
                 Text("${culture.status} · ${culture.quantity} (${culture.quantityKind})",
                     color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
             }
-            Icon(Icons.Outlined.ChevronRight,"Открыть контейнер",tint=Lab07Palette.InkBrass)
+            Icon(Icons.Outlined.ChevronRight,"Открыть контейнер",tint=MaterialTheme.colorScheme.tertiary)
         }
     }
 }
@@ -301,7 +301,7 @@ fun Lab07ReadOnlyCard(title:String,caption:String) {
         border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),
         colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
-            Text(title,style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest)
+            Text(title,style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
             Text(caption,style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
