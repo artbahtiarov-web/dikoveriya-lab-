@@ -62,6 +62,7 @@ fun DikoveriyaApp() {
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var quickMenu by rememberSaveable { mutableStateOf(false) }
+    var quickOperationPicker by rememberSaveable { mutableStateOf(false) }
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var photoCultureId by remember { mutableStateOf<Long?>(null) }
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
@@ -396,12 +397,21 @@ fun DikoveriyaApp() {
                     onScan={quickMenu=false;scan()},
                     onChooseOperation={
                         quickMenu=false
-                        tab="Коллекция"
-                        routeStack=emptyList()
-                        subsection=""
-                        Toast.makeText(context,"Открой контейнер и выбери «Операции»",Toast.LENGTH_SHORT).show()
+                        quickOperationPicker=true
                     },
                     onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)}
+                )
+            }
+            if(quickOperationPicker) {
+                Lab10CulturePicker(
+                    db=db,revision=refresh,
+                    onDismiss={quickOperationPicker=false},
+                    onSelect={id->
+                        quickOperationPicker=false
+                        actionPreferredMode=""
+                        actionCultureId=id
+                    },
+                    onScan={quickOperationPicker=false;scan()}
                 )
             }
             when(dialog){
