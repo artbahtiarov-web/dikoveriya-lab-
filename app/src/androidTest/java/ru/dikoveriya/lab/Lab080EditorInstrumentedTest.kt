@@ -37,8 +37,8 @@ class Lab080EditorInstrumentedTest {
             rule.onNodeWithContentDescription(
                 "Предпросмотр наклейки 40 на 12 миллиметров")
                 .performTouchInput{
-                    val start=Offset(size.width*.5f,size.height*.2f)
-                    val end=Offset(size.width*.35f,size.height*.2f)
+                    val start=Offset(center.x,center.y*.4f)
+                    val end=Offset(center.x*.7f,center.y*.4f)
                     swipe(start=start,end=end,durationMillis=500)
                 }
             rule.onNodeWithContentDescription("Вправо").performScrollTo().performClick()
