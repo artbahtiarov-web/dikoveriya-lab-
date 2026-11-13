@@ -111,7 +111,7 @@ fun Lab07QuickAction(text:String,icon:@Composable ()->Unit,primary:Boolean=false
 }
 
 @Composable
-fun Lab07Dashboard(
+internal fun Lab07Dashboard(
     plants:List<PlantRecord>,cultures:List<CultureRecord>,tasks:List<TaskRecord>,
     onCollection:()->Unit,onContainer:(Long)->Unit,
     onNewContainer:()->Unit,onNewPlant:()->Unit,onMediums:()->Unit,onScan:()->Unit,
