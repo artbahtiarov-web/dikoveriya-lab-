@@ -151,30 +151,34 @@ private fun Cursor.plantItem11():Lab11PlantItem =
         getString(15),getString(16),if(isNull(17))null else getInt(17),
         getString(18),getInt(19)==1,if(isNull(20))null else getString(20))
 
-private fun itemWhere11(query:String,kind:String,favorites:Boolean):Pair<String,Array<String>>{
+private fun itemWhere11(query:String,kind:String,favorites:Boolean,
+    stage:String,status:String):Pair<String,Array<String>>{
     val conditions=mutableListOf<String>()
     val args=mutableListOf<String>()
     if(query.isNotBlank()){
-        conditions+="(i.code LIKE ? OR p.name LIKE ? OR i.location_text LIKE ?)"
-        repeat(3){args+="%"+query.trim().take(100)+"%"}
+        conditions+="(i.code LIKE ? OR p.name LIKE ? OR i.location_text LIKE ? OR EXISTS (SELECT 1 FROM cultures c WHERE c.id=i.parent_culture_id AND c.code LIKE ?))"
+        repeat(4){args+="%"+query.trim().take(100)+"%"}
     }
     if(kind.isNotBlank()){conditions+="i.kind=?";args+=kind}
     if(favorites)conditions+="i.favorite=1"
+    if(stage.isNotBlank()){conditions+="i.stage=?";args+=stage}
+    if(status.isNotBlank()){conditions+="i.status=?";args+=status}
     return (if(conditions.isEmpty())"" else " WHERE "+conditions.joinToString(" AND ")) to args.toTypedArray()
 }
 
 /** SQL paging, not loading 20k plant records and bitmap covers into memory. */
 internal fun LabDatabase.plantItems11(query:String="",limit:Int=40,offset:Int=0,
-    kind:String="",favorites:Boolean=false):List<Lab11PlantItem>{
+    kind:String="",favorites:Boolean=false,
+    stage:String="",status:String=""):List<Lab11PlantItem>{
     require(limit in 1..100 && offset>=0)
-    val (where,args)=itemWhere11(query,kind,favorites)
+    val (where,args)=itemWhere11(query,kind,favorites,stage,status)
     return readableDatabase.rawQuery(
         ITEM_SELECT11+where+" ORDER BY i.favorite DESC,i.updated_at DESC,i.id DESC LIMIT "+limit+" OFFSET "+offset,
         args).use{c->buildList{while(c.moveToNext())add(c.plantItem11())}}
 }
 internal fun LabDatabase.itemsCount11(query:String="",kind:String="",
-    favorites:Boolean=false):Int{
-    val (where,args)=itemWhere11(query,kind,favorites)
+    favorites:Boolean=false,stage:String="",status:String=""):Int{
+    val (where,args)=itemWhere11(query,kind,favorites,stage,status)
     return readableDatabase.rawQuery(
         "SELECT COUNT(*) FROM plant_items i JOIN plants p ON p.id=i.plant_id"+where,args
     ).use{c->c.moveToFirst();c.getInt(0)}
@@ -304,3 +308,11 @@ internal fun LabDatabase.itemPhotos11(id:Long):List<Pair<String,String>> =
         arrayOf(id.toString())).use{c->buildList{
             while(c.moveToNext())add(c.getString(0) to c.getString(1))
         }}
+
+
+internal fun LabDatabase.itemFilterValues11(column:String):List<String>{
+    val safe=when(column){"stage"->"stage";"status"->"status";else->error("Неверный фильтр")}
+    return readableDatabase.rawQuery(
+        "SELECT DISTINCT "+safe+" FROM plant_items WHERE "+safe+"<>'' ORDER BY "+safe,
+        null).use{c->buildList{while(c.moveToNext())add(c.getString(0))}}
+}
