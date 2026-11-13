@@ -44,6 +44,15 @@ fun DikoveriyaApp() {
     val db=remember{LabDatabase(context.applicationContext)}
     val labPreferences=remember{context.getSharedPreferences("dikoveriya_lab_preferences",0)}
     var darkTheme by rememberSaveable{mutableStateOf(labPreferences.getBoolean("dark_theme",true))}
+    val updatedInstall=remember{
+        runCatching{
+            val pkg=context.packageManager.getPackageInfo(context.packageName,0)
+            pkg.lastUpdateTime-pkg.firstInstallTime>1500L
+        }.getOrDefault(true)
+    }
+    var showOnboarding by rememberSaveable {
+        mutableStateOf(!labPreferences.getBoolean("onboarding_done",false) && !updatedInstall)
+    }
     var refresh by remember { mutableIntStateOf(0) }
     var tab by rememberSaveable { mutableStateOf("Главная") }
     var tabHistory by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -211,13 +220,18 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=!quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
+    BackHandler(enabled=!showOnboarding && !quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
 
     DikoveriyaTheme(dark=darkTheme) {
-        Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
+        if(showOnboarding){
+            Lab10OnboardingScreen(onFinish={
+                showOnboarding=false
+                labPreferences.edit().putBoolean("onboarding_done",true).apply()
+            })
+        }else Scaffold(containerColor=MaterialTheme.colorScheme.background,bottomBar={
             Lab10BottomNav(
                 selectedTab=activeNavigationTab,
                 onSelect={name->
@@ -619,6 +633,7 @@ fun DikoveriyaApp() {
             }){Text("Да, восстановить",color=MaterialTheme.colorScheme.error)}},dismissButton={TextButton(onClick={restoreUri=null}){Text("Отмена")}})}
             error?.let{message->AlertDialog(onDismissRequest={error=null},title={Text("Не удалось выполнить действие")},text={Text(message)},confirmButton={TextButton(onClick={error=null}){Text("Понятно")}})}
         }
+    }
     }
 }
 
