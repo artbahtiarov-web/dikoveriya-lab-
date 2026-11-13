@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -28,6 +28,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         LabCoreV8.create(db)
         LabCoreV9.create(db)
         LabCoreV10.create(db)
+        LabCoreV11.create(db)
         listOf("Alocasia Black Velvet Aurea", "Alocasia Dragon Scale Mint", "Philodendron Burle Marx Flame").forEach { n ->
             db.insertOrThrow("plants", null, cv("name" to n))
         }
@@ -132,6 +133,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         if (oldVersion < 10) {
             LabCoreV10.create(db)
             LabCoreV10.validate(db)
+        }
+        if (oldVersion < 11) {
+            LabCoreV11.create(db)
+            LabCoreV11.validate(db)
         }
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
@@ -900,7 +905,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val BACKUP_ORDER_V7=BACKUP_ORDER_V6+listOf("culture_measurements","culture_recipe_history")
         val BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")
         val BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables
-        val BACKUP_ORDER=BACKUP_ORDER_V9+LabCoreV10.backupTables
+        val BACKUP_ORDER_V10=BACKUP_ORDER_V9+LabCoreV10.backupTables
+        val BACKUP_ORDER=BACKUP_ORDER_V10+LabCoreV11.backupTables
     }
     /**
      * Stream backup JSON directly to ZIP without constructing a giant JSONObject
@@ -916,7 +922,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         try{
             writer.beginObject()
             writer.name("format").value("DIKOVERIYA_LAB")
-            writer.name("schema").value(10)
+            writer.name("schema").value(11)
             writer.name("exported_at").value(System.currentTimeMillis())
             writer.name("tables").beginObject()
             BACKUP_ORDER.forEach {table->
@@ -924,9 +930,13 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 val sql=if(table=="storage_locations")
                     "SELECT * FROM storage_locations ORDER BY id" else "SELECT * FROM $table"
                 db.rawQuery(sql,null).use{c->
-                    val photoIndex=if(table=="culture_photos")c.getColumnIndex("filename") else -1
+                    val photoIndex=when(table){
+                        "culture_photos"->c.getColumnIndex("filename")
+                        "plant_visuals"->c.getColumnIndex("cover_filename")
+                        else->-1
+                    }
                     while(c.moveToNext()){
-                        if(photoIndex>=0)photoNames+=c.getString(photoIndex)
+                        if(photoIndex>=0 && !c.isNull(photoIndex))photoNames+=c.getString(photoIndex)
                         writer.beginObject()
                         for(i in 0 until c.columnCount){
                             writer.name(c.getColumnName(i))
@@ -954,7 +964,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
 
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",10).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",11).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         // A consistent read snapshot prevents a backup that mixes partially completed operations.
         db.beginTransactionNonExclusive()
@@ -990,10 +1000,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..10) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..11) { "Неизвестная версия резервной копии" }
         val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;9->BACKUP_ORDER_V9;else->BACKUP_ORDER}
+        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;9->BACKUP_ORDER_V9;10->BACKUP_ORDER_V10;else->BACKUP_ORDER}
         importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
@@ -1036,6 +1046,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
             }
             LabCoreV10.validate(this)
+            LabCoreV11.validate(this)
         }
     }
 }
