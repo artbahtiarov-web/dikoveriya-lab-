@@ -39,6 +39,14 @@ class NiimbotPrintSession(
         density:Int=3,
         flipFeed:Boolean=false,
         progress:(NiimJobProgress)->Unit
+    ) = printLazy(jobs.map{(code,image)->code to (suspend {image})},
+        density,flipFeed,progress)
+
+    suspend fun printLazy(
+        jobs:List<Pair<String,suspend ()->Bitmap>>,
+        density:Int=3,
+        flipFeed:Boolean=false,
+        progress:(NiimJobProgress)->Unit
     ){
         require(jobs.isNotEmpty()&&jobs.size<=200)
         require(jobs.map{it.first}.distinct().size==jobs.size){
@@ -50,8 +58,9 @@ class NiimbotPrintSession(
         var sent=0
         try{
             handshake()
-            for((code,bitmap) in jobs){
-                // Render/validate ALL row data before starting each print job.
+            for((code,render) in jobs){
+                // Create one image at a time, even with 200 unique containers.
+                val bitmap=render()
                 val rows=NiimRaster.rowFrames(bitmap,model,flipFeed)
                 progress(NiimJobProgress(sent,confirmed,jobs.size,
                     "Подготовка этикетки $code"))
