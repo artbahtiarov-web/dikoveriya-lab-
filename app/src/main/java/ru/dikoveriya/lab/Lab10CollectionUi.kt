@@ -158,7 +158,8 @@ internal fun Lab10PlantFolder(
 internal fun Lab10CollectionScreen(
     plants:List<PlantRecord>,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,onNewPlant:()->Unit,
-    onChanged:()->Unit,onError:(String)->Unit,modifier:Modifier=Modifier
+    onChanged:()->Unit,onError:(String)->Unit,
+    onOpenItems:()->Unit={},modifier:Modifier=Modifier
 ){
     val context=androidx.compose.ui.platform.LocalContext.current
     val scope=rememberCoroutineScope()
@@ -194,6 +195,10 @@ internal fun Lab10CollectionScreen(
                 Text("ДИКОВЕРИЯ / ЛАБОРАТОРИЯ",style=MaterialTheme.typography.labelSmall,
                     color=MaterialTheme.colorScheme.tertiary)
                 Text("Коллекция",style=MaterialTheme.typography.headlineSmall)
+            }
+            TextButton(onClick=onOpenItems){
+                Icon(Icons.Outlined.Spa,contentDescription=null)
+                Text("Экземпляры")
             }
             IconButton(onClick={compact=!compact}){
                 Icon(if(compact)Icons.Outlined.GridView else Icons.Outlined.ViewList,
