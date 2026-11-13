@@ -11,7 +11,7 @@ object LabQr {
     fun payload(code: String): String = "DIKOVERIYA:$code"
     fun getCode(text: String): String? {
         val value=text.trim().removePrefix("DIKOVERIYA:")
-        return if(Regex("LAB-[0-9]{6}").matches(value)) value else null
+        return if(Regex("(LAB|PLT|MAT|LOC|AST)-[0-9]{5,6}|ГР-[0-9]{6}").matches(value)) value else null
     }
     fun bitmap(code: String, size: Int = 600): Bitmap {
         val bits=MultiFormatWriter().encode(payload(code),BarcodeFormat.QR_CODE,size,size,mapOf(EncodeHintType.MARGIN to 2))
