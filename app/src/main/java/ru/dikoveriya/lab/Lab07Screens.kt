@@ -33,6 +33,7 @@ fun Lab07RouteScreen(
     onLegacyAssessment:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit= {},
+    onPrintLabels:(List<Long>)->Unit= {},
     modifier:Modifier=Modifier
 ) {
     val id=route.substringAfter(':',"").toLongOrNull()
