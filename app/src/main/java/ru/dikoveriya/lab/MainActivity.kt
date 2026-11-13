@@ -73,6 +73,14 @@ fun DikoveriyaApp() {
         routeStack=Lab07Navigation.enter(routeStack,next)
     }
     fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
+    LaunchedEffect(context){
+        val fromReminder=(context as? MainActivity)?.intent?.getBooleanExtra("open_tasks",false)==true
+        if(fromReminder){
+            tab="Главная"
+            routeStack=listOf(Lab07Navigation.TASKS)
+            (context as? MainActivity)?.intent?.removeExtra("open_tasks")
+        }
+    }
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var quickMenu by rememberSaveable { mutableStateOf(false) }
@@ -105,6 +113,11 @@ fun DikoveriyaApp() {
             val n=withContext(Dispatchers.IO){db.generateRecurringTasks11()}
             if(n>0)refresh++
         }catch(e:Exception){error=e.message?:"Не удалось обновить повторяющиеся задачи"}
+    }
+    LaunchedEffect(db,refresh){
+        try{
+            withContext(Dispatchers.IO){Lab11Reminders.sync(context.applicationContext,db)}
+        }catch(e:Exception){error=e.message?:"Не удалось настроить напоминания"}
     }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
