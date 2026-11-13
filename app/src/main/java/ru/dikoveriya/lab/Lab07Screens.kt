@@ -356,6 +356,25 @@ private fun Lab07GrowthScreen(
             Lab07Filters(listOf("Побеги","Растения","Экспланты","Заражено"),plotted,{plotted=it})
         }
         item(key="plot") { Lab07ObservationPlot(samples,plotted) }
+        item(key="growth-summary"){
+            val values=samples.mapNotNull{row->
+                when(plotted){
+                    "Побеги"->row.shoots
+                    "Растения"->row.plants
+                    "Экспланты"->row.explants
+                    else->row.contaminated
+                }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
+                Lab10GrowthTile("Последний замер",
+                    values.firstOrNull()?.toString()?:"—",Modifier.weight(1f))
+                Lab10GrowthTile("Изменение",
+                    if(values.size<2)"Нет пары замеров"
+                    else (values[0]-values[1]).let{delta->
+                        if(delta>0)"+"+delta else delta.toString()
+                    },Modifier.weight(1f))
+            }
+        }
         if(!closed) {
             item(key="observation-title") { SectionTitle("Новое наблюдение") }
             item(key="explants") { Field("Эксплантов",explants,{explants=it.filter(Char::isDigit)},numeric=true) }
@@ -424,6 +443,23 @@ private fun Lab07GrowthScreen(
         onSaved={controlDialog=false;onChanged()},
         onError=onError,
         initialReason="Обнаружено заражённых при осмотре: $lastContaminated")
+}
+
+@Composable
+private fun Lab10GrowthTile(title:String,value:String,modifier:Modifier=Modifier){
+    OutlinedCard(modifier=modifier.heightIn(min=92.dp),
+        shape=RoundedCornerShape(17.dp),
+        border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.35f)),
+        colors=CardDefaults.outlinedCardColors(
+            containerColor=MaterialTheme.colorScheme.surface)){
+        Column(Modifier.fillMaxWidth().padding(13.dp),
+            verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Text(title,style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value,style=MaterialTheme.typography.titleMedium,
+                color=Lab07Palette.Forest,maxLines=2)
+        }
+    }
 }
 
 data class Lab07MediumUse(val id:Long,val name:String,val version:Int,val date:Long,val reason:String)
