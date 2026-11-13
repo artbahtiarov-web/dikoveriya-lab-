@@ -562,7 +562,10 @@ fun DikoveriyaApp() {
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
                 "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
-                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""})
+                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},
+                    onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""},
+                    customCategories=listOf("Материалы","Субстраты","Препараты","Удобрения")
+                        .flatMap{db.categories11(it)})
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
                 "newIncident" -> AddIncidentDialog(cultures,onClose={dialog=""},onSave={t,n,c->if(act{db.addIncident(t,n,c)})dialog=""})
                 "newExperiment" -> AddExperimentDialog(onClose={dialog=""},onSave={t,h->if(act{db.addExperiment(t,h)})dialog=""})
