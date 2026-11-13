@@ -142,7 +142,8 @@ internal object LabCoreV12 {
             occurred_at INTEGER NOT NULL,
             source_type TEXT NOT NULL,
             source_id INTEGER,
-            note TEXT NOT NULL DEFAULT ''
+            note TEXT NOT NULL DEFAULT '',
+            reversed INTEGER NOT NULL DEFAULT 0
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS stock_usage(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,7 +154,8 @@ internal object LabCoreV12 {
             unit_cost_minor INTEGER NOT NULL CHECK(unit_cost_minor>=0),
             total_minor INTEGER NOT NULL CHECK(total_minor>=0),
             used_at INTEGER NOT NULL,
-            note TEXT NOT NULL DEFAULT ''
+            note TEXT NOT NULL DEFAULT '',
+            reversed INTEGER NOT NULL DEFAULT 0
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS equipment_assets(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
