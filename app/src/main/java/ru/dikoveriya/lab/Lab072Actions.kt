@@ -171,6 +171,8 @@ fun LabDatabase.flagControl072(ids:List<Long>,reason:String,severity:String,
                 "task_id" to taskId,"recorded_at" to now,"action" to "Создана",
                 "next_due_at" to dueAt,"next_done" to 0,
                 "next_priority" to taskPriority,"note" to "Контроль контейнера"))
+            insertOrThrow("case_tasks",null,lab072CV(
+                "case_id" to caseId,"task_id" to taskId))
         }
     }
 }
@@ -185,7 +187,8 @@ fun LabDatabase.cases072(cultureId:Long):List<Lab072Case> =
             c.getLong(6),c.lab072Long(7),c.getString(8)))
     }}
 
-fun LabDatabase.resolveCase072(caseId:Long,note:String)=lab072Tx{
+fun LabDatabase.resolveCase072(caseId:Long,note:String,
+    restoreNormal:Boolean=false)=lab072Tx{
     val text=lab072Text(note)
     val row=rawQuery("SELECT culture_id,closed_at FROM control_cases WHERE id=?",
         arrayOf(caseId.toString())).use{c->
@@ -197,11 +200,53 @@ fun LabDatabase.resolveCase072(caseId:Long,note:String)=lab072Tx{
     update("control_cases",lab072CV("closed_at" to now,"resolution" to text),
         "id=?",arrayOf(caseId.toString()))
     insertOrThrow("control_case_history",null,lab072CV(
-        "case_id" to caseId,"recorded_at" to now,"action" to "Закрыт","note" to text))
-    val op=operation072("Результат контроля",text,now)
-    event072(row.first,"Результат контроля",text,op,now)
-    // Do not silently revert quarantine/control status; that is a separate passport action.
+        "case_id" to caseId,"recorded_at" to now,
+        "action" to "Закрыт","note" to text))
+    // Only tasks explicitly linked at creation are completed. Historic v9
+    // cases have no safe relation and must not be paired heuristically.
+    rawQuery("""SELECT t.id,t.done,t.due_at,COALESCE(m.priority,'Не задан')
+        FROM case_tasks ct JOIN tasks t ON t.id=ct.task_id
+        LEFT JOIN task_metadata m ON m.task_id=t.id
+        WHERE ct.case_id=?""",arrayOf(caseId.toString())).use{c->
+        while(c.moveToNext())if(c.getInt(1)==0){
+            val taskId=c.getLong(0)
+            val due=c.getLong(2)
+            val priority=c.getString(3)
+            update("tasks",lab072CV("done" to 1),"id=?",arrayOf(taskId.toString()))
+            insertOrThrow("task_history",null,lab072CV(
+                "task_id" to taskId,"recorded_at" to now,
+                "action" to "Закрыта проверка","previous_due_at" to due,
+                "next_due_at" to due,"previous_done" to 0,"next_done" to 1,
+                "previous_priority" to priority,"next_priority" to priority,
+                "note" to text))
+        }
+    }
+    val old=row072(row.first)
+    var status=old.status
+    if(restoreNormal){
+        require(old.status!=LabTerms.QUARANTINE){
+            "Карантин снимается только отдельным решением по паспорту"
+        }
+        val other=rawQuery("""SELECT COUNT(*) FROM control_cases
+            WHERE culture_id=? AND closed_at IS NULL""",
+            arrayOf(row.first.toString())).use{c->c.moveToFirst();c.getInt(0)}
+        require(other==0){"Есть другие открытые причины контроля"}
+        if(old.status==LabTerms.CONTROL){
+            val beforeAudit=auditTop072(row.first)
+            update("cultures",lab072CV("status" to LabTerms.IN_CULTURE,
+                "updated_at" to now),"id=?",arrayOf(row.first.toString()))
+            status=LabTerms.IN_CULTURE
+            val op=operation072("Результат контроля","Возврат к работе: "+text,now)
+            change072(op,old,status,beforeAudit)
+            event072(row.first,"Результат контроля",text,op,now)
+        }
+    }
+    if(status==old.status){
+        val op=operation072("Результат контроля",text,now)
+        event072(row.first,"Результат контроля",text,op,now)
+    }
 }
+
 
 data class Lab072TaskFilter(
     val period:String="Все",val priority:String="",val kind:String="",
