@@ -159,7 +159,9 @@ internal fun Lab10ResourcesScreen(
             Column(Modifier.padding(20.dp),
                 verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text("Фильтры склада",style=MaterialTheme.typography.headlineSmall)
-                listOf("Все","Реактивы","Расходники","Инвентарь","Другое").forEach{value->
+                (listOf("Все","Реактивы","Расходники","Инвентарь","Другое")+
+                    listOf("Материалы","Субстраты","Препараты","Удобрения")
+                        .flatMap{db.categories11(it)}).distinct().forEach{value->
                     Row(Modifier.fillMaxWidth().heightIn(min=44.dp)
                         .clickable{draftCategory=value},verticalAlignment=Alignment.CenterVertically){
                         RadioButton(selected=draftCategory==value,onClick={draftCategory=value})
