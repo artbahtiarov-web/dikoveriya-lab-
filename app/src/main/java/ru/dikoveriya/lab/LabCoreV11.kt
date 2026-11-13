@@ -12,7 +12,16 @@ import java.util.UUID
 object LabCoreV11 {
     val backupTables=listOf("plant_visuals","knowledge_notes","knowledge_revisions")
     fun create(db:SQLiteDatabase) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS plant_visuals (plant_id INTEGER PRIMARY KEY NOT NULL REFERENCES plants(id), icon_key TEXT NOT NULL DEFAULT 'leaf', color_key TEXT NOT NULL DEFAULT 'forest', cover_filename TEXT, changed_at INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS plant_visuals (plant_id INTEGER PRIMARY KEY NOT NULL REFERENCES plants(id), icon_key TEXT NOT NULL DEFAULT 'leaf', color_key TEXT NOT NULL DEFAULT 'forest', cover_filename TEXT, cover_zoom REAL NOT NULL DEFAULT 1.0, cover_pan_x REAL NOT NULL DEFAULT 0, cover_pan_y REAL NOT NULL DEFAULT 0, changed_at INTEGER NOT NULL DEFAULT 0)")
+        val visualFields=db.rawQuery("PRAGMA table_info(plant_visuals)",null).use{c->
+            buildSet{while(c.moveToNext())add(c.getString(1))}
+        }
+        if("cover_zoom" !in visualFields)db.execSQL(
+            "ALTER TABLE plant_visuals ADD COLUMN cover_zoom REAL NOT NULL DEFAULT 1.0")
+        if("cover_pan_x" !in visualFields)db.execSQL(
+            "ALTER TABLE plant_visuals ADD COLUMN cover_pan_x REAL NOT NULL DEFAULT 0")
+        if("cover_pan_y" !in visualFields)db.execSQL(
+            "ALTER TABLE plant_visuals ADD COLUMN cover_pan_y REAL NOT NULL DEFAULT 0")
         db.execSQL("CREATE TABLE IF NOT EXISTS knowledge_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL, body TEXT NOT NULL, source_url TEXT NOT NULL DEFAULT '', plant_id INTEGER REFERENCES plants(id), tags TEXT NOT NULL DEFAULT '', protocol_version INTEGER NOT NULL DEFAULT 1, archived INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, created_at INTEGER NOT NULL)")
         val fields=db.rawQuery("PRAGMA table_info(knowledge_notes)",null).use{c->
             buildSet{while(c.moveToNext())add(c.getString(1))}
@@ -41,13 +50,15 @@ object LabCoreV11 {
 }
 
 data class Lab10PlantVisual(val plantId:Long,val iconKey:String="leaf",
-    val colorKey:String="forest",val coverFilename:String?=null)
+    val colorKey:String="forest",val coverFilename:String?=null,
+    val coverZoom:Float=1f,val panX:Float=0f,val panY:Float=0f)
 
 fun LabDatabase.plantVisuals10():Map<Long,Lab10PlantVisual> =
-    readableDatabase.rawQuery("SELECT plant_id,icon_key,color_key,cover_filename FROM plant_visuals",null).use{c->
+    readableDatabase.rawQuery("SELECT plant_id,icon_key,color_key,cover_filename,cover_zoom,cover_pan_x,cover_pan_y FROM plant_visuals",null).use{c->
         buildMap { while(c.moveToNext()){
             val row=Lab10PlantVisual(c.getLong(0),c.getString(1),c.getString(2),
-                if(c.isNull(3))null else c.getString(3))
+                if(c.isNull(3))null else c.getString(3),
+                c.getFloat(4),c.getFloat(5),c.getFloat(6))
             put(row.plantId,row)
         } }
     }
@@ -58,7 +69,11 @@ private val colors10=setOf("forest","moss","gold","teal","rose")
 private fun LabDatabase.plantExists10(id:Long)=readableDatabase.rawQuery(
     "SELECT 1 FROM plants WHERE id=?",arrayOf(id.toString())).use{it.moveToFirst()}
 
-fun LabDatabase.stylePlant10(plantId:Long,iconKey:String,colorKey:String){
+fun LabDatabase.stylePlant10(plantId:Long,iconKey:String,colorKey:String,
+    zoom:Float=1f,panX:Float=0f,panY:Float=0f){
+    require(zoom in 1f..3f && panX in -0.6f..0.6f && panY in -0.6f..0.6f){
+        "Проверь масштаб и расположение изображения"
+    }
     require(iconKey in icons10 && colorKey in colors10){"Неверное оформление"}
     require(plantExists10(plantId)){"Сорт не найден"}
     val db=writableDatabase
@@ -67,6 +82,7 @@ fun LabDatabase.stylePlant10(plantId:Long,iconKey:String,colorKey:String){
         db.execSQL("INSERT OR IGNORE INTO plant_visuals(plant_id) VALUES (?)",arrayOf(plantId))
         val values=ContentValues().apply{
             put("icon_key",iconKey);put("color_key",colorKey)
+            put("cover_zoom",zoom);put("cover_pan_x",panX);put("cover_pan_y",panY)
             put("changed_at",System.currentTimeMillis())
         }
         require(db.update("plant_visuals",values,"plant_id=?",arrayOf(plantId.toString()))==1)
@@ -114,7 +130,9 @@ fun LabDatabase.setPlantCover10(context:Context,plantId:Long,uri:Uri){
         try{
             db.execSQL("INSERT OR IGNORE INTO plant_visuals(plant_id) VALUES (?)",arrayOf(plantId))
             val values=ContentValues().apply{
-                put("cover_filename",filename);put("changed_at",System.currentTimeMillis())
+                put("cover_filename",filename)
+                put("cover_zoom",1f);put("cover_pan_x",0f);put("cover_pan_y",0f)
+                put("changed_at",System.currentTimeMillis())
             }
             require(db.update("plant_visuals",values,"plant_id=?",arrayOf(plantId.toString()))==1)
             db.setTransactionSuccessful()
@@ -129,7 +147,7 @@ fun LabDatabase.removePlantCover10(context:Context,plantId:Long){
     val db=writableDatabase
     db.beginTransaction()
     try{
-        db.execSQL("UPDATE plant_visuals SET cover_filename=NULL,changed_at=? WHERE plant_id=?",
+        db.execSQL("UPDATE plant_visuals SET cover_filename=NULL,cover_zoom=1.0,cover_pan_x=0,cover_pan_y=0,changed_at=? WHERE plant_id=?",
             arrayOf(System.currentTimeMillis(),plantId))
         db.setTransactionSuccessful()
     }finally{db.endTransaction()}
