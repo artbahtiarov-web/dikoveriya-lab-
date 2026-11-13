@@ -1,0 +1,139 @@
+name: Signed Dikoveriya LAB 1.1.0 RC (permanent production key)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/1.1.0-rc']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Verify checkout contains current source (never apply uploaded ZIP patches)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/src/main/java/ru/dikoveriya/lab/LabDatabase.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/LabCoreV8.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/LabJournal.kt
+          test -f qa/check_v050.py
+          # Signed 1.1.0 RC comes from the exact isolated release branch SHA.
+          echo "Release source commit: $(git rev-parse HEAD)"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Restore permanent signing key (required)
+        env:
+          LAB_SIGNING_BUNDLE_B64: ${{ secrets.LAB_SIGNING_BUNDLE_B64 }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import os, json, base64
+          from pathlib import Path
+
+          encoded = os.environ.get('LAB_SIGNING_BUNDLE_B64', '').strip()
+          if not encoded:
+              raise SystemExit('SIGNING NOT CONFIGURED: add the LAB_SIGNING_BUNDLE_B64 repository secret. No temporary signed APK will be published.')
+          try:
+              data = json.loads(base64.b64decode(encoded, validate=True))
+              assert data['version'] == 1
+              raw_key = base64.b64decode(data['keystore_b64'], validate=True)
+              assert len(raw_key) > 1000
+              store_password = data['store_password']
+              key_password = data['key_password']
+              key_alias = data['alias']
+              assert store_password and key_password and key_alias
+          except Exception as e:
+              raise SystemExit('Signing bundle is damaged or invalid') from e
+
+          folder = Path('app/signing')
+          folder.mkdir(parents=True, exist_ok=True)
+          keyfile = folder / 'dikoveriya.p12'
+          keyfile.write_bytes(raw_key)
+          keyfile.chmod(0o600)
+          # GitHub masks individual passwords as well as the original secret
+          print(f'::add-mask::{store_password}')
+          print(f'::add-mask::{key_password}')
+          envfile = Path(os.environ['GITHUB_ENV'])
+          with envfile.open('a', encoding='utf-8') as f:
+              f.write(f'LAB_KEYSTORE_PASS={store_password}\n')
+              f.write(f'LAB_KEY_PASS={key_password}\n')
+              f.write(f'LAB_KEY_ALIAS={key_alias}\n')
+          print('Permanent signing key restored')
+          PYTHON
+
+      - name: Verify expected signing certificate
+        run: |
+          set -euo pipefail
+          keytool -exportcert -storetype PKCS12 -keystore app/signing/dikoveriya.p12 \
+            -storepass "$LAB_KEYSTORE_PASS" -alias "$LAB_KEY_ALIAS" > "$RUNNER_TEMP/dikoveriya.cer"
+          actual="$(sha256sum "$RUNNER_TEMP/dikoveriya.cer" | cut -d ' ' -f 1)"
+          expected="dc6afaf6df81d6a48dd643ef8f038a441791a99e572e783c38cd8e2e083ce7f5"
+          echo "Signing certificate SHA-256: $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo '::error::Signing certificate does not match the permanent identity; refusing build.'
+            exit 1
+          fi
+
+      - name: Validate current SQLite schema and regression tests
+        run: |
+          set -euo pipefail
+          python3 qa/check_v050.py
+          python3 -m unittest discover -s qa -v
+
+      - name: Verify 1.1.0 RC identity and additive data schema
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "1.1.0-rc1"' app/build.gradle.kts
+          grep -q 'versionCode = 110000 +' app/build.gradle.kts
+          grep -q 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)' app/src/main/java/ru/dikoveriya/lab/LabDatabase.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/Lab10CollectionUi.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/Lab10OperationsUi.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/Lab10AnalyticsDetailsUi.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/LabCoreV12.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/Lab11Finance.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/Lab11StorageUi.kt
+          echo "Release identity and required feature modules verified"
+
+      - name: Unit tests and build APK
+        run: gradle :app:testDebugUnitTest :app:assembleRelease --stacktrace
+
+      - name: Verify APK is signed by permanent certificate
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signature.txt"
+          actual="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-signature.txt" | head -n 1 | tr -d '[:space:]:' | tr 'A-F' 'a-f')"
+          expected="dc6afaf6df81d6a48dd643ef8f038a441791a99e572e783c38cd8e2e083ce7f5"
+          if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+            echo "::error::APK was not signed by the permanent key (found: $actual)."
+            exit 1
+          fi
+          echo "Verified permanent APK signing certificate: $actual"
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dikoveriya-lab-1.1.0-rc1-permanent-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
