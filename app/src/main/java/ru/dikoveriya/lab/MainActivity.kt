@@ -303,11 +303,12 @@ fun DikoveriyaApp() {
                         item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
                         item { Text("Активных: ${running.size} · на контроле: $attention · завершённых: ${cultures.size-running.size}") }
                         item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
-                        item { SectionTitle("Результаты по сортам") }
+                        item { SectionTitle("Последние замеры активных контейнеров по сортам") }
+                        item { Text("Это показатели наблюдений, а не текущие складские остатки. Пустые измерения не означают измеренный ноль.",style=MaterialTheme.typography.bodySmall) }
                         items(cultivarResults,key={"results-${it.plantId}"}) { r ->
                             Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}")
                         }
-                        item { SectionTitle("Рост по рецептурам") }
+                        item { SectionTitle("Зарегистрированные измерения по рецептурам") }
                         item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
                         items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
                             Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
