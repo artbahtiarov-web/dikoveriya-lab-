@@ -41,7 +41,7 @@ internal fun Lab11SalesScreen(db:LabDatabase,revision:Int,
     val valid=from.isBlank() || validDate11(from)!=null
     val validEnd=to.isBlank() || validDate11(to)!=null
     val periodValid=valid && validEnd && start<=end
-    val query=remember(search,kind,order,start,end){
+    val query=remember(search,kind,order,start,end,periodValid){
         if(periodValid)Lab11SaleFilter(search,kind,start,end,order) else null
     }
     LaunchedEffect(revision,query,page){
