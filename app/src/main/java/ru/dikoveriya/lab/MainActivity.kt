@@ -47,7 +47,7 @@ fun DikoveriyaApp() {
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
         "collection","variety"->"Коллекция"
-        "container","growth","medium","operations","history","work","groups","places"->"Коллекция"
+        "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
         "tasks"->"Главная"
         else->if(tab=="Аналитика")"Ещё" else tab
     }
@@ -235,7 +235,7 @@ fun DikoveriyaApp() {
                         onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
                         onEdit={cultureId=it},
-                        onLabel={labelCultureId=it},
+                        onLabel={openRoute(Lab07Navigation.label(it))},
                         onPhotos={photoCultureId=it},
                         onSale={saleCultureId=it},
                         onLegacyAssessment={legacyAssessmentId=it},
