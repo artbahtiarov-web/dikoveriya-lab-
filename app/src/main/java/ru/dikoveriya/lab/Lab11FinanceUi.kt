@@ -167,7 +167,7 @@ internal fun Lab11FinanceScreen(
                                 style=MaterialTheme.typography.bodySmall,
                                 maxLines=2)
                         }
-                        Text((if(row.direction=="Доход")+"+" else "−")+
+                        Text((if(row.direction=="Доход")"+" else "−")+
                             kopecks11(row.amount),style=MaterialTheme.typography.bodyMedium)
                     }
                 }
