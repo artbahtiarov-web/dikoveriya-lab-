@@ -308,7 +308,25 @@ fun DikoveriyaApp() {
                         labPreferences.edit().putBoolean("dark_theme",value).apply()
                     },onBack={subsection=""},modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Аналитика") {
-                Lab10AnalyticsScreen(db,refresh,modifier=Modifier.fillMaxSize().padding(padding))
+                Lab10AnalyticsScreen(db,refresh,
+                    onMetric={key->
+                        when {
+                            key in setOf("all","active","attention")->
+                                openRoute(Lab07Navigation.work(key))
+                            key=="operations"->openSection("Операции")
+                            key=="sales"->openSection("Продажи")
+                            key.startsWith("stage:")->
+                                openRoute(Lab07Navigation.stageWork(key.substringAfter("stage:")))
+                        }
+                    },
+                    onBreakdown={section,id->
+                        when(section){
+                            "Потери"->openRoute(Lab07Navigation.losses(id))
+                            "Среды"->recipeId=id
+                            else->openRoute(Lab07Navigation.plantWork(id))
+                        }
+                    },
+                    modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="База знаний") {
                 Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
                     modifier=Modifier.fillMaxSize().padding(padding))
