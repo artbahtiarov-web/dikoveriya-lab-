@@ -172,13 +172,31 @@ fun QuickCultureDialog(db:LabDatabase,initialRecipeId:Long?,initialPlantId:Long?
     var explants by remember { mutableStateOf("") }
     var shoots by remember { mutableStateOf("") }
     var plantsCount by remember { mutableStateOf("") }
-    var place by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
+    var place by rememberSaveable { mutableStateOf("") }
+    var locationId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var passage by rememberSaveable { mutableStateOf("0") }
+    var stage by rememberSaveable { mutableStateOf(LabTerms.IN_VITRO) }
+    var quantityKind by rememberSaveable { mutableStateOf("Определить по одному показателю") }
+    var note by rememberSaveable { mutableStateOf("") }
     var newPlantName by remember { mutableStateOf("") }
     var newMotherOrigin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val availableMothers=mothers.filter{it.plantId==plantId}
     val selectedRecipe=recipes.firstOrNull{it.id==recipeId}
+    val locations=remember(revision){db.locations072()}
+    val positiveKinds=listOfNotNull(
+        explants.toIntOrNull()?.takeIf{it>0}?.let{"Экспланты"},
+        shoots.toIntOrNull()?.takeIf{it>0}?.let{"Побеги"},
+        plantsCount.toIntOrNull()?.takeIf{it>0}?.let{"Растения"}
+    )
+    val effectiveKind=if(quantityKind=="Определить по одному показателю")
+        positiveKinds.singleOrNull() else quantityKind
+    val effectiveQty=when(effectiveKind){
+        "Экспланты"->explants.toIntOrNull()
+        "Побеги"->shoots.toIntOrNull()
+        "Растения"->plantsCount.toIntOrNull()
+        else->null
+    }
     AlertDialog(onDismissRequest=onClose,title={Text(when(mode){"plant"->"Новое растение";"mother"->"Новый маточник";"medium"->"Новая среда";else->"Новый контейнер"})},text={
         Column(Modifier.fillMaxWidth().heightIn(max=580.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             when(mode) {
@@ -222,16 +240,47 @@ fun QuickCultureDialog(db:LabDatabase,initialRecipeId:Long?,initialPlantId:Long?
                     Field("Эксплантов, шт.",explants,{explants=it.filter(Char::isDigit)},numeric=true)
                     Field("Побегов, шт.",shoots,{shoots=it.filter(Char::isDigit)},numeric=true)
                     Field("Растений, шт.",plantsCount,{plantsCount=it.filter(Char::isDigit)},numeric=true)
-                    Field("Стеллаж / полка",place,{place=it})
+                    PickOne("Что реально находится в контейнере",
+                        listOf("Определить по одному показателю","Экспланты","Побеги","Растения"),
+                        quantityKind,{quantityKind=it})
+                    Text(if(effectiveKind==null)
+                            "Выбери единицу учёта: показатели не складываются."
+                         else "К учёту: ${effectiveQty ?: "нет измерения"} · ${effectiveKind}. Остальные показатели сохраняются отдельно.",
+                        style=MaterialTheme.typography.bodySmall,
+                        color=if(effectiveKind==null || (effectiveQty?:0)<=0)
+                            MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Field("Пассаж (P0 — первое введение, P2 — существующая культура)",
+                        passage,{passage=it.filter(Char::isDigit)},numeric=true)
+                    PickOne("Этап",LabTerms.stages,stage,{stage=it})
+                    if(locations.isNotEmpty()) {
+                        PickOne("Место хранения",listOf("Не указано","Ввести вручную")+
+                            locations.map{it.path},
+                            locations.firstOrNull{it.id==locationId}?.path ?:
+                                if(place.isNotBlank())"Ввести вручную" else "Не указано",
+                            {value->
+                                locationId=locations.firstOrNull{it.path==value}?.id
+                                if(value=="Не указано")place=""
+                            })
+                    }
+                    if(locationId==null)Field("Место (если нет в справочнике)",
+                        place,{place=it})
                     Field("Примечание",note,{note=it},single=false)
+                    Text("После создания откроется паспорт контейнера. Задачи назначаются отдельно, с реальным сроком.",
+                        style=MaterialTheme.typography.bodySmall)
                 }
             }
             if(errorMessage!=null)Text(errorMessage!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
         }
     },confirmButton={
         if(mode=="container") Button(onClick={try {
+            require(effectiveKind!=null && (effectiveQty?:0)>0){
+                "Выбери подтверждённую единицу и количество биоматериала"
+            }
+            val p=passage.toIntOrNull() ?:error("Укажи пассаж")
             val id=db.addCultureQuick(plantId?:error("Выбери растение"),motherId,recipeId,
-                explants.asCount(),shoots.asCount(),plantsCount.asCount(),place,note)
+                explants.asCount(),shoots.asCount(),plantsCount.asCount(),place,note,
+                passage=p,stage=stage,quantityKind=effectiveKind,locationId=locationId)
             onSaved(id)
         }catch(e:Exception){errorMessage=e.message?:"Проверь данные"}}){Text("Создать контейнер")}
     },dismissButton={TextButton(onClick=onClose){Text("Закрыть")}})
