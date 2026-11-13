@@ -100,7 +100,7 @@ fun RecipeDialog(
         Text(r.name)
         Text("${r.purpose} · версия ${r.version} · ${r.status}",style=MaterialTheme.typography.bodySmall)
     }},text={Column(Modifier.fillMaxWidth().heightIn(max=550.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        PickOne("Раздел",listOf("Состав","Расчёт","Приготовить"),mode,{mode=it})
+        PickOne("Раздел",listOf("Состав","Расчёт"),mode,{mode=it})
         when(mode){
             "Состав" -> {
                 Text("Компоненты",fontWeight=FontWeight.SemiBold)
@@ -139,7 +139,7 @@ fun RecipeDialog(
                     OutlinedButton(onClick=onRevise){Text("Создать новую версию")}
                 }
             }
-            "Расчёт", "Приготовить" -> {
+            "Расчёт" -> {
                 Field("Необходимый объём, мл",volume,{volume=it.filter(Char::isDigit)},numeric=true)
                 when{
                     result.isSuccess -> result.getOrThrow().forEach{c->
@@ -152,7 +152,7 @@ fun RecipeDialog(
                 if(mode=="Приготовить"){
                     Text("Подтверди фактически отмеренные количества",fontWeight=FontWeight.Medium)
                     if(result.isSuccess) result.getOrThrow().forEach { item ->
-                        Field("${item.title} (${item.unit})",actual[item.title] ?: RecipeCalculator.formatAmount(item.amount),{actual[item.title]=it},numeric=true)
+                        Field("${item.title} (${item.unit})",actual[item.title].orEmpty(),{actual[item.title]=it},numeric=true)
                     }
                     Field("Фактический pH (необязательно)",ph,{ph=it})
                     Field("Стерилизация: температура, давление, время",sterilization,{sterilization=it})
@@ -165,7 +165,7 @@ fun RecipeDialog(
         if(mode=="Приготовить" && r.status=="Утверждена" && result.isSuccess)
             TextButton(onClick={
                 val items=result.getOrThrow()
-                val actualMap=items.associate{it.title to ((actual[it.title]?:RecipeCalculator.formatAmount(it.amount)).replace(',','.').toDoubleOrNull() ?: Double.NaN)}
+                val actualMap=items.associate{it.title to ((actual[it.title]?:error("Фактическая масса ${it.title} не введена")).replace(',','.').toDoubleOrNull() ?: Double.NaN)}
                 onPrepare(volume.toIntOrNull()?:0,ph,sterilization,notes,actualMap)
             }){Text("Сохранить партию")}
     },dismissButton={TextButton(onClick=onClose){Text("Закрыть")}})
