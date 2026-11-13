@@ -71,7 +71,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Instrumented Android tests 360/430dp
+      - name: Instrumented Android tests 360/393/430dp
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -91,6 +91,15 @@ jobs:
             adb shell screencap -p /sdcard/v1-360.png
             adb pull /sdcard/v1-360.png screenshots/v1-360.png
             adb shell am force-stop ru.dikoveriya.lab
+            adb shell wm size 393x852
+            adb shell wm density 160
+            adb shell settings put system font_scale 1.4
+            gradle --no-daemon :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
+            adb shell am start -n ru.dikoveriya.lab/.MainActivity
+            sleep 3
+            adb shell screencap -p /sdcard/v1-393.png
+            adb pull /sdcard/v1-393.png screenshots/v1-393.png
+            adb shell am force-stop ru.dikoveriya.lab
             adb shell wm size 430x900
             adb shell wm density 160
             adb shell settings put system font_scale 1.6
@@ -103,7 +112,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lab-v1-ui-360-430
+          name: lab-v11-ui-360-393-430
           path: |
             screenshots/*.png
             app/build/outputs/androidTest-results/connected/**
