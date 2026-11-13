@@ -2,6 +2,7 @@ package ru.dikoveriya.lab
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.graphics.BitmapFactory
@@ -135,38 +136,50 @@ internal fun LabDatabase.takeCutting11(parentItemId:Long,date:Long,
     }finally{db.endTransaction()}
 }
 
-internal fun LabDatabase.plantItems11(query:String="",limit:Int=250):List<Lab11PlantItem>{
-    require(limit in 1..1000)
-    val name=query.trim().take(100)
-    val where=if(name.isEmpty())"" else
-        " WHERE i.code LIKE ? OR p.name LIKE ? OR i.location_text LIKE ?"
-    val args=if(name.isEmpty())emptyArray() else
-        arrayOf("%"+name+"%","%"+name+"%","%"+name+"%")
-    return readableDatabase.rawQuery("""SELECT i.id,i.code,i.plant_id,p.name,i.kind,i.stage,
-        i.status,i.acquired_at,i.supplier,i.purchase_cost_minor,
-        i.parent_item_id,i.parent_culture_id,i.location_id,
-        i.location_text,i.substrate,i.rooting_method,i.stimulant,i.pot_volume_ml,
-        i.notes,i.favorite,i.cover_filename
-        FROM plant_items i JOIN plants p ON p.id=i.plant_id $where
-        ORDER BY i.favorite DESC,i.updated_at DESC,i.id DESC LIMIT $limit""",args)
-        .use{c->buildList{
-            while(c.moveToNext())add(
-                Lab11PlantItem(c.getLong(0),c.getString(1),c.getLong(2),
-                    c.getString(3),c.getString(4),c.getString(5),
-                    c.getString(6),c.getLong(7),c.getString(8),c.getLong(9),
-                    if(c.isNull(10))null else c.getLong(10),
-                    if(c.isNull(11))null else c.getLong(11),
-                    if(c.isNull(12))null else c.getLong(12),
-                    c.getString(13),c.getString(14),c.getString(15),
-                    c.getString(16),if(c.isNull(17))null else c.getInt(17),
-                    c.getString(18),c.getInt(19)==1,
-                    if(c.isNull(20))null else c.getString(20))
-            )
-        }}
+private const val ITEM_SELECT11="""SELECT i.id,i.code,i.plant_id,p.name,i.kind,i.stage,
+    i.status,i.acquired_at,i.supplier,i.purchase_cost_minor,
+    i.parent_item_id,i.parent_culture_id,i.location_id,
+    i.location_text,i.substrate,i.rooting_method,i.stimulant,i.pot_volume_ml,
+    i.notes,i.favorite,i.cover_filename FROM plant_items i JOIN plants p ON p.id=i.plant_id"""
+private fun Cursor.plantItem11():Lab11PlantItem =
+    Lab11PlantItem(getLong(0),getString(1),getLong(2),getString(3),
+        getString(4),getString(5),getString(6),getLong(7),getString(8),getLong(9),
+        if(isNull(10))null else getLong(10),if(isNull(11))null else getLong(11),
+        if(isNull(12))null else getLong(12),getString(13),getString(14),
+        getString(15),getString(16),if(isNull(17))null else getInt(17),
+        getString(18),getInt(19)==1,if(isNull(20))null else getString(20))
+
+private fun itemWhere11(query:String,kind:String,favorites:Boolean):Pair<String,Array<String>>{
+    val conditions=mutableListOf<String>()
+    val args=mutableListOf<String>()
+    if(query.isNotBlank()){
+        conditions+="(i.code LIKE ? OR p.name LIKE ? OR i.location_text LIKE ?)"
+        repeat(3){args+="%"+query.trim().take(100)+"%"}
+    }
+    if(kind.isNotBlank()){conditions+="i.kind=?";args+=kind}
+    if(favorites)conditions+="i.favorite=1"
+    return (if(conditions.isEmpty())"" else " WHERE "+conditions.joinToString(" AND ")) to args.toTypedArray()
 }
 
+/** SQL paging, not loading 20k plant records and bitmap covers into memory. */
+internal fun LabDatabase.plantItems11(query:String="",limit:Int=40,offset:Int=0,
+    kind:String="",favorites:Boolean=false):List<Lab11PlantItem>{
+    require(limit in 1..100 && offset>=0)
+    val (where,args)=itemWhere11(query,kind,favorites)
+    return readableDatabase.rawQuery(
+        ITEM_SELECT11+where+" ORDER BY i.favorite DESC,i.updated_at DESC,i.id DESC LIMIT "+limit+" OFFSET "+offset,
+        args).use{c->buildList{while(c.moveToNext())add(c.plantItem11())}}
+}
+internal fun LabDatabase.itemsCount11(query:String="",kind:String="",
+    favorites:Boolean=false):Int{
+    val (where,args)=itemWhere11(query,kind,favorites)
+    return readableDatabase.rawQuery(
+        "SELECT COUNT(*) FROM plant_items i JOIN plants p ON p.id=i.plant_id"+where,args
+    ).use{c->c.moveToFirst();c.getInt(0)}
+}
 internal fun LabDatabase.item11(id:Long):Lab11PlantItem? =
-    plantItems11(limit=1000).firstOrNull{it.id==id}
+    readableDatabase.rawQuery(ITEM_SELECT11+" WHERE i.id=?",
+        arrayOf(id.toString())).use{c->if(c.moveToFirst())c.plantItem11() else null}
 
 internal fun LabDatabase.itemEvents11(id:Long):List<Lab11ItemEvent> =
     readableDatabase.rawQuery("""SELECT id,kind,event_at,note,details_json,cancelled
