@@ -49,7 +49,6 @@ fun Lab072TasksScreen(
     var toText by rememberSaveable{mutableStateOf("")}
     var advanced by rememberSaveable{mutableStateOf(false)}
     var pages by rememberSaveable{mutableIntStateOf(1)}
-    var createDialog by rememberSaveable{mutableStateOf(false)}
     var editTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
     var cancelTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
     var cancelReason by rememberSaveable{mutableStateOf("")}
@@ -106,13 +105,6 @@ fun Lab072TasksScreen(
                     Text("Включить напоминания о задачах")
                 }
             }
-        item(key="new"){
-            Button(onClick={createDialog=true},
-                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
-                Icon(Icons.Outlined.AddTask,null);Spacer(Modifier.width(8.dp))
-                Text("Новая задача")
-            }
-        }
         item(key="search"){
             OutlinedTextField(
                 value=search,
@@ -254,8 +246,6 @@ fun Lab072TasksScreen(
             }
         }){Text("Сохранить")}},
         dismissButton={TextButton(onClick={viewDialog=false}){Text("Отмена")}})
-    if(createDialog)Lab072TaskForm(db,recipes,onClose={createDialog=false},
-        onSaved={createDialog=false;onChanged()},onError=onError)
     editTaskId?.let{id->
         rows.firstOrNull{it.id==id}?.let{task->
             Lab072TaskEdit(task,onClose={editTaskId=null},
@@ -268,7 +258,7 @@ fun Lab072TasksScreen(
 }
 
 @Composable
-private fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
+internal fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
     onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit){
     var title by rememberSaveable{mutableStateOf("")}
     var deadline by rememberSaveable{mutableStateOf("")}

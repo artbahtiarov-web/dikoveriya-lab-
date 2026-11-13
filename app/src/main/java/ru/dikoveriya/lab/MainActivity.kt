@@ -544,7 +544,7 @@ fun DikoveriyaApp() {
                         quickMenu=false
                         quickOperationPicker=true
                     },
-                    onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)},
+                    onOpenTasks={quickMenu=false;dialog="newTask"},
                     onNewItem={quickMenu=false;dialog="newItem"},
                     onBulkCulture={quickMenu=false;dialog="bulkCulture"},
                     onCutting={
@@ -590,7 +590,9 @@ fun DikoveriyaApp() {
                     onUseExisting={id->dialog="";recipeId=id})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
-                "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
+                "newTask" -> Lab072TaskForm(db,recipes,
+                    onClose={dialog=""},onSaved={dialog="";refresh++},
+                    onError={error=it})
                 "newMaterial" -> AddMaterialDialog(onClose={dialog=""},
                     onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""},
                     customCategories=listOf("Материалы","Субстраты","Препараты","Удобрения")

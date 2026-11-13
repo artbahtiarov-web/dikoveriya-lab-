@@ -97,7 +97,9 @@ internal fun Lab11FinanceScreen(
                 "Денежный поток отдельно от себестоимости, имущества и материалов.",onBack)
         }
         item{
-            Row(verticalAlignment=Alignment.CenterVertically,
+            Row(Modifier.fillMaxWidth().horizontalScroll(
+                androidx.compose.foundation.rememberScrollState()),
+                verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 FilterChip(selected=scope=="Всё время",onClick={scope="Всё время"},
                     label={Text("Всё время")})
@@ -128,7 +130,9 @@ internal fun Lab11FinanceScreen(
             }
         }
         item{
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth().horizontalScroll(
+                androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 listOf("Обзор","Операции","Закупки","Отчёты").forEach{label->
                     FilterChip(selected=view==label,onClick={view=label},
                         label={Text(label)})
