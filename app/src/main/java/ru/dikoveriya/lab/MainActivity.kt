@@ -344,6 +344,7 @@ fun DikoveriyaApp() {
                     onMaterial={openSection("Склад")},
                     onOpenItem={openRoute(Lab07Navigation.item(it))},
                     onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onVariety={plantId->openRoute(Lab07Navigation.plantWork(plantId))},
                     onChanged={refresh++},onError={error=it},
                     modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="Закупки") {
@@ -353,6 +354,7 @@ fun DikoveriyaApp() {
                     onMaterial={openSection("Склад")},
                     onOpenItem={openRoute(Lab07Navigation.item(it))},
                     onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onVariety={plantId->openRoute(Lab07Navigation.plantWork(plantId))},
                     onChanged={refresh++},onError={error=it},
                     initialView="Закупки",
                     modifier=Modifier.fillMaxSize().padding(padding))
