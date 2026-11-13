@@ -36,7 +36,7 @@ private fun Lab11FinanceTile(title:String,value:String,subtitle:String,
 @Composable
 internal fun Lab11FinanceScreen(
     db:LabDatabase,revision:Int,
-    onBack:()->Unit,onSales:()->Unit,onMaterial:()->Unit,
+    onBack:()->Unit,onSales:()->Unit,onMaterial:()->Unit,onAsset:()->Unit,
     onOpenItem:(Long)->Unit,onOpenCulture:(Long)->Unit,
     onVariety:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
@@ -55,6 +55,20 @@ internal fun Lab11FinanceScreen(
     val to=if(scope=="Месяц")current.plusMonths(1).atDay(1)
         .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()-1 else Long.MAX_VALUE
     val stats=remember(revision,from,to){db.financeSummary11(from,to)}
+    val businessResult=remember(revision,from,to){db.performance11(from,to)}
+    var costPages by rememberSaveable{mutableIntStateOf(1)}
+    LaunchedEffect(from,to){costPages=1}
+    val costCount=remember(revision,from,to,view){
+        if(view=="Прямые затраты")db.directCostsCount11(from,to)else 0
+    }
+    val costs=remember(revision,from,to,view,costPages){
+        if(view!="Прямые затраты")emptyList()
+        else buildList{
+            val upto=minOf(costCount,costPages*40)
+            for(offset in 0 until upto step 40)
+                addAll(db.directCostsPage11(from,to,minOf(40,upto-offset),offset))
+        }
+    }
     var cashPages by rememberSaveable{mutableIntStateOf(1)}
     var purchasePages by rememberSaveable{mutableIntStateOf(1)}
     LaunchedEffect(from,to,cashCategory){cashPages=1}
@@ -141,17 +155,17 @@ internal fun Lab11FinanceScreen(
                     Lab11FinanceTile("Материалы на складе",kopecks11(stats.inventory),
                         "Текущая оценка остатков",onClick=onMaterial,modifier=Modifier.weight(1f))
                     Lab11FinanceTile("Оборудование",kopecks11(stats.assets),
-                        "Сумма покупок, не рыночная оценка",onClick={view="Закупки"},
+                        "Сумма покупок, не рыночная оценка",onClick=onAsset,
                         modifier=Modifier.weight(1f))
                 }
             }
             item{
                 Lab11FinanceTile("Прямые затраты",kopecks11(stats.direct),
                     "Использованные материалы: не новая выплата",
-                    onClick={view="Операции"})
+                    onClick={view="Прямые затраты"})
             }
             item{
-                Lab11FinanceTile("Продажи и результат",kopecks11(stats.income),
+                Lab11FinanceTile("Продажи и результат",kopecks11(businessResult.salesRevenue),
                     "Открыть карточки продаж и их себестоимость",
                     onClick=onSales)
             }
@@ -165,6 +179,49 @@ internal fun Lab11FinanceScreen(
                 Text("Покупка оборудования и материалов уменьшает денежный остаток один раз. Использование материала уменьшает запас и увеличивает прямые затраты, но не создаёт вторую выплату.",
                     style=MaterialTheme.typography.bodySmall,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if(view=="Прямые затраты"){
+            item{
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Text("Прямые затраты · "+costCount,
+                        modifier=Modifier.weight(1f),
+                        style=MaterialTheme.typography.titleLarge)
+                    TextButton(onClick={view="Обзор"}){Text("К обзору")}
+                }
+                Text("Это стоимость фактически использованных материалов и записанных прямых расходов, а не новые платежи.",
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(costs.isEmpty())item{Text("Прямых затрат в этом периоде нет")}
+            items(costs,key={it.id}){record->
+                OutlinedCard(onClick={
+                    if(record.kind=="item")onOpenItem(record.entityId)
+                    else if(record.kind=="culture")onOpenCulture(record.entityId)
+                },modifier=Modifier.fillMaxWidth()){
+                    Row(Modifier.padding(13.dp),
+                        verticalAlignment=Alignment.CenterVertically){
+                        Column(Modifier.weight(1f)){
+                            Text(record.category,
+                                style=MaterialTheme.typography.titleMedium)
+                            Text((if(record.kind=="item")"Растение" else "Контейнер")+
+                                " #"+record.entityId+" · "+formatDate(record.at),
+                                style=MaterialTheme.typography.bodySmall)
+                            Text(record.note.ifBlank{record.sourceType},
+                                style=MaterialTheme.typography.labelSmall)
+                        }
+                        Text(kopecks11(record.amountMinor),
+                            style=MaterialTheme.typography.titleSmall)
+                        Icon(Icons.Outlined.ChevronRight,
+                            contentDescription="Открыть объект затрат")
+                    }
+                }
+            }
+            if(costs.size<costCount)item{
+                OutlinedButton(onClick={costPages++},
+                    modifier=Modifier.fillMaxWidth()){
+                    Text("Показать ещё · "+(costCount-costs.size))
+                }
             }
         }
         if(view=="Отчёты")item{

@@ -239,3 +239,27 @@ internal fun LabDatabase.purchasesPage11(limit:Int=40,offset:Int=0):List<Lab11Pu
             if(c.isNull(9))null else c.getLong(9),c.getString(10)))
     }}
 }
+
+internal data class Lab11DirectCostRow(
+    val id:Long,val kind:String,val entityId:Long,val category:String,
+    val amountMinor:Long,val at:Long,val sourceType:String,val note:String
+)
+internal fun LabDatabase.directCostsCount11(from:Long=0,to:Long=Long.MAX_VALUE):Int{
+    require(from>=0 && to>=from)
+    return readableDatabase.rawQuery("""SELECT COUNT(*) FROM direct_costs
+        WHERE reversed=0 AND occurred_at BETWEEN ? AND ?""",
+        arrayOf(from.toString(),to.toString())).use{c->c.moveToFirst();c.getInt(0)}
+}
+internal fun LabDatabase.directCostsPage11(from:Long=0,to:Long=Long.MAX_VALUE,
+    limit:Int=40,offset:Int=0):List<Lab11DirectCostRow>{
+    require(from>=0 && to>=from && limit in 1..100 && offset>=0)
+    return readableDatabase.rawQuery("""SELECT id,entity_kind,entity_id,
+        category,amount_minor,occurred_at,source_type,note FROM direct_costs
+        WHERE reversed=0 AND occurred_at BETWEEN ? AND ?
+        ORDER BY occurred_at DESC,id DESC LIMIT """+limit+" OFFSET "+offset,
+        arrayOf(from.toString(),to.toString())).use{c->buildList{
+        while(c.moveToNext())add(Lab11DirectCostRow(
+            c.getLong(0),c.getString(1),c.getLong(2),c.getString(3),
+            c.getLong(4),c.getLong(5),c.getString(6),c.getString(7)))
+    }}
+}
