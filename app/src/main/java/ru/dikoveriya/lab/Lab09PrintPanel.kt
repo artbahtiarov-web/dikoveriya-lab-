@@ -48,7 +48,8 @@ object NiimPreflight {
 
 @Composable
 fun Lab09PrintPanel(values:LabelValues,layout:LabelDesign,
-    onError:(String)->Unit
+    onError:(String)->Unit,
+    batchJobs:List<Pair<LabelValues,LabelDesign>> = emptyList()
 ){
     val context=LocalContext.current
     val ble=remember{NiimbotBle(context.applicationContext)}
@@ -141,10 +142,15 @@ fun Lab09PrintPanel(values:LabelValues,layout:LabelDesign,
                 style=MaterialTheme.typography.bodyMedium)
             Slider(value=density,onValueChange={density=it},
                 valueRange=1f..5f,steps=3,enabled=!busy)
-            Text("Экземпляров: "+copies.roundToInt(),
-                style=MaterialTheme.typography.bodyMedium)
-            Slider(value=copies,onValueChange={copies=it},
-                valueRange=1f..10f,steps=8,enabled=!busy)
+            if(batchJobs.isEmpty()){
+                Text("Экземпляров: "+copies.roundToInt(),
+                    style=MaterialTheme.typography.bodyMedium)
+                Slider(value=copies,onValueChange={copies=it},
+                    valueRange=1f..10f,steps=8,enabled=!busy)
+            }else{
+                Text("Очередь: "+batchJobs.size+" разных контейнеров. У каждого собственный QR.",
+                    style=MaterialTheme.typography.bodyMedium)
+            }
             Row(verticalAlignment=Alignment.CenterVertically){
                 Checkbox(checked=flip,onCheckedChange={flip=it},enabled=!busy)
                 Text("Повернуть направление подачи на 180°",
@@ -154,16 +160,28 @@ fun Lab09PrintPanel(values:LabelValues,layout:LabelDesign,
                 busy=true;sent=0;confirmed=0
                 scope.launch{
                     try{
-                        val design=layout.copy(dpi=printer.dpi)
-                        val image=withContext(Dispatchers.Default){
-                            LabLabelDesigner.bitmap(values,design).also{
-                                NiimPreflight.verifyQr(it,design,values.code)
+                        val items=if(batchJobs.isEmpty())
+                            (1..copies.roundToInt()).map{n->
+                                (values.code+" · копия "+n) to
+                                    (suspend {
+                                        withContext(Dispatchers.Default){
+                                            val d=layout.copy(dpi=printer.dpi)
+                                            LabLabelDesigner.bitmap(values,d).also{
+                                                NiimPreflight.verifyQr(it,d,values.code)
+                                            }
+                                        }
+                                    })
+                            }else batchJobs.map{(itemValues,itemDesign)->
+                                itemValues.code to (suspend {
+                                    withContext(Dispatchers.Default){
+                                        val d=itemDesign.copy(dpi=printer.dpi)
+                                        LabLabelDesigner.bitmap(itemValues,d).also{
+                                            NiimPreflight.verifyQr(it,d,itemValues.code)
+                                        }
+                                    }
+                                })
                             }
-                        }
-                        val job=(1..copies.roundToInt()).map{n->
-                            values.code+" · экземпляр "+n to image
-                        }
-                        NiimbotPrintSession(ble,printer).print(job,
+                        NiimbotPrintSession(ble,printer).printLazy(items,
                             density=density.roundToInt(),flipFeed=flip){progress->
                             sent=progress.sent
                             confirmed=progress.confirmed
@@ -177,7 +195,8 @@ fun Lab09PrintPanel(values:LabelValues,layout:LabelDesign,
                 }
             },enabled=!busy,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){
                 Icon(Icons.Outlined.Print,null);Spacer(Modifier.width(8.dp))
-                Text("Печать напрямую · "+copies.roundToInt()+" шт.")
+                Text(if(batchJobs.isEmpty())"Печать напрямую · "+copies.roundToInt()+" шт."
+                    else "Печать "+batchJobs.size+" контейнеров")
             }
             Text("Отправлено: "+sent+" · подтверждено принтером: "+confirmed,
                 style=MaterialTheme.typography.bodySmall)
