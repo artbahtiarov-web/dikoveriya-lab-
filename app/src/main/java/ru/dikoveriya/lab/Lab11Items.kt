@@ -181,6 +181,10 @@ internal fun LabDatabase.item11(id:Long):Lab11PlantItem? =
     readableDatabase.rawQuery(ITEM_SELECT11+" WHERE i.id=?",
         arrayOf(id.toString())).use{c->if(c.moveToFirst())c.plantItem11() else null}
 
+internal fun LabDatabase.itemIdByCode11(code:String):Long? =
+    readableDatabase.rawQuery("SELECT id FROM plant_items WHERE code=? LIMIT 1",
+        arrayOf(code.trim())).use{c->if(c.moveToFirst())c.getLong(0) else null}
+
 internal fun LabDatabase.itemEvents11(id:Long):List<Lab11ItemEvent> =
     readableDatabase.rawQuery("""SELECT id,kind,event_at,note,details_json,cancelled
         FROM item_events WHERE item_id=? ORDER BY event_at DESC,id DESC LIMIT 1000""",
