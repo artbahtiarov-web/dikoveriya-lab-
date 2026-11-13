@@ -411,6 +411,7 @@ fun DikoveriyaApp() {
                                 openRoute(Lab07Navigation.stageWork(key.substringAfter("stage:")))
                         }
                     },
+                    onOpenItem={id->tab="Коллекция";openRoute(Lab07Navigation.item(id))},
                     onBreakdown={section,id->
                         when(section){
                             "Потери"->openRoute(Lab07Navigation.losses(id))
