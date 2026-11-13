@@ -168,3 +168,56 @@ internal fun LabDatabase.findLocationForCode11(code:String):Long?{
         }
     return null
 }
+
+
+/**
+ * Atomic mixed placement. Production-group QR expands into its registered
+ * member containers; repeated scanned codes never cause duplicate events.
+ */
+internal fun LabDatabase.moveSelected11(
+    codes:List<String>,targetId:Long,reason:String
+):Pair<Int,Int>{
+    require(codes.isNotEmpty() && codes.size<=200){
+        "Можно переместить от 1 до 200 объектов одной операцией"
+    }
+    require(reason.trim().length in 2..500){"Укажи причину размещения"}
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        db.rawQuery("SELECT 1 FROM storage_locations WHERE id=?",
+            arrayOf(targetId.toString())).use{
+            require(it.moveToFirst()){"Место размещения не найдено"}
+        }
+        val plants=linkedSetOf<Long>()
+        val cultures=linkedSetOf<Long>()
+        codes.forEach{raw->
+            val code=raw.trim().uppercase()
+            when{
+                code.startsWith("LAB-")->{
+                    cultures+=findCulture072(code)?:error("Не найден контейнер "+code)
+                }
+                code.startsWith("PLT-")->{
+                    plants+=itemIdByCode11(code)?:error("Не найдено растение "+code)
+                }
+                code.startsWith("ГР-")->{
+                    val group=groupIdByCode11(code)?:error("Не найдена партия "+code)
+                    val members=db.rawQuery(
+                        "SELECT culture_id FROM culture_groups WHERE group_id=?",
+                        arrayOf(group.toString())).use{c->buildList{
+                        while(c.moveToNext())add(c.getLong(0))
+                    }}
+                    require(members.isNotEmpty()){"В партии нет контейнеров"}
+                    cultures.addAll(members)
+                }
+                else->error("Неподдерживаемый номер "+code)
+            }
+        }
+        require(cultures.size+plants.size<=200){"За один раз можно переместить не более 200 объектов"}
+        if(cultures.isNotEmpty())
+            moveContainers072(cultures.toList(),targetId,reason.trim())
+        val at=System.currentTimeMillis()
+        plants.forEach{moveItem11(it,targetId,at,reason.trim())}
+        db.setTransactionSuccessful()
+        return cultures.size to plants.size
+    }finally{db.endTransaction()}
+}
