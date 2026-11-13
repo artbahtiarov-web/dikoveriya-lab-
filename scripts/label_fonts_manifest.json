@@ -92,6 +92,87 @@
       "git_blob_sha": "2ec1f4b0676c83ef33049db87b311171699e9192",
       "size": 276932,
       "license": "ofl/nunito/OFL.txt"
+    },
+    {
+      "id": "oswald",
+      "name": "oswald",
+      "asset": "oswald.ttf",
+      "path": "ofl/oswald/Oswald[wght].ttf",
+      "git_blob_sha": "d1a3b9cb1325bf20b3a06ef9849d21c411212a3b",
+      "size": 172088,
+      "license": "ofl/oswald/OFL.txt"
+    },
+    {
+      "id": "ptsans",
+      "name": "ptsans",
+      "asset": "ptsans.ttf",
+      "path": "ofl/ptsans/PT_Sans-Web-Regular.ttf",
+      "git_blob_sha": "83a21b724c47127a95e725b5c6bdfa30fcc1a7be",
+      "size": 442960,
+      "license": "ofl/ptsans/OFL.txt"
+    },
+    {
+      "id": "ptserif",
+      "name": "ptserif",
+      "asset": "ptserif.ttf",
+      "path": "ofl/ptserif/PT_Serif-Web-Regular.ttf",
+      "git_blob_sha": "5310691a999658437d6db608b9447d606598753e",
+      "size": 359048,
+      "license": "ofl/ptserif/OFL.txt"
+    },
+    {
+      "id": "ibmplexsans",
+      "name": "ibmplexsans",
+      "asset": "ibmplexsans.ttf",
+      "path": "ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf",
+      "git_blob_sha": "30f837e8b02e8ecddce6cbebc425b1f422392515",
+      "size": 537244,
+      "license": "ofl/ibmplexsans/OFL.txt"
+    },
+    {
+      "id": "ibmplexserif",
+      "name": "ibmplexserif",
+      "asset": "ibmplexserif.ttf",
+      "path": "ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
+      "git_blob_sha": "069d26a6c7951cd60811dcd100bdf2e6f39cfcc4",
+      "size": 163068,
+      "license": "ofl/ibmplexserif/OFL.txt"
+    },
+    {
+      "id": "ibmplexmono",
+      "name": "ibmplexmono",
+      "asset": "ibmplexmono.ttf",
+      "path": "ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+      "git_blob_sha": "0c9770d5183ba60dc4350d3e011b782a320761ae",
+      "size": 135580,
+      "license": "ofl/ibmplexmono/OFL.txt"
+    },
+    {
+      "id": "firacode",
+      "name": "firacode",
+      "asset": "firacode.ttf",
+      "path": "ofl/firacode/FiraCode[wght].ttf",
+      "git_blob_sha": "83f2b3875f734f135154f18bb4f13d4075186927",
+      "size": 260364,
+      "license": "ofl/firacode/OFL.txt"
+    },
+    {
+      "id": "jost",
+      "name": "jost",
+      "asset": "jost.ttf",
+      "path": "ofl/jost/Jost[wght].ttf",
+      "git_blob_sha": "cdf8630280e37a7e8040dd5a32e3c13a9794e6d4",
+      "size": 134996,
+      "license": "ofl/jost/OFL.txt"
+    },
+    {
+      "id": "merriweather",
+      "name": "merriweather",
+      "asset": "merriweather.ttf",
+      "path": "ofl/merriweather/Merriweather[opsz,wdth,wght].ttf",
+      "git_blob_sha": "cb775b80fa0a6f3b2aea114869a7171695b50a62",
+      "size": 4628080,
+      "license": "ofl/merriweather/OFL.txt"
     }
   ]
 }
