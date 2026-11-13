@@ -75,6 +75,7 @@ fun Lab072RegistryScreen(
     var shownId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var resolveId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var resolution by rememberSaveable(mode){mutableStateOf("")}
+    var restoreStatus by rememberSaveable(mode){mutableStateOf(false)}
     val groups=remember(revision){db.groups072()}
     val locations=remember(revision){db.locations072()}
     val views=remember(revision){db.savedViews072(mode)}
@@ -303,11 +304,17 @@ fun Lab072RegistryScreen(
             title={Text("Результат проверки")},
             text={Column{
                 Field("Что установлено и какие действия выполнены",resolution,{resolution=it},single=false)
-                Text("Закрытие причины НЕ снимает автоматически карантин или статус контроля.",
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Checkbox(checked=restoreStatus,onCheckedChange={restoreStatus=it})
+                    Text("Вернуть к обычной работе, если других проблем нет",
+                        style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Связанная задача автоматически завершится. Карантин снимается только отдельным решением. Старые задачи без связи не затрагиваются.",
                     style=MaterialTheme.typography.bodySmall)
             }},
             confirmButton={Button(enabled=resolution.isNotBlank(),onClick={
-                changed{db.resolveCase072(id,resolution);resolveId=null;resolution=""}
+                changed{db.resolveCase072(id,resolution,restoreStatus);resolveId=null;
+                    resolution="";restoreStatus=false}
             }){Text("Сохранить результат")}},
             dismissButton={TextButton(onClick={resolveId=null}){Text("Отмена")}})
     }
