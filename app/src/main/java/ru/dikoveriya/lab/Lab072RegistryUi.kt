@@ -41,6 +41,7 @@ fun Lab072RegistryScreen(
     onBack:()->Unit,onNavigate:(String)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit = {},
+    onPrintLabels:(List<Long>)->Unit = {},
     onNewContainer:(()->Unit)?=null,
     modifier:Modifier=Modifier
 ) {
