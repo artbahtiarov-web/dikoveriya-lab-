@@ -49,6 +49,64 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      LAB_PR_DEBUG_BUILD: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable Android emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify cold app launch on a real Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -eu
+            mkdir -p screenshots
+            adb shell wm size 393x852
+            adb shell wm density 160
+            gradle --no-daemon :app:assembleDebug --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n ru.dikoveriya.lab/.MainActivity
+            sleep 5
+            adb shell dumpsys activity activities > screenshots/launch-activity.txt
+            adb logcat -d -v time -s AndroidRuntime:E ActivityTaskManager:W > screenshots/launch-logcat.txt || true
+            adb shell screencap -p /sdcard/launch.png
+            adb pull /sdcard/launch.png screenshots/launch.png
+            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/launch-activity.txt; then
+              echo '::error::The real application did not remain in the foreground after cold launch.'
+              grep -E 'FATAL EXCEPTION|Process: ru.dikoveriya.lab|Caused by|Exception' screenshots/launch-logcat.txt || true
+              grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' screenshots/launch-activity.txt || true
+              exit 1
+            fi
+      - name: Archive launch diagnostics even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-v11-cold-start-evidence
+          path: screenshots/**
+          if-no-files-found: warn
+          retention-days: 14
   ui:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
@@ -90,6 +148,12 @@ jobs:
             sleep 3
             adb shell screencap -p /sdcard/v1-360.png
             adb pull /sdcard/v1-360.png screenshots/v1-360.png
+            adb shell dumpsys activity activities > screenshots/foreground-360.txt
+            adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-360.txt || true
+            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-360.txt; then
+              echo '::error::App not foreground at 360dp'; cat screenshots/logcat-360.txt
+              exit 1
+            fi
             adb shell am force-stop ru.dikoveriya.lab
             adb shell wm size 393x852
             adb shell wm density 160
@@ -99,6 +163,12 @@ jobs:
             sleep 3
             adb shell screencap -p /sdcard/v1-393.png
             adb pull /sdcard/v1-393.png screenshots/v1-393.png
+            adb shell dumpsys activity activities > screenshots/foreground-393.txt
+            adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-393.txt || true
+            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-393.txt; then
+              echo '::error::App not foreground at 393dp'; cat screenshots/logcat-393.txt
+              exit 1
+            fi
             adb shell am force-stop ru.dikoveriya.lab
             adb shell wm size 430x900
             adb shell wm density 160
@@ -108,6 +178,12 @@ jobs:
             sleep 3
             adb shell screencap -p /sdcard/v1-430.png
             adb pull /sdcard/v1-430.png screenshots/v1-430.png
+            adb shell dumpsys activity activities > screenshots/foreground-430.txt
+            adb logcat -d -v time -s AndroidRuntime:E > screenshots/logcat-430.txt || true
+            if ! grep -Eq '(mResumedActivity|topResumedActivity|ResumedActivity).*ru[.]dikoveriya[.]lab' screenshots/foreground-430.txt; then
+              echo '::error::App not foreground at 430dp'; cat screenshots/logcat-430.txt
+              exit 1
+            fi
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
