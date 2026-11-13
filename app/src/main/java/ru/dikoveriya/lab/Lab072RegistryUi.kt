@@ -132,66 +132,16 @@ fun Lab072RegistryScreen(
                 {query=it;reset()})
         }
         item(key="sort") {
-            Lab072Chips(listOf("Всё время","7 дней","30 дней"),period,
-                {period=it;reset()})
-            Spacer(Modifier.height(6.dp))
-            PickOne("Порядок",listOf("Новые","Старые","Название","Место",
-                "Последний осмотр","По побегам","По растениям"),order,
-                {order=it;reset()})
+            Text("Период: "+period+" · Порядок: "+order,
+                style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item(key="filters") {
-            OutlinedButton(onClick={advanced=!advanced},
+            OutlinedButton(onClick={advanced=true},
                 modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
                 Icon(Icons.Outlined.Tune,null)
                 Spacer(Modifier.width(8.dp))
-                Text(if(advanced)"Скрыть фильтры" else "Фильтры: сорт, среда, этап, группа, место")
-                Spacer(Modifier.weight(1f))
-                Icon(if(advanced)Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,null)
-            }
-        }
-        if(advanced)item(key="advanced"){
-            Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
-                PickOne("Сорт",listOf("Все")+plants.map{it.name},
-                    plants.firstOrNull{it.id==plantId}?.name?:"Все",{value->
-                        plantId=plants.firstOrNull{it.name==value}?.id;reset()
-                    })
-                PickOne("Питательная среда",listOf("Все")+recipes.map{it.name+" · v"+it.version},
-                    recipes.firstOrNull{it.id==recipeId}?.let{it.name+" · v"+it.version}?:"Все",
-                    {value->recipeId=recipes.firstOrNull{it.name+" · v"+it.version==value}?.id;reset()})
-                PickOne("Этап",listOf("Все")+LabTerms.stages,
-                    stage.ifBlank{"Все"},{stage=if(it=="Все")"" else it;reset()})
-                PickOne("Состояние",listOf("Все")+LabTerms.statuses,
-                    status.ifBlank{"Все"},{status=if(it=="Все")"" else it;reset()})
-                PickOne("Производственная группа",listOf("Все")+groups.map{it.code+" · "+it.title},
-                    groups.firstOrNull{it.id==groupId}?.let{it.code+" · "+it.title}?:"Все",
-                    {value->groupId=groups.firstOrNull{it.code+" · "+it.title==value}?.id;reset()})
-                PickOne("Место хранения",listOf("Все")+locations.map{it.path},
-                    locations.firstOrNull{it.id==locationId}?.path?:"Все",
-                    {value->locationId=locations.firstOrNull{it.path==value}?.id;reset()})
-                Text("По побегам и по растениям — только последние фактические измерения. Пустые поля не считаются нулём.",
-                    style=MaterialTheme.typography.bodySmall,
-                    color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) {
-                    OutlinedButton(onClick={viewDialog=true},modifier=Modifier.weight(1f)){
-                        Text("Сохранить фильтр")
-                    }
-                    OutlinedButton(onClick={onNavigate(Lab07Navigation.GROUPS)},modifier=Modifier.weight(1f)){
-                        Text("Группы")
-                    }
-                }
-                if(views.isNotEmpty()){
-                    PickOne("Мои фильтры",listOf("Выбрать")+views.map{it.name},"Выбрать",
-                        {label->
-                            views.firstOrNull{it.name==label}?.let{view->
-                                val saved=filter.withSaved(view.config)
-                                query=saved.text;plantId=saved.plantId;recipeId=saved.recipeId
-                                groupId=saved.groupId;locationId=saved.locationId
-                                stage=saved.stage;status=saved.status;order=saved.order
-                                period=org.json.JSONObject(view.config).optString("period","Всё время")
-                reset()
-                            }
-                        })
-                }
+                Text("Фильтры и сортировка")
             }
         }
         item(key="count"){
@@ -266,6 +216,34 @@ fun Lab072RegistryScreen(
                 style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+    if(advanced){
+        Lab10RegistryFilterSheet(
+            initial=Lab10RegistryFilterValues(plantId,recipeId,groupId,locationId,stage,status,period,order),
+            plants=plants,recipes=recipes,
+            groups=groups.map{it.id to (it.code+" · "+it.title)},
+            locations=locations.map{it.id to it.path},
+            savedNames=views.map{it.name},
+            onSelectSaved={label->
+                views.firstOrNull{it.name==label}?.let{view->
+                    val saved=filter.withSaved(view.config)
+                    query=saved.text;plantId=saved.plantId;recipeId=saved.recipeId
+                    groupId=saved.groupId;locationId=saved.locationId
+                    stage=saved.stage;status=saved.status;order=saved.order
+                    period=org.json.JSONObject(view.config).optString("period","Всё время")
+                    reset()
+                }
+                advanced=false
+            },
+            onSavePreset={advanced=false;viewDialog=true},
+            onApply={v->
+                plantId=v.plantId;recipeId=v.recipeId;groupId=v.groupId
+                locationId=v.locationId;stage=v.stage;status=v.status
+                period=v.period;order=v.order
+                advanced=false;reset()
+            },
+            onDismiss={advanced=false}
+        )
     }
     if(viewDialog){
         AlertDialog(onDismissRequest={viewDialog=false},title={Text("Сохранить набор фильтров")},
