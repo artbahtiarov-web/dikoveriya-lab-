@@ -52,6 +52,7 @@ private fun LabDatabase.analytics10(since:Long?):Lab10AnalyticsData{
 /** All cards use real SQL counts; no fabricated success/efficiency percentages. */
 @Composable
 internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
+    onMetric:(String)->Unit={},onBreakdown:(String,Long)->Unit={_,_->},
     modifier:Modifier=Modifier
 ){
     var period by rememberSaveable{mutableStateOf("30 дней")}
@@ -83,18 +84,18 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Lab10StatCard("Всего контейнеров",data.total.toString(),
-                        Icons.Outlined.Inventory2,Modifier.weight(1f))
+                        Icons.Outlined.Inventory2,Modifier.weight(1f)){onMetric("all")}
                     Lab10StatCard("Активных",data.active.toString(),
-                        Icons.Outlined.Spa,Modifier.weight(1f))
+                        Icons.Outlined.Spa,Modifier.weight(1f)){onMetric("active")}
                 }
             }
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Lab10StatCard("На контроле",data.control.toString(),
-                        Icons.Outlined.ReportProblem,Modifier.weight(1f))
+                        Icons.Outlined.ReportProblem,Modifier.weight(1f)){onMetric("attention")}
                     Lab10StatCard("Выручка по записям",
                         String.format(Locale("ru"),"%.0f ₽",data.revenue),
-                        Icons.Outlined.Payments,Modifier.weight(1f))
+                        Icons.Outlined.Payments,Modifier.weight(1f)){onMetric("sales")}
                 }
             }
             item{
@@ -108,7 +109,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                 }
             }
             item{
-                Card(colors=CardDefaults.cardColors(
+                Card(onClick={onMetric("operations")},colors=CardDefaults.cardColors(
                     containerColor=MaterialTheme.colorScheme.surface),
                     shape=RoundedCornerShape(18.dp)){
                     Column(Modifier.padding(17.dp)){
@@ -126,7 +127,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                 style=MaterialTheme.typography.titleLarge)}
             if(data.stages.isEmpty())item{Text("Нет активных контейнеров")}
             else items(data.stages,key={it.first}){(stage,count)->
-                Card(colors=CardDefaults.cardColors(
+                Card(onClick={onMetric("stage:"+stage)},colors=CardDefaults.cardColors(
                     containerColor=MaterialTheme.colorScheme.surface),
                     shape=RoundedCornerShape(15.dp)){
                     Column(Modifier.fillMaxWidth().padding(13.dp),
@@ -152,14 +153,15 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision)}
+        item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision,onBreakdown)}
     }
 }
 
 @Composable
 private fun Lab10StatCard(label:String,value:String,
-    icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier){
-    Card(modifier=modifier,colors=heightInColor(),shape=RoundedCornerShape(18.dp),
+    icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier,
+    onClick:()->Unit){
+    Card(onClick=onClick,modifier=modifier,colors=heightInColor(),shape=RoundedCornerShape(18.dp),
         border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.28f))){
         Column(Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement=Arrangement.spacedBy(7.dp)){
