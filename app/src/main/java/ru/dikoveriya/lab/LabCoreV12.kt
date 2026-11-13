@@ -47,6 +47,7 @@ internal object LabCoreV12 {
             code TEXT NOT NULL UNIQUE,
             plant_id INTEGER NOT NULL REFERENCES plants(id),
             kind TEXT NOT NULL CHECK(kind IN ('Горшечное','Черенок','Маточник','Другое')),
+            custom_kind TEXT NOT NULL DEFAULT '',
             stage TEXT NOT NULL DEFAULT 'В работе',
             status TEXT NOT NULL DEFAULT 'Активен',
             acquired_at INTEGER NOT NULL,
