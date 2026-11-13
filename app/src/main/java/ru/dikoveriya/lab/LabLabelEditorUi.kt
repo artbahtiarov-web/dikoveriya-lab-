@@ -2,6 +2,7 @@ package ru.dikoveriya.lab
 
 import android.content.ClipData
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -65,6 +66,8 @@ fun Lab080LabelEditor(
     val initial=remember(culture.id){runCatching{db.labelForCulture080(culture.id)}
         .getOrNull()?:LabelDesign.initial()}
     var serialized by rememberSaveable(culture.id){mutableStateOf(initial.encode())}
+    var lastSaved by remember(culture.id){mutableStateOf(initial.encode())}
+    var confirmLeave by rememberSaveable(culture.id){mutableStateOf(false)}
     val layout=remember(serialized){LabelDesign.decode(serialized)}
     val latestLayout by rememberUpdatedState(layout)
     var selected by rememberSaveable(culture.id){mutableStateOf("plant")}
@@ -102,6 +105,7 @@ fun Lab080LabelEditor(
     fun save(){
         try{
             db.saveLabel080(culture.id,layout)
+            lastSaved=serialized
             savedNotice="Макет контейнера сохранён"
             onChanged()
         }catch(e:Exception){onError(e.message?:"Не удалось сохранить макет")}
@@ -122,11 +126,17 @@ fun Lab080LabelEditor(
     }
 
     val setSelected:(String)->Unit={selected=it}
+    fun requestBack(){
+        if(serialized!=lastSaved)confirmLeave=true else onBack()
+    }
+    BackHandler(enabled=serialized!=lastSaved){
+        confirmLeave=true
+    }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())
         .padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         Lab07ScreenHeader("${culture.code} / МАРКИРОВКА",
             "Редактор этикетки",
-            "Холст 40 × 12 мм. Перетащи элемент пальцем, настрой размеры и сохрани шаблон.",onBack)
+            "Холст 40 × 12 мм. Перетащи элемент пальцем, настрой размеры и сохрани шаблон.",::requestBack)
         Row(verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(8.dp)){
             Text("Увеличение",style=MaterialTheme.typography.bodySmall)
@@ -449,6 +459,16 @@ fun Lab080LabelEditor(
             style=MaterialTheme.typography.bodySmall,
             color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    if(confirmLeave)AlertDialog(
+        onDismissRequest={confirmLeave=false},
+        title={Text("Закрыть без сохранения?")},
+        text={Text("Изменения макета контейнера ещё не сохранены. Сначала сохрани их, если они нужны для следующих этикеток.")},
+        confirmButton={Button(onClick={confirmLeave=false;onBack()}){
+            Text("Выйти без сохранения")
+        }},
+        dismissButton={TextButton(onClick={confirmLeave=false}){
+            Text("Продолжить редактирование")
+        }})
     confirmDelete?.let{id->
         AlertDialog(onDismissRequest={confirmDelete=null},
             title={Text("Удалить шаблон?")},
