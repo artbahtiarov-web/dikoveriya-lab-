@@ -24,7 +24,7 @@ fun Lab072TasksScreen(
     onNavigate:(String)->Unit,onChanged:()->Unit,
     onError:(String)->Unit,modifier:Modifier=Modifier
 ){
-    var period by rememberSaveable{mutableStateOf("Просрочено")}
+    var period by rememberSaveable{mutableStateOf("Открытые")}
     var priority by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
     var plantId by rememberSaveable{mutableStateOf<Long?>(null)}
