@@ -235,6 +235,7 @@ fun DikoveriyaApp() {
                         onNavigate={openRoute(it)},
                         onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
+                        onEditPlant={dialog="plantInfo:$it"},
                         onEdit={cultureId=it},
                         onLabel={openRoute(Lab07Navigation.label(it))},
                         onPhotos={photoCultureId=it},
@@ -400,14 +401,24 @@ fun DikoveriyaApp() {
             }
             if(dialog.startsWith("ingredientInfo:")){
                 val ing=ingredients.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
-                if(ing!=null) DialogForm(ing.name,close={dialog=""}){
-                    Text("Категория: ${ing.category} · ${ing.unit}")
-                    Text(ing.notes.ifBlank{"Дополнительные сведения не указаны"})
-                }
+                if(ing!=null) Lab080IngredientDialog(ing,onClose={dialog=""},
+                    onSave={name,category,unit,notes,reason->
+                        if(act{db.changeIngredient080(ing.id,name,category,unit,notes,reason)})
+                            dialog=""
+                    },
+                    onArchive={reason->
+                        if(act{db.archiveIngredient080(ing.id,reason)})dialog=""
+                    })
             }
             if(dialog.startsWith("plantInfo:")){
                 val p=plants.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
-                if(p!=null) DialogForm(p.name,close={dialog=""}){Text(p.description.ifEmpty{"Дополнительных сведений пока нет"})}
+                if(p!=null)Lab080PlantDialog(p,onClose={dialog=""},
+                    onSave={name,notes,reason->
+                        if(act{db.changePlant080(p.id,name,notes,reason)})dialog=""
+                    },
+                    onArchive={reason->
+                        if(act{db.archiveUnusedPlant080(p.id,reason)})dialog=""
+                    })
             }
             if(dialog.startsWith("motherInfo:")){
                 val m=mothers.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
