@@ -20,7 +20,8 @@ internal data class Lab11PlantItem(
     val locationId:Long?,val location:String,
     val substrate:String,val rootingMethod:String,val stimulant:String,
     val potMl:Int?,val notes:String,val favorite:Boolean,val cover:String?,
-    val customKind:String=""
+    val customKind:String="",val coverZoom:Float=1f,
+    val coverPanX:Float=0f,val coverPanY:Float=0f
 )
 
 internal data class Lab11ItemEvent(
@@ -142,14 +143,16 @@ private const val ITEM_SELECT11="""SELECT i.id,i.code,i.plant_id,p.name,i.kind,i
     i.status,i.acquired_at,i.supplier,i.purchase_cost_minor,
     i.parent_item_id,i.parent_culture_id,i.location_id,
     i.location_text,i.substrate,i.rooting_method,i.stimulant,i.pot_volume_ml,
-    i.notes,i.favorite,i.cover_filename FROM plant_items i JOIN plants p ON p.id=i.plant_id"""
+    i.notes,i.favorite,i.cover_filename,i.custom_kind,i.cover_zoom,i.cover_pan_x,i.cover_pan_y
+    FROM plant_items i JOIN plants p ON p.id=i.plant_id"""
 private fun Cursor.plantItem11():Lab11PlantItem =
     Lab11PlantItem(getLong(0),getString(1),getLong(2),getString(3),
         getString(4),getString(5),getString(6),getLong(7),getString(8),getLong(9),
         if(isNull(10))null else getLong(10),if(isNull(11))null else getLong(11),
         if(isNull(12))null else getLong(12),getString(13),getString(14),
         getString(15),getString(16),if(isNull(17))null else getInt(17),
-        getString(18),getInt(19)==1,if(isNull(20))null else getString(20))
+        getString(18),getInt(19)==1,if(isNull(20))null else getString(20),
+        getString(21),getFloat(22),getFloat(23),getFloat(24))
 
 private fun itemWhere11(query:String,kind:String,favorites:Boolean,
     stage:String,status:String):Pair<String,Array<String>>{
@@ -315,4 +318,28 @@ internal fun LabDatabase.itemFilterValues11(column:String):List<String>{
     return readableDatabase.rawQuery(
         "SELECT DISTINCT "+safe+" FROM plant_items WHERE "+safe+"<>'' ORDER BY "+safe,
         null).use{c->buildList{while(c.moveToNext())add(c.getString(0))}}
+}
+
+
+internal data class Lab11PhotoEntry(
+    val filename:String,val caption:String,val addedAt:Long
+)
+internal fun LabDatabase.itemPhotoEntries11(itemId:Long):List<Lab11PhotoEntry> =
+    readableDatabase.rawQuery("""SELECT filename,caption,added_at FROM item_photos
+        WHERE entity_kind='item' AND entity_id=?
+        ORDER BY added_at DESC,id DESC LIMIT 200""",
+        arrayOf(itemId.toString())).use{c->buildList{
+        while(c.moveToNext())add(Lab11PhotoEntry(c.getString(0),c.getString(1),c.getLong(2)))
+    }}
+
+internal fun LabDatabase.updateItemCover11(
+    itemId:Long,zoom:Float,panX:Float,panY:Float
+){
+    require(zoom.isFinite() && zoom in 1f..3f)
+    require(panX.isFinite() && panX in -1f..1f &&
+            panY.isFinite() && panY in -1f..1f)
+    require(writableDatabase.update("plant_items",ContentValues().apply{
+        put("cover_zoom",zoom);put("cover_pan_x",panX)
+        put("cover_pan_y",panY);put("updated_at",System.currentTimeMillis())
+    },"id=?",arrayOf(itemId.toString()))==1){"Растение не найдено"}
 }
