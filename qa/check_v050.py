@@ -23,8 +23,8 @@ gradle=read('app/build.gradle.kts')
 models=read('app/src/main/java/ru/dikoveriya/lab/LabModels.kt')
 
 checks={
- 'db v10': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10)' in db,
- 'v10 backup': 'put("schema",10)' in db and 'root.getInt("schema") in 4..10' in backup,
+ 'db v11': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11)' in db,
+ 'v11 backup': 'put("schema",11)' in db and 'root.getInt("schema") in 4..11' in backup,
  'migration': 'ALTER TABLE cultures ADD COLUMN medium_recipe_id' in db and 'ALTER TABLE recipe_parts ADD COLUMN sugar_g_l' in db,
  'snapshot/history': 'CREATE TABLE IF NOT EXISTS culture_recipe_history' in db,
  'measurements': 'CREATE TABLE IF NOT EXISTS culture_measurements' in db,
