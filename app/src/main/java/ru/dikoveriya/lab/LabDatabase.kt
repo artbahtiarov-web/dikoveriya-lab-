@@ -257,19 +257,35 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         writableDatabase.tx { createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,batchId,motherId,notes,quantityKind=quantityKind) }
     }
     /** Simple intake: one container, optional mother and recipe; all three measurements are independent. */
-    fun addCultureQuick(plantId:Long,motherId:Long?,recipeId:Long?,explants:Int?,shoots:Int?,plantsCount:Int?,location:String,notes:String):Long {
+    fun addCultureQuick(plantId:Long,motherId:Long?,recipeId:Long?,explants:Int?,shoots:Int?,plantsCount:Int?,location:String,notes:String,
+        passage:Int=0,stage:String=LabTerms.IN_VITRO,quantityKind:String?=null,locationId:Long?=null):Long {
+        require(passage in 0..999){"Пассаж должен быть от P0 до P999"}
+        require(stage in LabTerms.stages){"Выбери этап выращивания"}
+        if(quantityKind!=null)require(quantityKind in LabTerms.quantityKinds.drop(1)){
+            "Выбери единицу материала: экспланты, побеги или растения"
+        }
         val counts=listOf(explants,shoots,plantsCount)
         require(counts.all{it==null || it in 0..1000000}) { "Проверь числа объектов" }
         require(counts.any{it!=null && it>0}) { "Укажи хотя бы один положительный показатель" }
         // Several measurements may coexist but cannot imply a common transferable unit.
         // The provisional quantity is locked until the operator confirms its meaning.
         val positives=listOfNotNull(explants?.takeIf{it>0},shoots?.takeIf{it>0},plantsCount?.takeIf{it>0})
-        val quantity=positives.maxOrNull()!!
-        val kind=if(positives.size==1) when {
+        val inferredKind=if(positives.size==1) when {
             (plantsCount?:0)>0->"Растения"
             (shoots?:0)>0->"Побеги"
             else->"Экспланты"
         } else "Не уточнено"
+        val kind=quantityKind?:inferredKind
+        val operational=when(kind){
+            "Экспланты"->explants
+            "Побеги"->shoots
+            "Растения"->plantsCount
+            else->null
+        }
+        require(kind=="Не уточнено" || operational!=null && operational>0) {
+            "Для выбранной единицы учёта укажи положительное количество"
+        }
+        val quantity=operational?:positives.maxOrNull()!!
         var resultId=0L
         writableDatabase.tx {
             if(recipeId!=null) {
@@ -277,7 +293,20 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 require(r.status=="Утверждена") { "Выбирай только готовые рецептуры" }
                 require(r.plantId==null || r.plantId==plantId) { "Эта рецептура предназначена для другого растения" }
             }
-            val id=createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,null,motherId,notes,quantityKind=kind)
+            val resolvedLocation=locationId?.let{key->
+                rawQuery("SELECT full_path FROM storage_locations WHERE id=?",
+                    arrayOf(key.toString())).use{c->
+                    require(c.moveToFirst()){"Указанное место больше не существует"}
+                    c.getString(0)
+                }
+            } ?: location
+            val id=createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,passage,stage,
+                resolvedLocation,null,motherId,notes,quantityKind=kind)
+            if(locationId!=null){
+                insertOrThrow("culture_storage",null,cv(
+                    "culture_id" to id,"location_id" to locationId,
+                    "assigned_at" to System.currentTimeMillis()))
+            }
             update("cultures",cv("medium_recipe_id" to recipeId),"id=?",arrayOf(id.toString()))
             if(recipeId!=null) {
                 insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to recipeId,"applied_at" to System.currentTimeMillis(),"note" to "Выбрана при создании"))
