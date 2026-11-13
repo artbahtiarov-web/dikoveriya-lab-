@@ -8,10 +8,17 @@ import android.database.sqlite.SQLiteDatabase
  * Both the label layouts and safe archival actions participate in JSON/ZIP backup.
  */
 internal object LabCoreV10 {
-    val backupTables = listOf("label_templates","label_overrides",
+    val backupTables = listOf("case_tasks","label_templates","label_overrides",
         "entity_archives","entity_changes")
 
     fun create(db:SQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS case_tasks(
+            case_id INTEGER NOT NULL REFERENCES control_cases(id),
+            task_id INTEGER NOT NULL REFERENCES tasks(id),
+            PRIMARY KEY(case_id,task_id),
+            UNIQUE(task_id)
+        )""".trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_case_tasks_task ON case_tasks(task_id)")
         db.execSQL("""CREATE TABLE IF NOT EXISTS label_templates(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL COLLATE NOCASE UNIQUE,
