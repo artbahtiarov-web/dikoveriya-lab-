@@ -398,7 +398,21 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
             require(quantity<=c.quantity) { "Недостаточно растений" }
             val rest=c.quantity-quantity
-            insertOrThrow("sales",null,cv("culture_id" to cultureId,"quantity" to quantity,"price" to total,"sold_at" to System.currentTimeMillis(),"note" to notes))
+            val soldAt=System.currentTimeMillis()
+            val saleId=insertOrThrow("sales",null,cv("culture_id" to cultureId,
+                "quantity" to quantity,"price" to total,"sold_at" to soldAt,"note" to notes))
+            val amountMinor=decimalMinor11(total)
+            val directCosts=rawQuery("""SELECT COALESCE(SUM(amount_minor),0)
+                FROM direct_costs WHERE entity_kind='culture' AND entity_id=?""",
+                arrayOf(cultureId.toString())).use{it.moveToFirst();it.getLong(0)}
+            val costSnapshot=if(directCosts>0)
+                (directCosts.toDouble()*quantity/c.quantity).toLong() else null
+            insertOrThrow("sale_details",null,cv("sale_id" to saleId,
+                "cogs_minor" to costSnapshot))
+            insertOrThrow("cash_ledger",null,cv("direction" to "Доход",
+                "category" to "Продажа","amount_minor" to amountMinor,
+                "occurred_at" to soldAt,"source_type" to "legacy_sale",
+                "source_id" to saleId,"note" to notes))
             update("cultures",cv("quantity" to rest,"status" to if(rest==0)LabTerms.SOLD else c.status),"id=?",arrayOf(cultureId.toString()))
             event(this,cultureId,"Продажа","Реализовано: $quantity; сумма: $total руб.; $notes",c.quantity,rest,c.batchId)
         }
