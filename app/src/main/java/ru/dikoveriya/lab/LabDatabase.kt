@@ -1006,6 +1006,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 event(this,ch.cultureId,"Отмена операции","Отменена ${original.first}: $reason. Старые записи сохранены",c.quantity,restoreQty,c.batchId,group)
             }
             update("culture_links",cv("cancelled" to 1),"event_group=?",arrayOf(originalId))
+            update("culture_cost_transfers",cv("reversed" to 1),
+                "operation_id=?",arrayOf(originalId))
             if(original.first=="Авария") update("incidents",cv("state" to "Аннулирован"),"operation_id=?",arrayOf(originalId))
         }
     }
