@@ -75,7 +75,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
             Row(verticalAlignment=Alignment.CenterVertically){
                 Text("Обзор",style=MaterialTheme.typography.titleLarge,
                     modifier=Modifier.weight(1f))
-                Icon(Icons.Outlined.BarChart,null,tint=Lab07Palette.InkBrass)
+                Icon(Icons.Outlined.BarChart,null,tint=MaterialTheme.colorScheme.tertiary)
             }
         }
         if(state==null)item{CircularProgressIndicator()}
@@ -164,9 +164,9 @@ private fun Lab10StatCard(label:String,value:String,
             verticalArrangement=Arrangement.spacedBy(7.dp)){
             Icon(icon,contentDescription=null,tint=Lab07Palette.Forest,
                 modifier=Modifier.size(26.dp))
-            Text(value,style=MaterialTheme.typography.headlineSmall)
+            Text(value,style=MaterialTheme.typography.headlineSmall,color=Lab07Palette.Ink)
             Text(label,style=MaterialTheme.typography.bodySmall,
-                color=MaterialTheme.colorScheme.onSurfaceVariant)
+                color=Lab07Palette.Muted)
         }
     }
 }
