@@ -3,6 +3,7 @@ package ru.dikoveriya.lab
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -33,6 +34,13 @@ class Lab080EditorInstrumentedTest {
             rule.onNodeWithText("Редактор этикетки").assertExists()
             rule.onNodeWithText("Отменить").assertExists().assertIsNotEnabled()
             rule.onNodeWithText("Элементы этикетки").assertExists()
+            rule.onNodeWithContentDescription(
+                "Предпросмотр наклейки 40 на 12 миллиметров")
+                .performTouchInput{
+                    val start=Offset(size.width*.5f,size.height*.2f)
+                    val end=Offset(size.width*.35f,size.height*.2f)
+                    swipe(start=start,end=end,durationMillis=500)
+                }
             rule.onNodeWithContentDescription("Вправо").performScrollTo().performClick()
             rule.onNodeWithText("Отменить").assertIsEnabled().performClick()
             rule.onNodeWithText("Вернуть").assertIsEnabled().performClick()
@@ -42,6 +50,8 @@ class Lab080EditorInstrumentedTest {
                 assertEquals(203,stored.dpi)
                 assertEquals(1,stored.layers.count{it.kind=="qr"&&it.visible})
                 assertEquals(1,stored.layers.count{it.kind=="code"&&it.visible})
+                assertTrue("Finger drag must change plant X in actual millimetres",
+                    stored.layers.single{it.kind=="plant"}.x<11.7f)
             }
             rule.onNodeWithText("Сохранить PNG 40×12").assertExists()
             rule.onNodeWithText("Передать на печать").assertExists()
