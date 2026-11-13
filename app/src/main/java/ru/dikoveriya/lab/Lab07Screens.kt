@@ -26,7 +26,7 @@ fun Lab07RouteScreen(
     route:String, db:LabDatabase, revision:Int,
     plants:List<PlantRecord>,cultures:List<CultureRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,onEditPlant:(Long)->Unit,
+    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,onNewItem:()->Unit,onEditPlant:(Long)->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
     onTask:(Long)->Unit,
@@ -59,7 +59,19 @@ fun Lab07RouteScreen(
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
         "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
-        "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,onChanged,onError,modifier)
+        "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,
+            onChanged,onError,onOpenItems={onNavigate(Lab07Navigation.ITEMS)},modifier=modifier)
+        "items" -> Lab11ItemsScreen(db,revision,onBack,onNewItem,
+            onOpen={onNavigate(Lab07Navigation.item(it))},modifier=modifier)
+        "item" -> if(id!=null)Lab11ItemPassport(id,db,revision,onBack,
+            onOpenItem={onNavigate(Lab07Navigation.item(it))},
+            onOpenCulture={onNavigate(Lab07Navigation.container(it))},
+            onChanged=onChanged,onError=onError,modifier=modifier)
+            else Lab07MissingScreen(onBack,modifier)
+        "losses" -> if(id!=null)Lab11LossesScreen(id,db,revision,onBack,
+            onCulture={onNavigate(Lab07Navigation.container(it))},
+            onHistory={onNavigate(Lab07Navigation.history(it))},modifier=modifier)
+            else Lab07MissingScreen(onBack,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
             if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
