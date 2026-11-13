@@ -60,10 +60,41 @@ private val BotanicalLight = lightColorScheme(
     onErrorContainer=Color(0xFF672323)
 )
 
+/**
+ * Dark museum/laboratory theme is the approved 1.0 flagship look.
+ * Keep a light option for outdoor use, microscopy work and readability.
+ */
+private val BotanicalDark = darkColorScheme(
+    primary=Lab07Palette.Brass,
+    onPrimary=Lab07Palette.DeepForest,
+    primaryContainer=Lab07Palette.Fern,
+    onPrimaryContainer=Lab07Palette.Champagne,
+    secondary=Color(0xFF98BE8B),
+    onSecondary=Lab07Palette.DeepForest,
+    secondaryContainer=Lab07Palette.Forest,
+    onSecondaryContainer=Lab07Palette.Champagne,
+    tertiary=Lab07Palette.Brass,
+    onTertiary=Lab07Palette.DeepForest,
+    tertiaryContainer=Lab07Palette.Fern,
+    onTertiaryContainer=Lab07Palette.Champagne,
+    background=Lab07Palette.DeepForest,
+    onBackground=Lab07Palette.Champagne,
+    surface=Lab07Palette.Forest,
+    onSurface=Lab07Palette.Champagne,
+    surfaceVariant=Lab07Palette.Fern,
+    onSurfaceVariant=Color(0xFFE2E6D9),
+    outline=Lab07Palette.Brass.copy(alpha=0.76f),
+    outlineVariant=Lab07Palette.Brass.copy(alpha=0.40f),
+    error=Color(0xFFFFAEA9),
+    onError=Lab07Palette.DeepForest,
+    errorContainer=Color(0xFF79342B),
+    onErrorContainer=Color(0xFFFFDDD6)
+)
+
 @Composable
-fun DikoveriyaTheme(content: @Composable ()->Unit) {
+fun DikoveriyaTheme(dark:Boolean=false,content: @Composable ()->Unit) {
     MaterialTheme(
-        colorScheme=BotanicalLight,
+        colorScheme=if(dark)BotanicalDark else BotanicalLight,
         typography=Typography(
             headlineMedium=TextStyle(fontFamily=FontFamily.Serif,fontSize=29.sp,
                 fontWeight=FontWeight.Normal,lineHeight=36.sp),
