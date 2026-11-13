@@ -16,14 +16,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class Lab10ReportLine(
-    val name:String,val headline:String,val explanation:String
+    val name:String,val headline:String,val explanation:String,
+    val sourceId:Long=0L,val category:String=""
 )
 
 internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLine>{
     val db=readableDatabase
     val sql=when(section){
         "Рост" -> """
-            SELECT p.name,COUNT(DISTINCT c.id),
+            SELECT p.id,p.name,COUNT(DISTINCT c.id),
               SUM(CASE WHEN EXISTS(
                 SELECT 1 FROM culture_measurements m
                 WHERE m.culture_id=c.id AND m.shoots IS NOT NULL
@@ -36,7 +37,7 @@ internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLi
             GROUP BY p.id ORDER BY 3 DESC,p.name LIMIT 40
         """.trimIndent()
         "Среды" -> """
-            SELECT r.name || ' · v' || r.version,
+            SELECT r.id,r.name || ' · v' || r.version,
                 COUNT(DISTINCT m.culture_id),
                 COUNT(CASE WHEN m.record_kind='observation' THEN m.id END),
                 COALESCE(SUM(CASE WHEN m.shoots IS NOT NULL AND m.id=(
@@ -49,7 +50,7 @@ internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLi
             GROUP BY r.id ORDER BY 3 DESC,r.name LIMIT 40
         """.trimIndent()
         "Потери" -> """
-            SELECT p.name,COUNT(DISTINCT l.operation_id),
+            SELECT p.id,p.name,COUNT(DISTINCT l.operation_id),
                    COALESCE(SUM(l.quantity),0),COUNT(DISTINCT l.culture_id)
             FROM operation_losses l
             JOIN lab_operations o ON o.id=l.operation_id AND o.status='Проведена'
@@ -58,7 +59,7 @@ internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLi
             GROUP BY p.id ORDER BY 3 DESC,p.name LIMIT 40
         """.trimIndent()
         "Адаптация" -> """
-            SELECT p.name,COUNT(*),
+            SELECT p.id,p.name,COUNT(*),
               SUM(CASE WHEN c.status='В культуре' THEN 1 ELSE 0 END),
               SUM(CASE WHEN c.status IN ('На контроле','Карантин') THEN 1 ELSE 0 END)
             FROM plants p JOIN cultures c ON c.plant_id=p.id
@@ -69,24 +70,26 @@ internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLi
     }
     return db.rawQuery(sql,null).use{c->buildList {
         while(c.moveToNext()){
-            val name=c.getString(0)
-            val a=c.getInt(1)
-            val b=if(c.isNull(2))0 else c.getInt(2)
-            val d=if(c.isNull(3))0 else c.getInt(3)
+            val sourceId=c.getLong(0)
+            val name=c.getString(1)
+            val a=c.getInt(2)
+            val b=if(c.isNull(3))0 else c.getInt(3)
+            val d=if(c.isNull(4))0 else c.getInt(4)
+            fun report(head:String,body:String)=Lab10ReportLine(name,head,body,sourceId,section)
             when(section){
-                "Рост"->add(Lab10ReportLine(name,
+                "Рост"->add(report(
                     if(b==0)"Недостаточно измерений" else "Побегов по последним замерам: "+d,
                     "Активных контейнеров: "+a+" · с замерами побегов: "+b+
                         ". Замеры других единиц не складываются с побегами."))
-                "Среды"->add(Lab10ReportLine(name,
+                "Среды"->add(report(
                     if(b==0)"Нет наблюдений" else "Побегов в последних замерах: "+d,
                     "Контейнеров с наблюдениями: "+a+" · записей: "+b+
                         ". Эффективность без сопоставимых групп не рассчитывается."))
-                "Потери"->add(Lab10ReportLine(name,
+                "Потери"->add(report(
                     "Подтверждённых потерь: "+b,
                     "Операций: "+a+" · затронутых контейнеров: "+d+
                         ". Суммируются только зарегистрированные потери; отменённые исключены."))
-                "Адаптация"->add(Lab10ReportLine(name,
+                "Адаптация"->add(report(
                     "На этапе адаптации: "+a,
                     "В работе: "+b+" · на контроле/карантине: "+d+
                         ". Выживаемость без исходной группы не рассчитывается."))
@@ -96,7 +99,8 @@ internal fun LabDatabase.analyticsBreakdown10(section:String):List<Lab10ReportLi
 }
 
 @Composable
-internal fun Lab10AnalyticsDetails(db:LabDatabase,revision:Int) {
+internal fun Lab10AnalyticsDetails(db:LabDatabase,revision:Int,
+    onOpen:(String,Long)->Unit={_,_->}) {
     var section by rememberSaveable{mutableStateOf("Рост")}
     val values by produceState<List<Lab10ReportLine>?>(initialValue=null,
         key1=section,key2=revision){
@@ -123,7 +127,8 @@ internal fun Lab10AnalyticsDetails(db:LabDatabase,revision:Int) {
             values==null->LinearProgressIndicator(Modifier.fillMaxWidth())
             values!!.isEmpty()->Text("Недостаточно данных для этого раздела")
             else->values!!.forEach{report->
-                OutlinedCard(modifier=Modifier.fillMaxWidth(),
+                OutlinedCard(onClick={onOpen(section,report.sourceId)},
+                    modifier=Modifier.fillMaxWidth(),
                     shape=RoundedCornerShape(17.dp)){
                     Column(Modifier.padding(14.dp),
                         verticalArrangement=Arrangement.spacedBy(6.dp)){
