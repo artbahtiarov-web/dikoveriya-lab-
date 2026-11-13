@@ -105,17 +105,17 @@ class LabV9Migration(unittest.TestCase):
 
     def test_v9_backup_is_parent_first_and_previous_json_supported(self):
         self.assertIn('null, 9)',DB)
-        self.assertIn('put("schema",9)',DB)
+        self.assertIn('put("schema",10)',DB)
         self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
-        self.assertIn('BACKUP_ORDER=BACKUP_ORDER_V8+LabCoreV9.backupTables',DB)
+        self.assertIn('BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables',DB)
         self.assertIn('8->BACKUP_ORDER_V8',DB)
-        self.assertIn('root.optInt("schema") in 4..9',DB)
-        self.assertIn('root.getInt("schema") in 4..9',BACKUP)
+        self.assertIn('root.optInt("schema") in 4..10',DB)
+        self.assertIn('root.getInt("schema") in 4..10',BACKUP)
         self.assertIn('LabCoreV9.create(db)',DB)
         self.assertIn('if (oldVersion < 9) {',DB)
         self.assertIn('LabCoreV9.create(db)',DB)
         self.assertIn('LabCoreV9.validate(db)',DB)
-        self.assertIn('LabCoreV9.validate(this)',DB)
+        self.assertIn('LabCoreV10.validate(this)',DB)
 
     def test_20k_paged_sql_and_indexes(self):
         db=fixture()
