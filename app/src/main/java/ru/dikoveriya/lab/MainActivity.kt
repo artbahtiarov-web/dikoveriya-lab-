@@ -597,6 +597,5 @@ fun DikoveriyaApp() {
             error?.let{message->AlertDialog(onDismissRequest={error=null},title={Text("Не удалось выполнить действие")},text={Text(message)},confirmButton={TextButton(onClick={error=null}){Text("Понятно")}})}
         }
     }
-    }
 }
 
