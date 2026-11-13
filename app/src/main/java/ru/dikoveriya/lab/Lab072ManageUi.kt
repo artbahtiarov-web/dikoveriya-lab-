@@ -20,10 +20,11 @@ fun Lab072BulkDialog(
     action:String,ids:List<Long>,db:LabDatabase,
     locations:List<Lab072Location>,recipes:List<RecipeRecord>,
     onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit,
-    onPlaces:()->Unit=onClose
+    onPlaces:()->Unit=onClose,
+    initialReason:String=""
 ){
     var title by rememberSaveable(action){mutableStateOf("")}
-    var reason by rememberSaveable(action){mutableStateOf("")}
+    var reason by rememberSaveable(action){mutableStateOf(initialReason)}
     var severity by rememberSaveable(action){mutableStateOf("Обычный")}
     var priority by rememberSaveable(action){mutableStateOf("Обычный")}
     var kind by rememberSaveable(action){mutableStateOf("Осмотр")}
