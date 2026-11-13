@@ -86,6 +86,7 @@ private fun filter072(f:Lab072Query):Pair<String,Array<String>>{
             c.status IN ('На контроле','Карантин') OR EXISTS(
             SELECT 1 FROM control_cases k WHERE k.culture_id=c.id AND k.closed_at IS NULL))"""
         "growth"->where+="c.stage IN ('Адаптация','Доращивание') AND c.status IN $active"
+        "active"->where+="c.status IN $active"
         "all"->Unit
         else->error("Недопустимый раздел")
     }
