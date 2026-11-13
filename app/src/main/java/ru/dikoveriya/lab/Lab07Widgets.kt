@@ -122,54 +122,29 @@ fun Lab07Dashboard(
     val controls=counts?.attention ?: active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
     val growth=counts?.growing ?: active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
     val due=counts?.tasksDue ?: tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
-    Column(verticalArrangement=Arrangement.spacedBy(15.dp)) {
-        Lab07BrandHero("Моя лаборатория","Коллекция редких растений · точный учёт")
+    Column(verticalArrangement=Arrangement.spacedBy(13.dp)) {
         SectionTitle("Состояние лаборатории")
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
-            Lab07Metric("Требуют внимания",controls.toString(),"контейнеров",Lab07Palette.Danger,Modifier.weight(1f)){onMetric("attention")}
+            Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",
+                Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
+            Lab07Metric("Требуют внимания",controls.toString(),"контейнеров",
+                Lab07Palette.Danger,Modifier.weight(1f)){onMetric("attention")}
         }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Lab07Metric("Растут",growth.toString(),"адаптация / доращивание",Lab07Palette.Moss,Modifier.weight(1f)){onMetric("growth")}
-            Lab07Metric("Задачи",due.toString(),"срок наступил",Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
+            Lab07Metric("Растут",growth.toString(),"адаптация / доращивание",
+                Lab07Palette.Moss,Modifier.weight(1f)){onMetric("growth")}
+            Lab07Metric("Задачи",due.toString(),"к выполнению",
+                Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
         }
         SectionTitle("Быстрые действия")
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val narrow=maxWidth<380.dp
-            if(narrow) {
-                Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
-                    Lab07QuickAction("Новый контейнер",{Icon(Icons.Outlined.AddCircleOutline,null)},true,onClick=onNewContainer)
-                    Lab07QuickAction("Открыть коллекцию",{Icon(Icons.Outlined.LocalFlorist,null)},onClick=onCollection)
-                    Lab07QuickAction("Новая питательная среда",{Icon(Icons.Outlined.Science,null)},onClick=onMediums)
-                    Lab07QuickAction("Сканировать контейнер",{Icon(Icons.Outlined.QrCodeScanner,null)},onClick=onScan)
-                }
-            } else {
-                Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
-                    Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
-                        Lab07QuickAction("Новый контейнер",{Icon(Icons.Outlined.AddCircleOutline,null)},true,Modifier.weight(1f),onNewContainer)
-                        Lab07QuickAction("Коллекция",{Icon(Icons.Outlined.LocalFlorist,null)},modifier=Modifier.weight(1f),onClick=onCollection)
-                    }
-                    Row(horizontalArrangement=Arrangement.spacedBy(9.dp)) {
-                        Lab07QuickAction("Новая среда",{Icon(Icons.Outlined.Science,null)},modifier=Modifier.weight(1f),onClick=onMediums)
-                        Lab07QuickAction("Сканировать",{Icon(Icons.Outlined.QrCodeScanner,null)},modifier=Modifier.weight(1f),onClick=onScan)
-                    }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
-            horizontalArrangement=Arrangement.SpaceBetween) {
-            SectionTitle("Коллекция")
-            TextButton(onClick=onCollection) { Text("Все сорта  ·  ${plants.size}") }
-        }
-        if(cultures.isEmpty()) {
-            Text("Контейнеров пока нет. Начни с нового контейнера или добавь сорт.",
-                style=MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick=onNewPlant) { Text("Добавить сорт") }
-        } else {
-            cultures.sortedByDescending{it.createdAt}.take(5).forEach{culture->
-                Lab07CultureRow(culture,onClick={onContainer(culture.id)})
-            }
-        }
+        Lab07QuickAction("Новый контейнер",
+            {Icon(Icons.Outlined.AddCircleOutline,null)},true,
+            onClick=onNewContainer)
+        Lab07QuickAction("Сканировать контейнер",
+            {Icon(Icons.Outlined.QrCodeScanner,null)},onClick=onScan)
+        Text("Растения — во вкладке «Растения», рецептуры — во вкладке «Среды».",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

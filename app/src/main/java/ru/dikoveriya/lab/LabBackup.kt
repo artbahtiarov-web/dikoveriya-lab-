@@ -13,15 +13,12 @@ import java.util.zip.ZipOutputStream
 /** Portable backup: full database JSON + original image bytes in one ZIP. */
 object LabBackup {
     fun save(context: Context, db: LabDatabase, output: OutputStream) {
-        val data=db.exportJson().toByteArray(Charsets.UTF_8)
         val folder=File(context.filesDir,"culture_photos")
         ZipOutputStream(output).use { zip ->
             zip.putNextEntry(ZipEntry("database.json"))
-            zip.write(data)
+            val photoNames=db.exportJsonTo(zip)
             zip.closeEntry()
-            val photos=JSONObject(String(data,Charsets.UTF_8)).getJSONObject("tables").getJSONArray("culture_photos")
-            for(i in 0 until photos.length()){
-                val name=photos.getJSONObject(i).getString("filename")
+            for(name in photoNames){
                 require(Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp|heic)").matches(name)) { "Неверное имя фото в базе" }
                 val file=File(folder,name)
                 require(file.isFile) { "Нет файла фотографии: $name. Копия отменена." }
@@ -69,7 +66,7 @@ object LabBackup {
             }
             val data=json?:error("В архиве отсутствует база данных")
             val root=JSONObject(data)
-            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..9){"Неподдерживаемая версия копии"}
+            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..10){"Неподдерживаемая версия копии"}
             val photoRows=root.getJSONObject("tables").getJSONArray("culture_photos")
             val expected=buildSet{for(i in 0 until photoRows.length())add(photoRows.getJSONObject(i).getString("filename"))}
             require(expected==found){"В архиве нет части фотографий или есть лишние фотографии"}

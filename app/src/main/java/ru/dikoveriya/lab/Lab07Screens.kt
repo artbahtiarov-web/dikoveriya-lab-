@@ -26,9 +26,10 @@ fun Lab07RouteScreen(
     route:String, db:LabDatabase, revision:Int,
     plants:List<PlantRecord>,cultures:List<CultureRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,
+    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,onEditPlant:(Long)->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
+    onTask:(Long)->Unit,
     onLegacyAssessment:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
     onExportLabels:(List<Long>)->Unit= {},
@@ -54,13 +55,13 @@ fun Lab07RouteScreen(
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
         "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
-        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,modifier)
+        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,onEditPlant,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
             if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
             else Lab07MissingScreen(onBack,modifier)
         }
-        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,modifier)
+        "container" -> if(culture!=null) Lab07ContainerScreen(culture,db,revision,onBack,onNavigate,onEdit,onAction,onLabel,onPhotos,onSale,onTask,modifier)
                        else Lab07MissingScreen(onBack,modifier)
         "growth" -> if(culture!=null) Lab07GrowthScreen(culture,db,revision,onBack,onChanged,onError,onLegacyAssessment,modifier)
                     else Lab07MissingScreen(onBack,modifier)
@@ -70,6 +71,11 @@ fun Lab07RouteScreen(
                         else Lab07MissingScreen(onBack,modifier)
         "history" -> if(culture!=null) Lab07HistoryScreen(culture,db,revision,onBack,modifier)
                      else Lab07MissingScreen(onBack,modifier)
+        "label" -> if(culture!=null) Lab080LabelEditor(
+            culture,db,revision,db.currentMedium(culture.id)?.let{
+                "${it.name} · v${it.version}"
+            }.orEmpty(),onBack,onChanged,onError,modifier)
+                   else Lab07MissingScreen(onBack,modifier)
         else -> Lab07MissingScreen(onBack,modifier)
     }
 }
@@ -104,70 +110,80 @@ private fun Lab07Filters(values:List<String>,selected:String,onSelect:(String)->
 private fun Lab07CollectionScreen(
     plants:List<PlantRecord>,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewPlant:()->Unit,modifier:Modifier
+    onNewPlant:()->Unit,onEditPlant:(Long)->Unit,modifier:Modifier
 ){
     var search by rememberSaveable{mutableStateOf("")}
-    var order by rememberSaveable{mutableStateOf("По названию")}
+    var order by rememberSaveable{mutableStateOf("А–Я")}
     val counts=remember(revision){db.plantCounts072()}
-    val total=remember(revision){db.cultureCount072()}
     val sorted=plants.filter{it.name.contains(search,true) ||
-        it.description.contains(search,true)}.let{found->
-        if(order=="Больше контейнеров")
-            found.sortedWith(compareByDescending<PlantRecord>{counts[it.id]?:0}
+        it.description.contains(search,true)}.let{filtered->
+        if(order=="По количеству")
+            filtered.sortedWith(compareByDescending<PlantRecord>{counts[it.id]?:0}
                 .thenBy{it.name})
-        else found.sortedBy{it.name.lowercase()}
+        else filtered.sortedBy{it.name.lowercase()}
     }
     LazyColumn(modifier=modifier,state=rememberLazyListState(),
         contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(11.dp)){
         item(key="header"){
-            Lab07ScreenHeader("ЛАБОРАТОРИЯ / КОЛЛЕКЦИЯ",
-                "Коллекция растений",
-                "Все сорта в одном месте. Любой контейнер можно найти напрямую.",onBack)
+            Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАСТЕНИЯ","Растения",
+                "Выбери сорт, чтобы увидеть его контейнеры.",onBack)
         }
-        item(key="switch"){
-            Lab072Chips(listOf("Сорта","Все контейнеры"),"Сорта",
-                {if(it=="Все контейнеры")onNavigate(Lab07Navigation.work("all"))})
+        item(key="search"){
+            Field("Название сорта или LAB-номер контейнера",search,{search=it})
+            if(LabQr.getCode(search.trim())!=null){
+                OutlinedButton(onClick={
+                    db.findCulture072(search.trim())?.let{
+                        onNavigate(Lab07Navigation.container(it))
+                    }
+                },modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
+                    Text("Открыть контейнер по номеру")
+                }
+            }
         }
-        item(key="hero"){
-            Lab07BrandHero("Живой каталог",
-                plants.size.toString()+" сортов · "+total+" контейнеров",
-                "ДИКОВЕРИЯ / КОЛЛЕКЦИЯ")
-        }
-        item(key="search"){Field("Найти растение",search,{search=it})}
-        item(key="order"){
-            Lab072Chips(listOf("По названию","Больше контейнеров"),order,{order=it})
-        }
-        item(key="new"){
-            OutlinedButton(onClick=onNewPlant,
-                modifier=Modifier.fillMaxWidth().heightIn(min=50.dp)){
-                Icon(Icons.Outlined.Add,null)
-                Spacer(Modifier.width(8.dp))
+        item(key="add"){
+            Button(onClick=onNewPlant,
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp))
                 Text("Добавить сорт")
             }
         }
-        item(key="count"){SectionTitle("Сорта · "+sorted.size)}
-        if(sorted.isEmpty())item(key="empty"){
-            Text("Сорта не найдены. Измени поиск или добавь новый.")
+        item(key="sort"){
+            Row(verticalAlignment=Alignment.CenterVertically){
+                Text("Сортов: ${sorted.size}",modifier=Modifier.weight(1f),
+                    style=MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick={
+                    order=if(order=="А–Я")"По количеству" else "А–Я"
+                },modifier=Modifier.heightIn(min=48.dp)){
+                    Icon(Icons.Outlined.Sort,null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if(order=="А–Я")"А–Я" else "Больше контейнеров")
+                }
+            }
         }
-        items(sorted,key={"plant-"+it.id}){plant->
+        if(sorted.isEmpty())item(key="empty"){
+            Text("Сорта не найдены. Проверь название или добавь новый.")
+        }
+        items(sorted,key={"plant-${it.id}"}){plant->
             OutlinedCard(onClick={onNavigate(Lab07Navigation.variety(plant.id))},
-                modifier=Modifier.fillMaxWidth().heightIn(min=83.dp),
-                colors=CardDefaults.outlinedCardColors(
-                    containerColor=MaterialTheme.colorScheme.surface),
+                modifier=Modifier.fillMaxWidth().heightIn(min=82.dp),
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){
                 Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically,
                     horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Icon(Icons.Outlined.LocalFlorist,null,tint=Lab07Palette.Forest,
-                        modifier=Modifier.size(31.dp))
+                        modifier=Modifier.size(30.dp))
                     Column(Modifier.weight(1f)){
                         Text(plant.name,style=MaterialTheme.typography.titleMedium)
-                        Text((counts[plant.id]?:0).toString()+" контейнеров",
+                        Text("Контейнеров: ${counts[plant.id]?:0}",
                             color=MaterialTheme.colorScheme.onSurfaceVariant,
                             style=MaterialTheme.typography.bodySmall)
                     }
-                    Icon(Icons.Outlined.ChevronRight,"Открыть сорт",
-                        tint=Lab07Palette.InkBrass)
+                    IconButton(onClick={onEditPlant(plant.id)},
+                        modifier=Modifier.size(48.dp)){
+                        Icon(Icons.Outlined.MoreVert,
+                            contentDescription="Изменить или архивировать сорт ${plant.name}",
+                            tint=Lab07Palette.InkBrass)
+                    }
                 }
             }
         }
@@ -180,51 +196,13 @@ private fun Lab07VarietyScreen(
     onBack:()->Unit,onNavigate:(String)->Unit,
     onNewContainer:(Long?)->Unit,modifier:Modifier
 ){
-    val filter=remember(plant.id){Lab072Query(mode="all",plantId=plant.id)}
-    val total=remember(plant.id,revision){db.countCultures072(filter)}
-    val first=remember(plant.id,revision){db.culturesPage072(filter,0,5)}
-    LazyColumn(modifier=modifier,state=rememberLazyListState(),
-        contentPadding=PaddingValues(16.dp),
-        verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item(key="header"){
-            Lab07ScreenHeader("КОЛЛЕКЦИЯ / СОРТ",plant.name,
-                plant.description.ifBlank{"Сорт, маточники и все зарегистрированные контейнеры"},onBack)
-        }
-        item(key="hero"){
-            Lab07BrandHero(plant.name,
-                total.toString()+" контейнеров · найдено в лаборатории",
-                "ДИКОВЕРИЯ / СОРТ")
-        }
-        item(key="new"){
-            Button(onClick={onNewContainer(plant.id)},
-                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
-                Icon(Icons.Outlined.AddCircleOutline,null)
-                Spacer(Modifier.width(8.dp))
-                Text("Создать контейнер этого сорта")
-            }
-        }
-        item(key="search"){
-            OutlinedButton(onClick={onNavigate(Lab07Navigation.plantWork(plant.id))},
-                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
-                Icon(Icons.Outlined.Search,null)
-                Spacer(Modifier.width(8.dp))
-                Text("Все контейнеры сорта · "+total)
-            }
-        }
-        item(key="title"){SectionTitle("Последние контейнеры")}
-        if(first.isEmpty())item(key="empty"){
-            Text("Контейнеров пока нет. Создай первый или вернись в коллекцию.")
-        }
-        items(first,key={"recent-"+it.id}){c->
-            SmallCard(c.code,c.quantity.toString()+" "+c.kind+" · "+c.stage+
-                " · "+c.status){onNavigate(Lab07Navigation.container(c.id))}
-        }
-        if(total>first.size)item(key="more"){
-            TextButton(onClick={onNavigate(Lab07Navigation.plantWork(plant.id))}){
-                Text("Показать остальные "+(total-first.size))
-            }
-        }
-    }
+    // The variety page IS the filtered SQL worklist. There is no intermediate
+    // "latest five" screen or another tap to see every culture.
+    Lab072RegistryScreen(mode="all",initialGroupId=null,initialPlantId=plant.id,
+        db=db,revision=revision,plants=db.plants(),recipes=db.recipes(),
+        onBack=onBack,onNavigate=onNavigate,
+        onChanged={},onError={},
+        onNewContainer={onNewContainer(plant.id)},modifier=modifier)
 }
 
 @Composable
@@ -232,7 +210,7 @@ private fun Lab07ContainerScreen(
     culture:CultureRecord,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,onEdit:(Long)->Unit,
     onAction:(Long,String)->Unit,onLabel:(Long)->Unit,onPhotos:(Long)->Unit,
-    onSale:(Long)->Unit,modifier:Modifier
+    onSale:(Long)->Unit,onTask:(Long)->Unit,modifier:Modifier
 ) {
     val last=remember(culture.id,revision){db.unifiedJournal(culture.id).firstOrNull()}
     val activeMedium=remember(culture.id,revision){db.currentMedium(culture.id)}
@@ -253,6 +231,7 @@ private fun Lab07ContainerScreen(
                 border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp),
                     verticalArrangement=Arrangement.spacedBy(7.dp)) {
+                    Text("Пассаж P${culture.passage} · ${culture.stage}")
                     Text("Остаток: ${culture.quantity} · ${culture.quantityKind}",
                         style=MaterialTheme.typography.titleMedium)
                     Text("Среда: ${activeMedium?.let{"${it.name} · v${it.version}"} ?: "не указана"}")
@@ -285,6 +264,14 @@ private fun Lab07ContainerScreen(
                         {Icon(Icons.Outlined.RemoveCircleOutline,null)},modifier=Modifier.weight(1f),
                         onClick={onAction(culture.id,"Потери")})
                 }
+            }
+        }
+        if(!closed)item(key="schedule") {
+            OutlinedButton(onClick={onTask(culture.id)},
+                modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                Icon(Icons.Outlined.EventNote,null)
+                Spacer(Modifier.width(8.dp))
+                Text("Назначить задачу этому контейнеру")
             }
         }
         item(key="labels") {
@@ -350,6 +337,9 @@ private fun Lab07GrowthScreen(
     var note by rememberSaveable { mutableStateOf("") }
     var plotted by rememberSaveable { mutableStateOf("Побеги") }
     var saved by rememberSaveable { mutableStateOf("") }
+    var suggestControl by rememberSaveable { mutableStateOf(false) }
+    var controlDialog by rememberSaveable { mutableStateOf(false) }
+    var lastContaminated by rememberSaveable { mutableIntStateOf(0) }
     val samples=remember(culture.id,revision){db.growthSamples(culture.id)}
     val closed=culture.status in setOf(LabTerms.DISPOSED,LabTerms.SOLD,LabTerms.ANNULLED,LabTerms.TRANSFERRED)
     fun parseCount(text:String):Int? = if(text.isBlank())null else text.toIntOrNull() ?: error("Некорректное число")
@@ -374,9 +364,12 @@ private fun Lab07GrowthScreen(
             item(key="save") {
                 Button(onClick={
                     try {
+                        val count=parseCount(infected)
                         db.addGrowthSample(culture.id,
                             parseCount(explants),parseCount(shoots),
-                            parseCount(plants),parseCount(infected),note)
+                            parseCount(plants),count,note)
+                        lastContaminated=count?:0
+                        if(lastContaminated>0)suggestControl=true
                         explants="";shoots="";plants="";infected="";note=""
                         saved="Сохранено · ${formatDate(System.currentTimeMillis())}"
                         onChanged()
@@ -416,6 +409,19 @@ private fun Lab07GrowthScreen(
             }
         }
     }
+    if(suggestControl)AlertDialog(onDismissRequest={suggestControl=false},
+        title={Text("Заражение зарегистрировано")},
+        text={Text("В осмотре отмечено заражённых: $lastContaminated. Назначить контроль? Осмотр уже сохранён, статус автоматически не меняется.")},
+        confirmButton={Button(onClick={suggestControl=false;controlDialog=true}){
+            Text("Назначить проверку")
+        }},
+        dismissButton={TextButton(onClick={suggestControl=false}){Text("Не сейчас")}})
+    if(controlDialog)Lab072BulkDialog(
+        "control",listOf(culture.id),db,db.locations072(),db.recipes(),
+        onClose={controlDialog=false},
+        onSaved={controlDialog=false;onChanged()},
+        onError=onError,
+        initialReason="Обнаружено заражённых при осмотре: $lastContaminated")
 }
 
 data class Lab07MediumUse(val id:Long,val name:String,val version:Int,val date:Long,val reason:String)

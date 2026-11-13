@@ -121,13 +121,21 @@ object LabLabel40 {
             else listOf(elide(first,maxWidth,paint),elide(left,maxWidth,paint))
     }
 
-    fun png(spec:LabLabelSpec):ByteArray {
+    fun png(spec:LabLabelSpec):ByteArray = png(bitmap(spec),spec.dpi)
+
+    /** Share the same pHYs path for the editable and the legacy label renderer. */
+    fun png(image:Bitmap,dpi:Int):ByteArray {
+        require(dpi in supportedDpi)
+        val expected=dimensions(dpi)
+        require(image.width==expected.first && image.height==expected.second) {
+            "Размер макета не соответствует бумаге 40×12 мм"
+        }
         val encoded=ByteArrayOutputStream().use{out->
-            check(bitmap(spec).compress(Bitmap.CompressFormat.PNG,100,out))
+            check(image.compress(Bitmap.CompressFormat.PNG,100,out))
             out.toByteArray()
         }
         // PNG physical resolution pHYs: pixels/metre, unit=metre.
-        val ppm=(spec.dpi/0.0254).roundToInt()
+        val ppm=(dpi/0.0254).roundToInt()
         val data=ByteArrayOutputStream().apply{
             writeInt(ppm);writeInt(ppm);write(1)
         }.toByteArray()

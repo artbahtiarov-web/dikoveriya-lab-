@@ -24,7 +24,7 @@ fun Lab072TasksScreen(
     onNavigate:(String)->Unit,onChanged:()->Unit,
     onError:(String)->Unit,modifier:Modifier=Modifier
 ){
-    var period by rememberSaveable{mutableStateOf("Просрочено")}
+    var period by rememberSaveable{mutableStateOf("Открытые")}
     var priority by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
     var plantId by rememberSaveable{mutableStateOf<Long?>(null)}
@@ -37,6 +37,8 @@ fun Lab072TasksScreen(
     var pages by rememberSaveable{mutableIntStateOf(1)}
     var createDialog by rememberSaveable{mutableStateOf(false)}
     var editTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
+    var cancelTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
+    var cancelReason by rememberSaveable{mutableStateOf("")}
     var viewDialog by rememberSaveable{mutableStateOf(false)}
     var viewName by rememberSaveable{mutableStateOf("")}
     val filter=Lab072TaskFilter(period=period,priority=priority,kind=kind,
@@ -83,7 +85,7 @@ fun Lab072TasksScreen(
             {search=it;pages=1})}
         item(key="period"){
             Lab072Chips(listOf("Просрочено","Сегодня","Ближайшие 7 дней",
-                "Открытые","Все","Выполнено"),period,{period=it;pages=1})
+                "Открытые","Все","Выполнено","Отменённые"),period,{period=it;pages=1})
         }
         item(key="filters"){
             OutlinedButton(onClick={advanced=!advanced},
@@ -155,7 +157,7 @@ fun Lab072TasksScreen(
                 border=BorderStroke(1.dp,if(overdue)color else MaterialTheme.colorScheme.outlineVariant)){
                 Column(Modifier.padding(13.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Row(verticalAlignment=Alignment.CenterVertically){
-                        Checkbox(checked=t.done,onCheckedChange={checked->
+                        if(period!="Отменённые")Checkbox(checked=t.done,onCheckedChange={checked->
                             update{db.updateTask072(t.id,done=checked,note=
                                 if(checked)"Отмечена выполненной" else "Возобновлена")}
                         })
@@ -185,9 +187,19 @@ fun Lab072TasksScreen(
                                      else "К контейнеру")
                             }
                         }
-                        OutlinedButton(onClick={editTaskId=t.id},
+                        if(period!="Отменённые")OutlinedButton(onClick={editTaskId=t.id},
                             modifier=Modifier.weight(1f).heightIn(min=48.dp)){
                             Text("Изменить")
+                        }
+                    }
+                    if(period=="Отменённые"){
+                        Text("Отменена — запись и история сохранены.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }else{
+                        TextButton(onClick={cancelTaskId=t.id}){
+                            Icon(Icons.Outlined.Cancel,null)
+                            Spacer(Modifier.width(7.dp))
+                            Text("Отменить ошибочную задачу")
                         }
                     }
                 }
@@ -199,6 +211,21 @@ fun Lab072TasksScreen(
                 Text("Ещё 40 · осталось "+(total-rows.size))
             }
         }
+    }
+    cancelTaskId?.let{id->
+        AlertDialog(onDismissRequest={cancelTaskId=null},
+            title={Text("Отменить задачу?")},
+            text={Column(verticalArrangement=Arrangement.spacedBy(9.dp)){
+                Text("Задача исчезнет из текущего рабочего списка, но останется в истории «Отменённые».")
+                Field("Причина отмены",cancelReason,{cancelReason=it},single=false)
+            }},
+            confirmButton={Button(enabled=cancelReason.trim().length>=2,
+                onClick={
+                    update{db.archiveTask080(id,cancelReason)
+                        cancelTaskId=null;cancelReason=""
+                    }
+                }){Text("Отменить задачу")}},
+            dismissButton={TextButton(onClick={cancelTaskId=null}){Text("Назад")}})
     }
     if(viewDialog)AlertDialog(onDismissRequest={viewDialog=false},
         title={Text("Сохранить фильтр задач")},

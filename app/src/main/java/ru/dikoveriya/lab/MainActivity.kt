@@ -47,7 +47,7 @@ fun DikoveriyaApp() {
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
         "collection","variety"->"Коллекция"
-        "container","growth","medium","operations","history","work","groups","places"->"Коллекция"
+        "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
         "tasks"->"Главная"
         else->if(tab=="Аналитика")"Ещё" else tab
     }
@@ -63,6 +63,7 @@ fun DikoveriyaApp() {
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
     var labelCultureId by remember { mutableStateOf<Long?>(null) }
     var legacyAssessmentId by remember { mutableStateOf<Long?>(null) }
+    var taskCultureId by remember { mutableStateOf<Long?>(null) }
     var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
     var labelsForExport by remember { mutableStateOf(emptyList<Long>()) }
     var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -145,16 +146,22 @@ fun DikoveriyaApp() {
                 }
                 val output=context.contentResolver.openOutputStream(uri)
                     ?:error("Файл недоступен")
+                val mothersById=db.mothers().associateBy{it.id}
                 java.util.zip.ZipOutputStream(output).use{zip->
                     ids.forEach{id->
                         val c=db.cultureById(id) ?:error("Контейнер не найден")
                         val medium=db.currentMedium(id)
                         val info=medium?.let{it.name+" · v"+it.version}.orEmpty()
-                        val spec=LabLabelSpec(c.code,c.plantName,c.passage,info,
-                            showMedium=true,dpi=203)
+                        val values=LabelValues(
+                            c.code,c.plantName,c.passage,info,
+                            java.text.SimpleDateFormat("dd.MM.yy",java.util.Locale("ru"))
+                                .format(java.util.Date(c.createdAt)),
+                            c.motherId?.let{mothersById[it]?.code}.orEmpty(),
+                            c.notes.take(150))
+                        val design=db.labelForCulture080(id)?:LabelDesign.initial()
                         val safeCode=c.code.replace(Regex("[^A-Za-z0-9_-]"),"_")
                         zip.putNextEntry(java.util.zip.ZipEntry("$safeCode-40x12.png"))
-                        zip.write(LabLabel40.png(spec))
+                        zip.write(LabLabelDesigner.png(values,design))
                         zip.closeEntry()
                     }
                 }
@@ -196,7 +203,7 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && actionCultureId==null &&
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
@@ -213,7 +220,7 @@ fun DikoveriyaApp() {
                             tab=name;subsection="";routeStack=emptyList()
                         },
                         icon={Icon(icon,contentDescription=null)},
-                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Коллекция";else->name},maxLines=1)},
+                        label={Text(when(name){"Главная"->"Обзор";"Коллекция"->"Растения";else->name},maxLines=1)},
                         colors=NavigationBarItemDefaults.colors(
                             selectedIconColor=Lab07Palette.Brass,
                             selectedTextColor=Lab07Palette.Champagne,
@@ -234,10 +241,12 @@ fun DikoveriyaApp() {
                         onNavigate={openRoute(it)},
                         onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
+                        onEditPlant={dialog="plantInfo:$it"},
                         onEdit={cultureId=it},
-                        onLabel={labelCultureId=it},
+                        onLabel={openRoute(Lab07Navigation.label(it))},
                         onPhotos={photoCultureId=it},
                         onSale={saleCultureId=it},
+                        onTask={taskCultureId=it},
                         onLegacyAssessment={legacyAssessmentId=it},
                         onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
                         onChanged={refresh++},
@@ -301,11 +310,12 @@ fun DikoveriyaApp() {
                         item { Text("Всего контейнеров: ${cultures.size} · растений: ${plants.size}") }
                         item { Text("Активных: ${running.size} · на контроле: $attention · завершённых: ${cultures.size-running.size}") }
                         item { Text("Продаж: ${sales.size}; выручка по записям: ${money(sales.sumOf{it.price})}") }
-                        item { SectionTitle("Результаты по сортам") }
+                        item { SectionTitle("Последние замеры активных контейнеров по сортам") }
+                        item { Text("Это показатели наблюдений, а не текущие складские остатки. Пустые измерения не означают измеренный ноль.",style=MaterialTheme.typography.bodySmall) }
                         items(cultivarResults,key={"results-${it.plantId}"}) { r ->
                             Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.containers} · эксплантов: ${r.lastExplants} · побегов: ${r.lastShoots} · растений: ${r.lastPlants} · выручка: ${money(r.revenue)}")
                         }
-                        item { SectionTitle("Рост по рецептурам") }
+                        item { SectionTitle("Зарегистрированные измерения по рецептурам") }
                         item { Text("Последнее наблюдение каждого контейнера на данной рецептуре; разные контейнеры могут иметь разные исходные условия.",style=MaterialTheme.typography.bodySmall) }
                         items(mediumResults,key={"medium-stats-${it.recipeId}"}) { r ->
                             Lab07ReadOnlyCard(r.name,"Контейнеров: ${r.cultures} · наблюдений для сравнения: ${r.observations} · побегов: ${r.latestShoots} · растений: ${r.latestPlants}")
@@ -366,7 +376,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.7.2 · локальная база SQLite v9. Приложение работает без интернета.")}
+                                    item{Text("Версия 0.8.0 · локальная база SQLite v10. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive, прямое подключение NIIMBOT и ИИ-аналитик пока не подключены. Для этикеток есть сохранение QR-кода PNG.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -397,14 +407,24 @@ fun DikoveriyaApp() {
             }
             if(dialog.startsWith("ingredientInfo:")){
                 val ing=ingredients.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
-                if(ing!=null) DialogForm(ing.name,close={dialog=""}){
-                    Text("Категория: ${ing.category} · ${ing.unit}")
-                    Text(ing.notes.ifBlank{"Дополнительные сведения не указаны"})
-                }
+                if(ing!=null) Lab080IngredientDialog(ing,onClose={dialog=""},
+                    onSave={name,category,unit,notes,reason->
+                        if(act{db.changeIngredient080(ing.id,name,category,unit,notes,reason)})
+                            dialog=""
+                    },
+                    onArchive={reason->
+                        if(act{db.archiveIngredient080(ing.id,reason)})dialog=""
+                    })
             }
             if(dialog.startsWith("plantInfo:")){
                 val p=plants.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
-                if(p!=null) DialogForm(p.name,close={dialog=""}){Text(p.description.ifEmpty{"Дополнительных сведений пока нет"})}
+                if(p!=null)Lab080PlantDialog(p,onClose={dialog=""},
+                    onSave={name,notes,reason->
+                        if(act{db.changePlant080(p.id,name,notes,reason)})dialog=""
+                    },
+                    onArchive={reason->
+                        if(act{db.archiveUnusedPlant080(p.id,reason)})dialog=""
+                    })
             }
             if(dialog.startsWith("motherInfo:")){
                 val m=mothers.firstOrNull{it.id.toString()==dialog.substringAfter(':')}
@@ -428,6 +448,13 @@ fun DikoveriyaApp() {
                             culture.recipeId,true)})cultureId=null
                     })
             }}
+            taskCultureId?.let{id->db.cultureById(id)?.let{culture->
+                Lab080TaskDialog(culture,onClose={taskCultureId=null},
+                    onSave={name,due,priority,kind->
+                        if(act{db.createTask072(name,due,priority,kind,id,null,null)})
+                            taskCultureId=null
+                    })
+            }}
             saleCultureId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071SaleDialog(culture,onClose={saleCultureId=null},
                     onSave={qty,total,note->
@@ -437,7 +464,11 @@ fun DikoveriyaApp() {
             photoCultureId?.let{id->db.cultureById(id)?.let{culture->
                 Lab071PhotosDialog(culture,db.photos(id),context.filesDir,
                     onClose={photoCultureId=null},
-                    onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")})
+                    onAdd={note->pendingPhotoId=id;pendingPhotoNote=note;selectPhoto.launch("image/*")},
+                    onEdit={photo,caption,reason->
+                        act{db.changePhotoCaption080(photo,caption,reason)}
+                    },
+                    onArchive={photo,reason->act{db.archivePhoto080(photo,reason)}})
             }}
             labelCultureId?.let{id->db.cultureById(id)?.let{culture->
                 val medium=recipes.firstOrNull{it.id==culture.recipeId}

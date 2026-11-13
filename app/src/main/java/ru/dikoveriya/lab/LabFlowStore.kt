@@ -193,7 +193,7 @@ fun LabDatabase.plantResults(): List<CultivarResult> {
                       COALESCE((SELECT m.explants FROM culture_measurements m WHERE m.culture_id=c.id AND m.explants IS NOT NULL ORDER BY m.observed_at DESC,m.id DESC LIMIT 1),0),
                       COALESCE((SELECT m.shoots FROM culture_measurements m WHERE m.culture_id=c.id AND m.shoots IS NOT NULL ORDER BY m.observed_at DESC,m.id DESC LIMIT 1),0),
                       COALESCE((SELECT m.plants FROM culture_measurements m WHERE m.culture_id=c.id AND m.plants IS NOT NULL ORDER BY m.observed_at DESC,m.id DESC LIMIT 1),0)
-                    FROM cultures c WHERE c.plant_id=?
+                    FROM cultures c WHERE c.plant_id=? AND c.status IN ('В культуре','На контроле','Карантин')
                 """.trimIndent(),arrayOf(plantId.toString())).use { measures ->
                     val values=IntArray(3)
                     while(measures.moveToNext())for(i in 0..2)values[i]+=measures.getInt(i)

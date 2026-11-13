@@ -104,8 +104,14 @@ fun Lab071SaleDialog(culture:CultureRecord,onClose:()->Unit,onSave:(Int,Double,S
 
 @Composable
 fun Lab071PhotosDialog(culture:CultureRecord,photos:List<CulturePhoto>,filesDir:File,
-    onClose:()->Unit,onAdd:(String)->Unit) {
+    onClose:()->Unit,onAdd:(String)->Unit,
+    onEdit:(Long,String,String)->Unit,
+    onArchive:(Long,String)->Unit) {
     var note by rememberSaveable(culture.id){mutableStateOf("")}
+    var editId by rememberSaveable(culture.id){mutableStateOf<Long?>(null)}
+    var archiveId by rememberSaveable(culture.id){mutableStateOf<Long?>(null)}
+    var editCaption by rememberSaveable(culture.id){mutableStateOf("")}
+    var reason by rememberSaveable(culture.id){mutableStateOf("")}
     AlertDialog(onDismissRequest=onClose,title={Text("Фото контейнера")},
         text={Column(Modifier.fillMaxWidth().heightIn(max=510.dp)
             .verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)) {
@@ -134,10 +140,44 @@ fun Lab071PhotosDialog(culture:CultureRecord,photos:List<CulturePhoto>,filesDir:
                     Modifier.fillMaxWidth().heightIn(max=180.dp))
                 Text("${formatDate(photo.addedAt)} · ${photo.caption}",
                     style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    TextButton(onClick={editId=photo.id;editCaption=photo.caption;reason=""}){
+                        Text("Изменить подпись")
+                    }
+                    TextButton(onClick={archiveId=photo.id;reason=""}){
+                        Text("Убрать из просмотра")
+                    }
+                }
             }
         }},
         confirmButton={},
         dismissButton={TextButton(onClick=onClose){Text("Назад")}})
+    editId?.let{id->
+        AlertDialog(onDismissRequest={editId=null},
+            title={Text("Исправить подпись")},
+            text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                Field("Новая подпись",editCaption,{editCaption=it})
+                Field("Причина исправления",reason,{reason=it},single=false)
+            }},
+            confirmButton={Button(enabled=reason.trim().length>=2,
+                onClick={onEdit(id,editCaption,reason);editId=null}){
+                Text("Сохранить")
+            }},
+            dismissButton={TextButton(onClick={editId=null}){Text("Отмена")}})
+    }
+    archiveId?.let{id->
+        AlertDialog(onDismissRequest={archiveId=null},
+            title={Text("Убрать фотографию?")},
+            text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                Text("Файл остаётся в резервной копии. Действие записывается в историю.")
+                Field("Причина",reason,{reason=it},single=false)
+            }},
+            confirmButton={Button(enabled=reason.trim().length>=2,
+                onClick={onArchive(id,reason);archiveId=null}){
+                Text("Убрать из просмотра")
+            }},
+            dismissButton={TextButton(onClick={archiveId=null}){Text("Отмена")}})
+    }
 }
 
 @Composable

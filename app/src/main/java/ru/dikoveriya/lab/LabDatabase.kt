@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 9) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -27,6 +27,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         createExtra(db)
         LabCoreV8.create(db)
         LabCoreV9.create(db)
+        LabCoreV10.create(db)
         listOf("Alocasia Black Velvet Aurea", "Alocasia Dragon Scale Mint", "Philodendron Burle Marx Flame").forEach { n ->
             db.insertOrThrow("plants", null, cv("name" to n))
         }
@@ -126,9 +127,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         if (oldVersion < 8) LabCoreV8.migrateFrom7(db)
         if (oldVersion < 9) {
             LabCoreV9.create(db)
-            // SQLiteOpenHelper wraps onUpgrade in its own transaction:
-            // any integrity failure rolls back instead of partially migrating.
             LabCoreV9.validate(db)
+        }
+        if (oldVersion < 10) {
+            LabCoreV10.create(db)
+            LabCoreV10.validate(db)
         }
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
@@ -155,7 +158,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         db.insertOrThrow("events", null, cv("culture_id" to id, "kind" to type, "note" to note, "created_at" to System.currentTimeMillis(), "before_qty" to before, "after_qty" to after, "medium_batch_id" to batch, "event_group" to group, "occurred_at" to occurredAt))
     }
     private fun Cursor.optLong(index: Int): Long? = if (isNull(index)) null else getLong(index)
-    fun plants(): List<PlantRecord> = readableDatabase.rawQuery("SELECT id,name,description FROM plants ORDER BY name COLLATE NOCASE", null).use { c ->
+    fun plants(): List<PlantRecord> = readableDatabase.rawQuery("SELECT id,name,description FROM plants WHERE NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='plant' AND a.entity_id=plants.id) ORDER BY name COLLATE NOCASE", null).use { c ->
         buildList { while(c.moveToNext()) add(PlantRecord(c.getLong(0),c.getString(1),c.getString(2))) }
     }
     fun addPlant(name: String, notes: String = "") {
@@ -186,11 +189,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             c.getString(8),c.optLong(9),c.optLong(10),c.getLong(11),c.getString(12),
             c.getString(13),c.getString(14),c.optLong(15))else null
     }
-    fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
+    fun photos(cultureId: Long): List<CulturePhoto> = readableDatabase.rawQuery("SELECT id,culture_id,filename,caption,created_at FROM culture_photos WHERE culture_id=? AND NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='photo' AND a.entity_id=culture_photos.id) ORDER BY id DESC",arrayOf(cultureId.toString())).use { c ->
         buildList { while(c.moveToNext()) add(CulturePhoto(c.getLong(0),c.getLong(1),c.getString(2),c.getString(3),c.getLong(4))) }
     }
     fun addPhoto(context: Context, cultureId: Long, uri: Uri, caption: String) {
-        require(cultures().any { it.id==cultureId }) { "Контейнер не найден" }
+        require(cultureById(cultureId)!=null) { "Контейнер не найден" }
         val folder=File(context.filesDir,"culture_photos").apply { mkdirs() }
         val mime=context.contentResolver.getType(uri)
         val ext=when(mime) {"image/png"->"png";"image/webp"->"webp";"image/jpeg"->"jpg";"image/heic","image/heif"->"heic";else->throw IllegalArgumentException("Поддерживаются JPEG, PNG, WebP и HEIC") }
@@ -254,19 +257,35 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         writableDatabase.tx { createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,batchId,motherId,notes,quantityKind=quantityKind) }
     }
     /** Simple intake: one container, optional mother and recipe; all three measurements are independent. */
-    fun addCultureQuick(plantId:Long,motherId:Long?,recipeId:Long?,explants:Int?,shoots:Int?,plantsCount:Int?,location:String,notes:String):Long {
+    fun addCultureQuick(plantId:Long,motherId:Long?,recipeId:Long?,explants:Int?,shoots:Int?,plantsCount:Int?,location:String,notes:String,
+        passage:Int=0,stage:String=LabTerms.IN_VITRO,quantityKind:String?=null,locationId:Long?=null):Long {
+        require(passage in 0..999){"Пассаж должен быть от P0 до P999"}
+        require(stage in LabTerms.stages){"Выбери этап выращивания"}
+        if(quantityKind!=null)require(quantityKind in LabTerms.quantityKinds.drop(1)){
+            "Выбери единицу материала: экспланты, побеги или растения"
+        }
         val counts=listOf(explants,shoots,plantsCount)
         require(counts.all{it==null || it in 0..1000000}) { "Проверь числа объектов" }
         require(counts.any{it!=null && it>0}) { "Укажи хотя бы один положительный показатель" }
         // Several measurements may coexist but cannot imply a common transferable unit.
         // The provisional quantity is locked until the operator confirms its meaning.
         val positives=listOfNotNull(explants?.takeIf{it>0},shoots?.takeIf{it>0},plantsCount?.takeIf{it>0})
-        val quantity=positives.maxOrNull()!!
-        val kind=if(positives.size==1) when {
+        val inferredKind=if(positives.size==1) when {
             (plantsCount?:0)>0->"Растения"
             (shoots?:0)>0->"Побеги"
             else->"Экспланты"
         } else "Не уточнено"
+        val kind=quantityKind?:inferredKind
+        val operational=when(kind){
+            "Экспланты"->explants
+            "Побеги"->shoots
+            "Растения"->plantsCount
+            else->null
+        }
+        require(kind=="Не уточнено" || operational!=null && operational>0) {
+            "Для выбранной единицы учёта укажи положительное количество"
+        }
+        val quantity=operational?:positives.maxOrNull()!!
         var resultId=0L
         writableDatabase.tx {
             if(recipeId!=null) {
@@ -274,7 +293,20 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 require(r.status=="Утверждена") { "Выбирай только готовые рецептуры" }
                 require(r.plantId==null || r.plantId==plantId) { "Эта рецептура предназначена для другого растения" }
             }
-            val id=createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,0,LabTerms.IN_VITRO,location,null,motherId,notes,quantityKind=kind)
+            val resolvedLocation=locationId?.let{key->
+                rawQuery("SELECT full_path FROM storage_locations WHERE id=?",
+                    arrayOf(key.toString())).use{c->
+                    require(c.moveToFirst()){"Указанное место больше не существует"}
+                    c.getString(0)
+                }
+            } ?: location
+            val id=createCultureInDb(this,plantId,quantity,LabTerms.IN_CULTURE,passage,stage,
+                resolvedLocation,null,motherId,notes,quantityKind=kind)
+            if(locationId!=null){
+                insertOrThrow("culture_storage",null,cv(
+                    "culture_id" to id,"location_id" to locationId,
+                    "assigned_at" to System.currentTimeMillis()))
+            }
             update("cultures",cv("medium_recipe_id" to recipeId),"id=?",arrayOf(id.toString()))
             if(recipeId!=null) {
                 insertOrThrow("culture_recipe_history",null,cv("culture_id" to id,"recipe_id" to recipeId,"applied_at" to System.currentTimeMillis(),"note" to "Выбрана при создании"))
@@ -867,11 +899,62 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val BACKUP_ORDER_V6=BACKUP_ORDER_V5+listOf("ingredient_catalog")
         val BACKUP_ORDER_V7=BACKUP_ORDER_V6+listOf("culture_measurements","culture_recipe_history")
         val BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")
-        val BACKUP_ORDER=BACKUP_ORDER_V8+LabCoreV9.backupTables
+        val BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables
+        val BACKUP_ORDER=BACKUP_ORDER_V9+LabCoreV10.backupTables
     }
+    /**
+     * Stream backup JSON directly to ZIP without constructing a giant JSONObject
+     * in memory. Names of all photo files are captured from the *same* read
+     * transaction as database rows. Does not change the on-disk backup format.
+     */
+    fun exportJsonTo(output:java.io.OutputStream):List<String> {
+        val db=readableDatabase
+        val photoNames=mutableListOf<String>()
+        val writer=android.util.JsonWriter(
+            java.io.OutputStreamWriter(output,Charsets.UTF_8))
+        db.beginTransactionNonExclusive()
+        try{
+            writer.beginObject()
+            writer.name("format").value("DIKOVERIYA_LAB")
+            writer.name("schema").value(10)
+            writer.name("exported_at").value(System.currentTimeMillis())
+            writer.name("tables").beginObject()
+            BACKUP_ORDER.forEach {table->
+                writer.name(table).beginArray()
+                val sql=if(table=="storage_locations")
+                    "SELECT * FROM storage_locations ORDER BY id" else "SELECT * FROM $table"
+                db.rawQuery(sql,null).use{c->
+                    val photoIndex=if(table=="culture_photos")c.getColumnIndex("filename") else -1
+                    while(c.moveToNext()){
+                        if(photoIndex>=0)photoNames+=c.getString(photoIndex)
+                        writer.beginObject()
+                        for(i in 0 until c.columnCount){
+                            writer.name(c.getColumnName(i))
+                            when(c.getType(i)){
+                                Cursor.FIELD_TYPE_NULL->writer.nullValue()
+                                Cursor.FIELD_TYPE_INTEGER->writer.value(c.getLong(i))
+                                Cursor.FIELD_TYPE_FLOAT->writer.value(c.getDouble(i))
+                                else->writer.value(c.getString(i))
+                            }
+                        }
+                        writer.endObject()
+                    }
+                }
+                writer.endArray()
+            }
+            writer.endObject()
+            writer.endObject()
+            writer.flush() // Do not close: output is an open ZIP entry.
+            db.setTransactionSuccessful()
+        }finally{
+            db.endTransaction()
+        }
+        return photoNames
+    }
+
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",9).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",10).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         // A consistent read snapshot prevents a backup that mixes partially completed operations.
         db.beginTransactionNonExclusive()
@@ -907,10 +990,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..9) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..10) { "Неизвестная версия резервной копии" }
         val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;else->BACKUP_ORDER}
+        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;9->BACKUP_ORDER_V9;else->BACKUP_ORDER}
         importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
@@ -952,7 +1035,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")
                 execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
             }
-            LabCoreV9.validate(this)
+            LabCoreV10.validate(this)
         }
     }
 }

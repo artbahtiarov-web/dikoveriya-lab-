@@ -22,9 +22,9 @@ GRADLE=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class UnifiedJourneys071(unittest.TestCase):
     def test_version_keeps_db_and_certificate(self):
-        self.assertIn('versionName = "0.7.2"',GRADLE)
-        self.assertIn('versionCode = 70200 +',GRADLE)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 9)',DB)
+        self.assertIn('versionName = "0.8.0"',GRADLE)
+        self.assertIn('versionCode = 80000 +',GRADLE)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10)',DB)
         self.assertIn('applicationId = "ru.dikoveriya.lab"',GRADLE)
         self.assertIn('file("signing/dikoveriya.p12")',GRADLE)
 
@@ -33,8 +33,8 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertNotIn('listOf("Главная","Коллекция","Работа","Аналитика","Ещё")',MAIN)
         self.assertIn('"Аналитика","Маточники","Задачи"',MAIN)
         self.assertIn('Lab071MediumCatalog(',MAIN)
-        self.assertIn('Lab072Chips(listOf("Сорта","Все контейнеры")',SCREENS)
-        self.assertIn('Lab07Navigation.work("all")',SCREENS)
+        self.assertIn('Text("Добавить сорт")',SCREENS)
+        self.assertIn('Lab072RegistryScreen(mode="all"',SCREENS)
 
     def test_passport_and_operations_have_no_double_dropdown(self):
         self.assertNotIn('PickOne("Действие"',OLD)
