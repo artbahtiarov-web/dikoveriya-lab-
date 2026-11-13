@@ -65,6 +65,7 @@ internal fun Lab11ItemsScreen(
     var query by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
     var favorites by rememberSaveable{mutableStateOf(false)}
+    var gridMode by rememberSaveable{mutableStateOf(false)}
     var stage by rememberSaveable{mutableStateOf("")}
     var status by rememberSaveable{mutableStateOf("")}
     var filterOpen by remember{mutableStateOf(false)}
@@ -118,8 +119,15 @@ internal fun Lab11ItemsScreen(
             }
         }
         item{
-            Text("Экземпляры · "+total,
-                style=MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment=Alignment.CenterVertically){
+                Text("Экземпляры · "+total,
+                    style=MaterialTheme.typography.titleMedium,
+                    modifier=Modifier.weight(1f))
+                IconButton(onClick={gridMode=!gridMode}){
+                    Icon(if(gridMode)Icons.Outlined.ViewList else Icons.Outlined.GridView,
+                        contentDescription=if(gridMode)"Показать списком" else "Показать плиткой")
+                }
+            }
         }
         if(loading)item{LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(!loading && rows.isEmpty())item{
@@ -132,35 +140,20 @@ internal fun Lab11ItemsScreen(
                 Button(onClick=onNew){Text("Добавить экземпляр")}
             }
         }
-        items(rows,key={it.id}){item->
-            OutlinedCard(onClick={onOpen(item.id)},modifier=Modifier.fillMaxWidth(),
-                shape=RoundedCornerShape(18.dp),
-                colors=CardDefaults.outlinedCardColors(
-                    containerColor=MaterialTheme.colorScheme.surface),
-                border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.25f))){
-                Row(Modifier.fillMaxWidth().heightIn(min=92.dp),
-                    verticalAlignment=Alignment.CenterVertically){
-                    Lab11ItemCover(item.cover,
-                        modifier=Modifier.size(width=92.dp,height=95.dp),
-                        kind=item.kind)
-                    Column(Modifier.weight(1f).padding(start=12.dp),
-                        verticalArrangement=Arrangement.spacedBy(4.dp)){
-                        Text(item.plantName,style=MaterialTheme.typography.titleMedium,
-                            maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(item.code+" · "+item.kind,
-                            style=MaterialTheme.typography.bodySmall,
-                            color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(item.stage+" · "+item.status,
-                            style=MaterialTheme.typography.bodySmall)
-                        if(item.location.isNotBlank())
-                            Text(item.location,maxLines=1,overflow=TextOverflow.Ellipsis,
-                                style=MaterialTheme.typography.labelSmall)
+        if(gridMode){
+            items(rows.chunked(2),key={it.first().id}){pair->
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)){
+                    pair.forEach{plant->
+                        Lab11ItemTile(plant,true,onClick={onOpen(plant.id)},
+                            modifier=Modifier.weight(1f))
                     }
-                    if(item.favorite)Icon(Icons.Outlined.Star,
-                        contentDescription="Избранное",tint=Lab07Palette.Brass)
-                    Icon(Icons.Outlined.ChevronRight,contentDescription=null,
-                        modifier=Modifier.padding(end=8.dp))
+                    if(pair.size<2)Spacer(Modifier.weight(1f))
                 }
+            }
+        }else{
+            items(rows,key={it.id}){plant->
+                Lab11ItemTile(plant,false,onClick={onOpen(plant.id)},
+                    modifier=Modifier.fillMaxWidth())
             }
         }
         if(rows.size<total)item{
@@ -203,6 +196,66 @@ internal fun Lab11ItemsScreen(
                         page=1;filterOpen=false
                     },modifier=Modifier.weight(1f)){Text("Применить")}
                 }
+            }
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Lab11ItemTile(
+    item:Lab11PlantItem,gridMode:Boolean,onClick:()->Unit,
+    modifier:Modifier=Modifier
+){
+    OutlinedCard(onClick=onClick,modifier=modifier,
+        shape=RoundedCornerShape(18.dp),
+        colors=CardDefaults.outlinedCardColors(
+            containerColor=MaterialTheme.colorScheme.surface),
+        border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.25f))){
+        if(gridMode){
+            Column(Modifier.fillMaxWidth(),
+                verticalArrangement=Arrangement.spacedBy(6.dp)){
+                Lab11ItemCover(item.cover,
+                    modifier=Modifier.fillMaxWidth().height(128.dp),kind=item.kind)
+                Column(Modifier.fillMaxWidth().padding(10.dp),
+                    verticalArrangement=Arrangement.spacedBy(5.dp)){
+                    Text(item.plantName,style=MaterialTheme.typography.titleSmall,
+                        maxLines=2,overflow=TextOverflow.Ellipsis)
+                    Text(item.code,style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(item.kind+" · "+item.stage,
+                        style=MaterialTheme.typography.labelSmall,
+                        maxLines=2,overflow=TextOverflow.Ellipsis)
+                    if(item.favorite)
+                        Icon(Icons.Outlined.Star,contentDescription="Избранное",
+                            tint=Lab07Palette.Brass,modifier=Modifier.size(15.dp))
+                }
+            }
+        }else{
+            Row(Modifier.fillMaxWidth().heightIn(min=92.dp),
+                verticalAlignment=Alignment.CenterVertically){
+                Lab11ItemCover(item.cover,
+                    modifier=Modifier.size(width=92.dp,height=95.dp),
+                    kind=item.kind)
+                Column(Modifier.weight(1f).padding(start=12.dp),
+                    verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    Text(item.plantName,style=MaterialTheme.typography.titleMedium,
+                        maxLines=2,overflow=TextOverflow.Ellipsis)
+                    Text(item.code+" · "+item.kind,
+                        style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(item.stage+" · "+item.status,
+                        style=MaterialTheme.typography.bodySmall)
+                    if(item.location.isNotBlank())
+                        Text(item.location,maxLines=1,
+                            overflow=TextOverflow.Ellipsis,
+                            style=MaterialTheme.typography.labelSmall)
+                }
+                if(item.favorite)Icon(Icons.Outlined.Star,
+                    contentDescription="Избранное",tint=Lab07Palette.Brass)
+                Icon(Icons.Outlined.ChevronRight,contentDescription=null,
+                    modifier=Modifier.padding(end=8.dp))
             }
         }
     }
