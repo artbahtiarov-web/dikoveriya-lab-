@@ -34,7 +34,7 @@ class UnifiedJourneys071(unittest.TestCase):
         self.assertIn('"Аналитика","Маточники","Задачи"',MAIN)
         self.assertIn('Lab071MediumCatalog(',MAIN)
         self.assertIn('Text("Добавить сорт")',SCREENS)
-        self.assertIn('Lab07Navigation.work("all")',SCREENS)
+        self.assertIn('Lab072RegistryScreen(mode="all"',SCREENS)
 
     def test_passport_and_operations_have_no_double_dropdown(self):
         self.assertNotIn('PickOne("Действие"',OLD)
