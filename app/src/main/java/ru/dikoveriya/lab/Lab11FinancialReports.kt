@@ -72,7 +72,7 @@ internal fun LabDatabase.performance11(from:Long=0,to:Long=Long.MAX_VALUE):Lab11
           AND occurred_at BETWEEN ? AND ?""")
     val general=sum("""SELECT COALESCE(SUM(amount_minor),0)
         FROM cash_ledger WHERE direction='Расход'
-          AND source_type='general_expense' AND occurred_at BETWEEN ? AND ?""")
+          AND source_type IN ('general_expense','asset_service') AND occurred_at BETWEEN ? AND ?""")
     val existing=sum("""SELECT COALESCE(SUM(cost_minor),0) FROM item_sales
         WHERE sold_at BETWEEN ? AND ?""")
     val vitro=sum("""SELECT COALESCE(SUM(d.cogs_minor),0)
