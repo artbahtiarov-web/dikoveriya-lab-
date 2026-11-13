@@ -43,6 +43,13 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
     var detail by remember(initialAssetId){mutableStateOf(initialAssetId)}
     var retire by remember{mutableStateOf<Long?>(null)}
     var configureLight by remember{mutableStateOf<Long?>(null)}
+    var serviceId by remember{mutableStateOf<Long?>(null)}
+    var serviceKind by remember{mutableStateOf("Обслуживание")}
+    var serviceDate by remember{mutableStateOf(dateText11())}
+    var serviceNote by remember{mutableStateOf("")}
+    var serviceExpense by remember{mutableStateOf("0")}
+    var showLightingUnitCost by rememberSaveable{mutableStateOf(false)}
+    var unitsForLighting by rememberSaveable{mutableStateOf("")}
     var reason by remember{mutableStateOf("")}
     var state by remember{mutableStateOf("Сломано")}
     LazyColumn(modifier=modifier,contentPadding=PaddingValues(16.dp),
@@ -88,6 +95,27 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
             Text("Расчётная стоимость по заявленной фактической мощности и тарифу. Это не оплаченный счёт и не себестоимость растений.",
                 style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick={showLightingUnitCost=!showLightingUnitCost}){
+                Text(if(showLightingUnitCost)"Скрыть условную оценку"
+                    else "Условная стоимость света на растение")
+            }
+            if(showLightingUnitCost){
+                OutlinedTextField(unitsForLighting,{unitsForLighting=it},
+                    label={Text("Количество единиц продукции на освещённых полках")},
+                    modifier=Modifier.fillMaxWidth(),singleLine=true)
+                val qty=unitsForLighting.toLongOrNull()
+                if(qty!=null && qty>0){
+                    val monthCost=lights.sumOf{it.estimatedMonth11(thisMonth)}
+                    val value=java.math.BigDecimal.valueOf(monthCost,2)
+                        .divide(java.math.BigDecimal.valueOf(qty),4,
+                            java.math.RoundingMode.HALF_UP)
+                    Text("Условно: "+value.toPlainString()+
+                        " ₽/ед. за месяц. В прямую себестоимость не добавляется.",
+                        style=MaterialTheme.typography.bodySmall)
+                }else if(unitsForLighting.isNotBlank())
+                    Text("Укажи положительное количество",
+                        color=MaterialTheme.colorScheme.error)
+            }
         }
         if(assets.isEmpty())item{Text("Оборудование ещё не зарегистрировано")}
         items(assets,key={it.id}){asset->
@@ -140,6 +168,10 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
                             Icon(Icons.Outlined.Lightbulb,null)
                             Text("Настроить освещение")
                         }
+                        OutlinedButton(onClick={detail=null;serviceId=id},
+                            modifier=Modifier.fillMaxWidth()){
+                            Text("Записать ремонт или обслуживание")
+                        }
                         OutlinedButton(onClick={detail=null;retire=id},
                             modifier=Modifier.fillMaxWidth()){
                             Text("Вывести из эксплуатации")
@@ -157,6 +189,37 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
     configureLight?.let{id->
         Lab11LightDialog(db,id,onClose={configureLight=null},
             onSaved={configureLight=null;onChanged()},onError=onError)
+    }
+    serviceId?.let{id->
+        AlertDialog(onDismissRequest={serviceId=null},
+            title={Text("История обслуживания")},
+            text={Column(Modifier.heightIn(max=450.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement=Arrangement.spacedBy(10.dp)){
+                PickOne("Действие",listOf("Проверка","Обслуживание","Ремонт",
+                    "Замена расходника"),serviceKind,{serviceKind=it})
+                Lab11DateField("Дата",serviceDate,{serviceDate=it})
+                Field("Что выполнено и почему",serviceNote,{serviceNote=it},
+                    single=false)
+                Field("Оплачено, ₽ (если были расходы)",serviceExpense,
+                    {serviceExpense=it})
+                Text("Если сумма больше нуля, появится отдельная выплата проекта. Исходная стоимость оборудования не списывается повторно.",
+                    style=MaterialTheme.typography.bodySmall)
+            }},
+            confirmButton={
+                Button(enabled=atDate11(serviceDate)!=null &&
+                    serviceNote.trim().length>=2 &&
+                    runCatching{rubles11(serviceExpense)}.isSuccess,
+                    onClick={
+                        try{
+                            db.recordAssetService11(id,serviceKind,
+                                requireNotNull(atDate11(serviceDate)),serviceNote,
+                                rubles11(serviceExpense))
+                            serviceId=null;serviceNote="";serviceExpense="0";onChanged()
+                        }catch(e:Exception){onError(e.message?:"Не удалось зарегистрировать обслуживание")}
+                    }){Text("Сохранить")}
+            },
+            dismissButton={TextButton(onClick={serviceId=null}){Text("Отмена")}}
+        )
     }
     retire?.let{id->
         AlertDialog(onDismissRequest={retire=null},
@@ -227,6 +290,8 @@ internal fun Lab11LightDialog(db:LabDatabase,assetId:Long,
     var tariff by rememberSaveable{mutableStateOf("")}
     var ppfd by rememberSaveable{mutableStateOf("")}
     var date by rememberSaveable{mutableStateOf(dateText11())}
+    val places=remember{db.lightLocations11()}
+    var selectedPlace by rememberSaveable{mutableStateOf<Long?>(null)}
     AlertDialog(onDismissRequest=onClose,
         title={Text("Расчёт освещения")},
         text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -236,16 +301,22 @@ internal fun Lab11LightDialog(db:LabDatabase,assetId:Long,
             Field("Часов работы в сутки",hours,{hours=it})
             Field("Тариф, ₽/кВт·ч",tariff,{tariff=it})
             Lab11DateField("Действует с",date,{date=it})
+            if(places.isNotEmpty())PickOne("Стеллаж или полка",
+                listOf("Не привязывать")+places.map{it.second},
+                places.firstOrNull{it.first==selectedPlace}?.second?:"Не привязывать",
+                {chosen->selectedPlace=places.firstOrNull{it.second==chosen}?.first})
             Field("PPFD, мкмоль/м²/с (необязательно)",ppfd,{ppfd=it})
             Text("Расчётный свет — общие расходы проекта, без распределения по растениям.",
                 style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={Button(onClick={
             try{
-                db.addLight11(assetId,null,
+                val tariffMinor=rubles11(tariff)
+                require(tariffMinor<=Int.MAX_VALUE){"Тариф вне диапазона"}
+                db.addLight11(assetId,selectedPlace,
                     watts.replace(',','.').toDoubleOrNull()?:-1.0,
                     hours.replace(',','.').toDoubleOrNull()?:-1.0,
-                    rubles11(tariff).toInt(),
+                    tariffMinor.toInt(),
                     requireNotNull(atDate11(date)),
                     ppfd.replace(',','.').toDoubleOrNull())
                 onSaved()

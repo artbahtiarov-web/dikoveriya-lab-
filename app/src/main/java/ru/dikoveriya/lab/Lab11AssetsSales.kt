@@ -95,13 +95,37 @@ internal fun LabDatabase.addLight11(assetId:Long?,locationId:Long?,
     require(hours.isFinite() && hours in 0.0..24.0)
     require(tariffMinor>=0 && from>0 && (ppfd==null || ppfd>=0 && ppfd.isFinite()))
     require(assetId!=null || locationId!=null){"Выбери лампу или место"}
-    return writableDatabase.insertOrThrow("light_profiles",null,ContentValues().apply{
-        if(assetId!=null)put("asset_id",assetId)
-        if(locationId!=null)put("location_id",locationId)
-        put("measured_watts",measuredW);put("nominal_watts",measuredW)
-        put("hours_per_day",hours);put("tariff_minor_per_kwh",tariffMinor)
-        put("from_date",from);if(ppfd!=null)put("measured_ppfd",ppfd)
-    })
+    // A revised tariff or lighting schedule closes the previous period.
+    // Otherwise two active profiles would double-count electricity.
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        val where=if(assetId!=null)"asset_id=?" else "asset_id IS NULL AND location_id=?"
+        val key=(assetId?:requireNotNull(locationId)).toString()
+        val current=db.rawQuery("""SELECT id,from_date FROM light_profiles
+            WHERE """+where+""" AND until_date IS NULL
+            ORDER BY from_date DESC,id DESC LIMIT 1""",
+            arrayOf(key)).use{c->
+            if(c.moveToFirst())c.getLong(0) to c.getLong(1) else null
+        }
+        if(current!=null){
+            require(from>current.second){
+                "Новый тариф или режим должен начинаться позже предыдущего"
+            }
+            require(db.update("light_profiles",ContentValues().apply{
+                put("until_date",from)
+            },"id=?",arrayOf(current.first.toString()))==1)
+        }
+        val id=db.insertOrThrow("light_profiles",null,ContentValues().apply{
+            if(assetId!=null)put("asset_id",assetId)
+            if(locationId!=null)put("location_id",locationId)
+            put("measured_watts",measuredW);put("nominal_watts",measuredW)
+            put("hours_per_day",hours);put("tariff_minor_per_kwh",tariffMinor)
+            put("from_date",from);if(ppfd!=null)put("measured_ppfd",ppfd)
+        })
+        db.setTransactionSuccessful()
+        return id
+    }finally{db.endTransaction()}
 }
 internal fun LabDatabase.lightProfiles11():List<Lab11LightProfile> =
     readableDatabase.rawQuery("""SELECT id,asset_id,location_id,measured_watts,
@@ -134,7 +158,8 @@ internal fun LabDatabase.sellItem11(id:Long,amountMinor:Long,
             c.getString(0) to c.getLong(1)}
         require(old.first=="Активен"){"Растение неактивно"}
         val direct=db.rawQuery("""SELECT COALESCE(SUM(amount_minor),0) FROM direct_costs
-            WHERE entity_kind='item' AND entity_id=?""",arrayOf(id.toString()))
+            WHERE entity_kind='item' AND entity_id=? AND reversed=0""",
+            arrayOf(id.toString()))
             .use{c->c.moveToFirst();c.getLong(0)}
         val sale=db.insertOrThrow("item_sales",null,ContentValues().apply{
             put("item_id",id);put("sold_at",at);put("amount_minor",amountMinor)
@@ -185,3 +210,39 @@ internal fun LabDatabase.sales11(limit:Int=500):List<Lab11Sale>{
     return result.sortedWith(compareByDescending<Lab11Sale>{it.date}
         .thenByDescending{it.id}).take(lim)
 }
+
+/** Date and cost of an equipment service are audited without rebooking its original purchase. */
+internal fun LabDatabase.recordAssetService11(assetId:Long,kind:String,
+    at:Long,reason:String,expenseMinor:Long=0L):Long{
+    require(kind in setOf("Проверка","Обслуживание","Ремонт","Замена расходника"))
+    require(at>0 && at<=System.currentTimeMillis()+86400000L)
+    require(reason.trim().length in 2..1000 && expenseMinor>=0)
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        db.rawQuery("SELECT status FROM equipment_assets WHERE id=?",
+            arrayOf(assetId.toString())).use{c->
+            require(c.moveToFirst()){"Оборудование не найдено"}
+            require(c.getString(0)=="Используется"){"Оборудование выведено из эксплуатации"}
+        }
+        val id=db.insertOrThrow("asset_events",null,ContentValues().apply{
+            put("asset_id",assetId);put("kind",kind)
+            put("occurred_at",at);put("note",reason.trim())
+        })
+        if(expenseMinor>0)db.insertOrThrow("cash_ledger",null,ContentValues().apply{
+            put("direction","Расход");put("category",kind+" оборудования")
+            put("amount_minor",expenseMinor);put("occurred_at",at)
+            put("source_type","asset_service");put("source_id",id)
+            put("note",reason.trim())
+        })
+        db.setTransactionSuccessful()
+        return id
+    }finally{db.endTransaction()}
+}
+
+internal fun LabDatabase.lightLocations11():List<Pair<Long,String>> =
+    readableDatabase.rawQuery("""SELECT id,full_path FROM storage_locations
+        WHERE level IN ('Полка','Стеллаж') ORDER BY full_path LIMIT 2000""",null)
+        .use{c->buildList{
+            while(c.moveToNext())add(c.getLong(0) to c.getString(1))
+        }}

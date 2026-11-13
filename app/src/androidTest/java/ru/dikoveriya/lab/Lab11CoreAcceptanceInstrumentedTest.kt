@@ -192,6 +192,38 @@ class Lab11CoreAcceptanceInstrumentedTest {
         assertEquals(expected,Lab11Reminders.dueReminderAt(due,zone))
     }
 
+    @Test fun equipmentServiceDoesNotRebookPurchaseAndTariffChangesDoNotOverlap(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val now=System.currentTimeMillis()
+            val asset=db.addAsset11("QA lamp "+UUID.randomUUID(),
+                "Лампы","Тест",250000L,now,measuredWatts=70.0)
+            val purchasePayment=db.cashRows11().first{
+                it.source=="purchase" && it.note.startsWith("QA lamp")
+            }
+            assertEquals(250000L,purchasePayment.amount)
+            val service=db.recordAssetService11(asset,"Ремонт",now,
+                "Заменён драйвер",35000L)
+            assertEquals(1,db.cashRows11().count{
+                it.source=="asset_service" && it.sourceId==service
+            })
+            assertEquals(1,db.cashRows11().count{it.id==purchasePayment.id})
+            assertEquals(250000L,db.assets11().first{it.id==asset}.cost)
+            db.addLight11(asset,null,70.0,16.0,500,now)
+            db.addLight11(asset,null,65.0,16.0,600,now+86400000L)
+            val rows=db.lightProfiles11().filter{it.assetId==asset}
+            assertEquals(2,rows.size)
+            assertEquals(now+86400000L,rows.first{it.from==now}.to)
+            assertEquals(null,rows.first{it.from==now+86400000L}.to)
+            var refused=false
+            try{db.addLight11(asset,null,65.0,16.0,900,now)}
+            catch(_:Exception){refused=true}
+            assertTrue(refused)
+            assertEquals(2,db.lightProfiles11().count{it.assetId==asset})
+        }finally{db.close()}
+    }
+
     @Test fun massCultureCreationHasIndependentIdentityAndCommonBatch(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
