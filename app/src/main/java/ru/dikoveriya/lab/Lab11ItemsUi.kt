@@ -65,21 +65,25 @@ internal fun Lab11ItemsScreen(
     var query by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
     var favorites by rememberSaveable{mutableStateOf(false)}
+    var stage by rememberSaveable{mutableStateOf("")}
+    var status by rememberSaveable{mutableStateOf("")}
     var filterOpen by remember{mutableStateOf(false)}
     var page by rememberSaveable{mutableIntStateOf(1)}
     var rows by remember{mutableStateOf(emptyList<Lab11PlantItem>())}
     var total by remember{mutableIntStateOf(0)}
     var loading by remember{mutableStateOf(true)}
-    LaunchedEffect(revision,query,kind,favorites,page){
+    val stageOptions=remember(revision){db.itemFilterValues11("stage")}
+    val statusOptions=remember(revision){db.itemFilterValues11("status")}
+    LaunchedEffect(revision,query,kind,favorites,stage,status,page){
         loading=true
         try{
             val pair=withContext(Dispatchers.IO){
-                val count=db.itemsCount11(query,kind,favorites)
+                val count=db.itemsCount11(query,kind,favorites,stage,status)
                 val upto=minOf(count,page*40)
                 val items=buildList{
                     for(offset in 0 until upto step 40)
                         addAll(db.plantItems11(query,minOf(40,upto-offset),offset,
-                            kind,favorites))
+                            kind,favorites,stage,status))
                 }
                 count to items
             }
@@ -168,6 +172,8 @@ internal fun Lab11ItemsScreen(
     if(filterOpen){
         var draftKind by remember(filterOpen){mutableStateOf(kind)}
         var draftFav by remember(filterOpen){mutableStateOf(favorites)}
+        var draftStage by remember(filterOpen){mutableStateOf(stage)}
+        var draftStatus by remember(filterOpen){mutableStateOf(status)}
         ModalBottomSheet(onDismissRequest={filterOpen=false}){
             Column(Modifier.padding(20.dp),
                 verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -181,15 +187,20 @@ internal fun Lab11ItemsScreen(
                         Text(option)
                     }
                 }
+                PickOne("Этап",listOf("Все")+stageOptions,
+                    draftStage.ifBlank{"Все"},{draftStage=if(it=="Все")"" else it})
+                PickOne("Статус",listOf("Все")+statusOptions,
+                    draftStatus.ifBlank{"Все"},{draftStatus=if(it=="Все")"" else it})
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Checkbox(draftFav,{draftFav=it})
                     Text("Только избранное")
                 }
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(onClick={draftKind="";draftFav=false},
+                    OutlinedButton(onClick={draftKind="";draftFav=false;draftStage="";draftStatus=""},
                         modifier=Modifier.weight(1f)){Text("Сбросить")}
                     Button(onClick={
-                        kind=draftKind;favorites=draftFav;page=1;filterOpen=false
+                        kind=draftKind;favorites=draftFav;stage=draftStage;status=draftStatus
+                        page=1;filterOpen=false
                     },modifier=Modifier.weight(1f)){Text("Применить")}
                 }
             }
