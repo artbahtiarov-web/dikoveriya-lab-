@@ -902,6 +902,56 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables
         val BACKUP_ORDER=BACKUP_ORDER_V9+LabCoreV10.backupTables
     }
+    /**
+     * Stream backup JSON directly to ZIP without constructing a giant JSONObject
+     * in memory. Names of all photo files are captured from the *same* read
+     * transaction as database rows. Does not change the on-disk backup format.
+     */
+    fun exportJsonTo(output:java.io.OutputStream):List<String> {
+        val db=readableDatabase
+        val photoNames=mutableListOf<String>()
+        val writer=android.util.JsonWriter(
+            java.io.OutputStreamWriter(output,Charsets.UTF_8))
+        db.beginTransactionNonExclusive()
+        try{
+            writer.beginObject()
+            writer.name("format").value("DIKOVERIYA_LAB")
+            writer.name("schema").value(10)
+            writer.name("exported_at").value(System.currentTimeMillis())
+            writer.name("tables").beginObject()
+            BACKUP_ORDER.forEach {table->
+                writer.name(table).beginArray()
+                val sql=if(table=="storage_locations")
+                    "SELECT * FROM storage_locations ORDER BY id" else "SELECT * FROM $table"
+                db.rawQuery(sql,null).use{c->
+                    val photoIndex=if(table=="culture_photos")c.getColumnIndex("filename") else -1
+                    while(c.moveToNext()){
+                        if(photoIndex>=0)photoNames+=c.getString(photoIndex)
+                        writer.beginObject()
+                        for(i in 0 until c.columnCount){
+                            writer.name(c.getColumnName(i))
+                            when(c.getType(i)){
+                                Cursor.FIELD_TYPE_NULL->writer.nullValue()
+                                Cursor.FIELD_TYPE_INTEGER->writer.value(c.getLong(i))
+                                Cursor.FIELD_TYPE_FLOAT->writer.value(c.getDouble(i))
+                                else->writer.value(c.getString(i))
+                            }
+                        }
+                        writer.endObject()
+                    }
+                }
+                writer.endArray()
+            }
+            writer.endObject()
+            writer.endObject()
+            writer.flush() // Do not close: output is an open ZIP entry.
+            db.setTransactionSuccessful()
+        }finally{
+            db.endTransaction()
+        }
+        return photoNames
+    }
+
     fun exportJson(): String {
         val db=readableDatabase
         val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",10).put("exported_at",System.currentTimeMillis())
