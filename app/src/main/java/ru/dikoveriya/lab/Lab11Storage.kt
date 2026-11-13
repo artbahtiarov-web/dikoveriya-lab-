@@ -152,3 +152,19 @@ internal fun LabDatabase.moveItem11(itemId:Long,locationId:Long,
         db.setTransactionSuccessful()
     }finally{db.endTransaction()}
 }
+
+
+internal fun LabDatabase.findLocationForCode11(code:String):Long?{
+    val normalized=code.trim().uppercase()
+    if(normalized.startsWith("LAB-"))
+        return readableDatabase.rawQuery("""SELECT cs.location_id FROM culture_storage cs
+            JOIN cultures c ON c.id=cs.culture_id WHERE c.code=?""",
+            arrayOf(normalized)).use{c->if(c.moveToFirst())c.getLong(0) else null}
+    if(normalized.startsWith("PLT-"))
+        return readableDatabase.rawQuery(
+            "SELECT location_id FROM plant_items WHERE code=?",
+            arrayOf(normalized)).use{c->
+            if(c.moveToFirst()&&!c.isNull(0))c.getLong(0) else null
+        }
+    return null
+}
