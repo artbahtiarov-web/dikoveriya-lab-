@@ -229,7 +229,13 @@ fun Lab072RegistryScreen(
                     modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
                     Icon(Icons.Outlined.QrCode,null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Этикетки 40×12 мм · ZIP")
+                    Text("Скачать этикетки ZIP")
+                }
+                Button(onClick={onPrintLabels(selected)},enabled=selected.isNotEmpty(),
+                    modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){
+                    Icon(Icons.Outlined.Print,null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Печать NIIMBOT · "+selected.size+" контейнеров")
                 }
             }
         }
