@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - 'feat/v1-*'
+      - 'feat/1.1.0-*'
   workflow_dispatch:
 
 permissions:
