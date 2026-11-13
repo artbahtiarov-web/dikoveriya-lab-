@@ -129,12 +129,7 @@ internal fun Lab07Dashboard(
         Lab07BrandHero("Моя лаборатория",
             "Растения, наблюдения, операции и задачи — в одном месте.",
             "ДИКОВЕРИЯ LAB · ЦЕНТР УПРАВЛЕНИЯ")
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge,
-                modifier=Modifier.weight(1f))
-            Icon(Icons.Outlined.Tune,null,tint=MaterialTheme.colorScheme.tertiary,
-                modifier=Modifier.size(20.dp))
-        }
+        Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge)
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",
                 Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
@@ -146,15 +141,6 @@ internal fun Lab07Dashboard(
                 Lab07Palette.Moss,Modifier.weight(1f)){onMetric("growth")}
             Lab07Metric("Задачи",due.toString(),"к выполнению",
                 Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
-        }
-        Text("Сделать сейчас",style=MaterialTheme.typography.titleLarge)
-        Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
-            Lab07QuickAction("Новый контейнер",
-                {Icon(Icons.Outlined.AddCircleOutline,null)},true,Modifier.weight(1f),
-                onClick=onNewContainer)
-            Lab07QuickAction("Сканировать контейнер",
-                {Icon(Icons.Outlined.QrCodeScanner,null)},
-                modifier=Modifier.weight(1f),onClick=onScan)
         }
         OutlinedCard(onClick=onFinance,
             modifier=Modifier.fillMaxWidth(),
