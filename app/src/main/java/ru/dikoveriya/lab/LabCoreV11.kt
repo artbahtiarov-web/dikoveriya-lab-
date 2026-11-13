@@ -15,6 +15,15 @@ object LabCoreV11 {
         db.execSQL("CREATE TABLE IF NOT EXISTS plant_visuals (plant_id INTEGER PRIMARY KEY NOT NULL REFERENCES plants(id), icon_key TEXT NOT NULL DEFAULT 'leaf', color_key TEXT NOT NULL DEFAULT 'forest', cover_filename TEXT, changed_at INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE IF NOT EXISTS knowledge_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, category TEXT NOT NULL, body TEXT NOT NULL, source_url TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL, created_at INTEGER NOT NULL)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_notes(category,updated_at)")
+        val categoryExists=db.rawQuery("PRAGMA table_info(materials)",null).use{c->
+            var found=false
+            while(c.moveToNext())if(c.getString(1)=="category")found=true
+            found
+        }
+        if(!categoryExists)db.execSQL(
+            "ALTER TABLE materials ADD COLUMN category TEXT NOT NULL DEFAULT 'Расходники'")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_material_category ON materials(category)")
+
     }
     fun validate(db:SQLiteDatabase) {
         require(!db.rawQuery("PRAGMA foreign_key_check",null).use{it.moveToFirst()}){"Нарушена целостность ссылок"}
