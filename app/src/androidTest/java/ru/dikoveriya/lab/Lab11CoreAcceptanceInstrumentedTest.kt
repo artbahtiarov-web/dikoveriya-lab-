@@ -90,6 +90,53 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun rackAndMixedBatchPlacementIsAuditedAndRejectsUnknownCode(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val p=plant(db)
+            val rack=db.createRack11("QA room "+UUID.randomUUID().toString().take(6),
+                "QA стеллаж",2,3)
+            val shelf=db.racks11().first{it.id==rack}.shelves.first()
+            val first=shelf.slots[0].id
+            val second=shelf.slots[1].id
+            val item=db.addPlantItem11(p,"Горшечное")
+            val created=db.createCulturesBulk11(p,listOf(1,1),"Побеги",0,
+                LabTerms.IN_VITRO,null,null,null,"",
+                System.currentTimeMillis(),"QA групповое перемещение")
+            val code=db.cultureById(created.first())!!.code
+            val itemCode=db.item11(item)!!.code
+            val counts=db.moveSelected11(listOf(code,itemCode),first,"QA размещение")
+            assertEquals(1,counts.first)
+            assertEquals(1,counts.second)
+            assertEquals(first,db.findLocationForCode11(code))
+            assertEquals(first,db.findLocationForCode11(itemCode))
+            assertEquals(2,db.slotOccupants11(first).size)
+            val groupId=db.readableDatabase.rawQuery(
+                "SELECT group_id FROM culture_groups WHERE culture_id=?",
+                arrayOf(created.first().toString())
+            ).use{c->assertTrue(c.moveToFirst());c.getLong(0)}
+            val groupCode=db.readableDatabase.rawQuery(
+                "SELECT code FROM production_groups WHERE id=?",
+                arrayOf(groupId.toString())
+            ).use{c->assertTrue(c.moveToFirst());c.getString(0)}
+            val moved=db.moveSelected11(listOf(groupCode),second,"QA перенос партии")
+            assertEquals(2,moved.first)
+            created.forEach{child->
+                assertEquals(second,
+                    db.findLocationForCode11(db.cultureById(child)!!.code))
+            }
+            assertEquals(first,db.findLocationForCode11(itemCode))
+            var rejected=false
+            try{db.moveSelected11(listOf(code,"LAB-999999"),first,"Недопустимо")}
+            catch(_:Exception){rejected=true}
+            assertTrue(rejected)
+            assertEquals(second,db.findLocationForCode11(code))
+            assertEquals("LOC-%06d".format(java.util.Locale.US,first),
+                LabQr.getCode("LOC-%06d".format(java.util.Locale.US,first)))
+        }finally{db.close()}
+    }
+
     @Test fun massCultureCreationHasIndependentIdentityAndCommonBatch(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
