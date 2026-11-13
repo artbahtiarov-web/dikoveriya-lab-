@@ -90,7 +90,7 @@ fun DikoveriyaApp() {
     val plants=remember(refresh){db.plants()}
     val mothers=remember(refresh){db.mothers()}
     val cultures=remember(refresh,tab,currentRoute,actionCultureId,dialog,experimentId) {
-        if(tab=="Аналитика" || actionCultureId!=null || experimentId!=null ||
+        if(actionCultureId!=null || experimentId!=null ||
             dialog in setOf("newIncident","newTask"))db.cultures()
         else db.cultures(limit=5)
     }
@@ -275,7 +275,9 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Ещё" && subsection=="База знаний") {
+            if(tab=="Аналитика") {
+                Lab10AnalyticsScreen(db,refresh,modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="База знаний") {
                 Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
                     modifier=Modifier.fillMaxSize().padding(padding))
             } else LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
