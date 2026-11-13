@@ -1,5 +1,7 @@
 package ru.dikoveriya.lab
 
+import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
@@ -17,6 +19,34 @@ data class LabelFontOption(val id:String,val title:String,val family:String,
 
 object LabelFontCatalog {
     val options=listOf(
+        LabelFontOption("gf:montserrat","Montserrat","montserrat",400,"Обычные"),
+        LabelFontOption("gf:roboto","Roboto","roboto",400,"Обычные"),
+        LabelFontOption("gf:opensans","Open Sans","opensans",400,"Обычные"),
+        LabelFontOption("gf:inter","Inter","inter",400,"Обычные"),
+        LabelFontOption("gf:rubik","Rubik","rubik",400,"Обычные"),
+        LabelFontOption("gf:manrope","Manrope","manrope",400,"Обычные"),
+        LabelFontOption("gf:raleway","Raleway","raleway",400,"Обычные"),
+        LabelFontOption("gf:playfairdisplay","Playfair Display","playfairdisplay",400,"С засечками"),
+        LabelFontOption("gf:lora","Lora","lora",400,"С засечками"),
+        LabelFontOption("gf:nunito","Nunito","nunito",400,"Обычные"),
+        LabelFontOption("gf:oswald","Oswald","oswald",400,"Узкие"),
+        LabelFontOption("gf:ptsans","PT Sans","ptsans",400,"Обычные"),
+        LabelFontOption("gf:ptserif","PT Serif","ptserif",400,"С засечками"),
+        LabelFontOption("gf:ibmplexsans","IBM Plex Sans","ibmplexsans",400,"Обычные"),
+        LabelFontOption("gf:ibmplexserif","IBM Plex Serif","ibmplexserif",400,"С засечками"),
+        LabelFontOption("gf:ibmplexmono","IBM Plex Mono","ibmplexmono",400,"Узкие"),
+        LabelFontOption("gf:firacode","Fira Code","firacode",400,"Узкие"),
+        LabelFontOption("gf:jost","Jost","jost",400,"Обычные"),
+        LabelFontOption("gf:merriweather","Merriweather","merriweather",400,"С засечками"),
+        LabelFontOption("gf:yesevaone","Yeseva One","yesevaone",400,"Декоративные"),
+        LabelFontOption("gf:comfortaa","Comfortaa","comfortaa",400,"Декоративные"),
+        LabelFontOption("gf:cormorantgaramond","Cormorant Garamond","cormorantgaramond",400,"С засечками"),
+        LabelFontOption("gf:philosopher","Philosopher","philosopher",400,"Декоративные"),
+        LabelFontOption("gf:forum","Forum","forum",400,"С засечками"),
+        LabelFontOption("gf:prata","Prata","prata",400,"С засечками"),
+        LabelFontOption("gf:tenorsans","Tenor Sans","tenorsans",400,"Декоративные"),
+        LabelFontOption("gf:spectral","Spectral","spectral",400,"С засечками"),
+        LabelFontOption("gf:alegreya","Alegreya","alegreya",400,"С засечками"),
         LabelFontOption("Sans","Простой · обычный","sans-serif",400,"Обычные"),
         LabelFontOption("Sans Light","Простой · лёгкий","sans-serif",300,"Обычные"),
         LabelFontOption("Sans Thin","Простой · тонкий","sans-serif",100,"Обычные"),
@@ -45,6 +75,12 @@ object LabelFontCatalog {
         LabelFontOption("Mono Bold","Моноширинный · жирный","monospace",700,"Узкие"),
         LabelFontOption("Sans Heavy Compact","Плотный компактный","sans-serif-condensed",800,"Узкие")
     )
+    // 28 truly separate OFL font families are packaged at build time.
+    // System variants remain for backwards compatibility with 0.8.0 labels.
+    @Volatile private var assetManager:AssetManager?=null
+    private val assetCache=java.util.concurrent.ConcurrentHashMap<String,Typeface>()
+    fun initialize(context:Context){assetManager=context.applicationContext.assets}
+    val embeddedFamilies=options.filter{it.id.startsWith("gf:")}
     val categories=listOf("Все","Обычные","Узкие","С засечками","Декоративные")
     fun option(id:String):LabelFontOption=options.firstOrNull{it.id==id}
         ?:when(id) {
@@ -54,7 +90,16 @@ object LabelFontCatalog {
         }
     fun typeface(id:String,bold:Boolean,italic:Boolean):Typeface{
         val spec=option(id)
-        val base=Typeface.create(spec.family,Typeface.NORMAL)
+        val base=if(id.startsWith("gf:")){
+            assetCache[id]?:synchronized(assetCache){
+                assetCache[id]?:run {
+                    val resources=assetManager
+                        ?:error("Шрифты приложения ещё не инициализированы")
+                    Typeface.createFromAsset(resources,"fonts/"+spec.family+".ttf")
+                        .also{assetCache[id]=it}
+                }
+            }
+        } else Typeface.create(spec.family,Typeface.NORMAL)
         val weight=(spec.weight+if(bold)200 else 0).coerceAtMost(900)
         return if(Build.VERSION.SDK_INT>=28)Typeface.create(base,weight,italic)
         else Typeface.create(base,when {
