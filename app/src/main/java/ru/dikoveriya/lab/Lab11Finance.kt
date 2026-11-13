@@ -185,3 +185,57 @@ internal fun LabDatabase.financeSummary11(from:Long=0L,to:Long=Long.MAX_VALUE):L
         WHERE d.cogs_minor IS NULL AND s.sold_at BETWEEN ? AND ?""",dates).toInt()
     return Lab11FinanceSummary(income,paid,direct,inventory,assets,cogs,unknown)
 }
+
+/** Financial ledgers are SQL-paged, including years with tens of thousands of transactions. */
+internal fun LabDatabase.cashCount11(from:Long,to:Long,category:String=""):Int{
+    require(from>=0 && to>=from)
+    val clause=if(category.isBlank())"" else " AND category=?"
+    val args=if(category.isBlank())arrayOf(from.toString(),to.toString())
+        else arrayOf(from.toString(),to.toString(),category)
+    return readableDatabase.rawQuery("""SELECT COUNT(*) FROM cash_ledger
+        WHERE occurred_at BETWEEN ? AND ?"""+clause,args)
+        .use{c->c.moveToFirst();c.getInt(0)}
+}
+internal fun LabDatabase.cashPage11(from:Long,to:Long,category:String="",
+    limit:Int=40,offset:Int=0):List<Lab11CashRow>{
+    require(from>=0 && to>=from && limit in 1..100 && offset>=0)
+    val clause=if(category.isBlank())"" else " AND category=?"
+    val args=if(category.isBlank())arrayOf(from.toString(),to.toString())
+        else arrayOf(from.toString(),to.toString(),category)
+    return readableDatabase.rawQuery("""SELECT id,direction,category,amount_minor,
+        occurred_at,source_type,source_id,note FROM cash_ledger
+        WHERE occurred_at BETWEEN ? AND ?"""+clause+
+        " ORDER BY occurred_at DESC,id DESC LIMIT "+limit+" OFFSET "+offset,args)
+        .use{c->buildList{while(c.moveToNext())add(Lab11CashRow(
+            c.getLong(0),c.getString(1),c.getString(2),c.getLong(3),
+            c.getLong(4),c.getString(5),
+            if(c.isNull(6))null else c.getLong(6),c.getString(7)
+        ))}}
+}
+internal fun LabDatabase.cashBySource11(source:String,sourceId:Long):Lab11CashRow?=
+    readableDatabase.rawQuery("""SELECT id,direction,category,amount_minor,
+        occurred_at,source_type,source_id,note FROM cash_ledger
+        WHERE source_type=? AND source_id=? LIMIT 1""",
+        arrayOf(source,sourceId.toString())).use{c->
+        if(!c.moveToFirst())null else Lab11CashRow(c.getLong(0),c.getString(1),
+            c.getString(2),c.getLong(3),c.getLong(4),c.getString(5),
+            if(c.isNull(6))null else c.getLong(6),c.getString(7))
+    }
+
+internal fun LabDatabase.purchasesCount11():Int=
+    readableDatabase.rawQuery("SELECT COUNT(*) FROM purchases",null)
+        .use{it.moveToFirst();it.getInt(0)}
+
+internal fun LabDatabase.purchasesPage11(limit:Int=40,offset:Int=0):List<Lab11Purchase>{
+    require(limit in 1..100 && offset>=0)
+    return readableDatabase.rawQuery("""SELECT id,title,category,supplier,purchased_at,
+        quantity,unit,amount_minor,material_id,asset_id,note
+        FROM purchases ORDER BY purchased_at DESC,id DESC LIMIT """+limit+
+        " OFFSET "+offset,null).use{c->buildList{
+        while(c.moveToNext())add(Lab11Purchase(c.getLong(0),c.getString(1),
+            c.getString(2),c.getString(3),c.getLong(4),c.getDouble(5),
+            c.getString(6),c.getLong(7),
+            if(c.isNull(8))null else c.getLong(8),
+            if(c.isNull(9))null else c.getLong(9),c.getString(10)))
+    }}
+}

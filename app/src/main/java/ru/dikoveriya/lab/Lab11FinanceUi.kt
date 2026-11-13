@@ -55,11 +55,27 @@ internal fun Lab11FinanceScreen(
     val to=if(scope=="Месяц")current.plusMonths(1).atDay(1)
         .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()-1 else Long.MAX_VALUE
     val stats=remember(revision,from,to){db.financeSummary11(from,to)}
-    val allCash=remember(revision){db.cashRows11(800)}
-    val cash=remember(allCash,from,to,cashCategory){allCash.filter{
-        it.date in from..to && (cashCategory.isBlank()||it.category==cashCategory)
-    }}
-    val purchases=remember(revision){db.purchases11()}
+    var cashPages by rememberSaveable{mutableIntStateOf(1)}
+    var purchasePages by rememberSaveable{mutableIntStateOf(1)}
+    LaunchedEffect(from,to,cashCategory){cashPages=1}
+    val cashCount=remember(revision,from,to,cashCategory){
+        db.cashCount11(from,to,cashCategory)
+    }
+    val cash=remember(revision,from,to,cashCategory,cashPages){
+        val upto=minOf(cashCount,cashPages*40)
+        buildList{
+            for(offset in 0 until upto step 40)
+                addAll(db.cashPage11(from,to,cashCategory,minOf(40,upto-offset),offset))
+        }
+    }
+    val purchaseCount=remember(revision){db.purchasesCount11()}
+    val purchases=remember(revision,purchasePages){
+        val upto=minOf(purchaseCount,purchasePages*40)
+        buildList{
+            for(offset in 0 until upto step 40)
+                addAll(db.purchasesPage11(minOf(40,upto-offset),offset))
+        }
+    }
     LazyColumn(modifier=modifier,contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)){
         item{
@@ -162,7 +178,7 @@ internal fun Lab11FinanceScreen(
                     Text("Категория: "+cashCategory+" · Сбросить")
                 }
             }
-            item{Text("Движение денег · "+cash.size,
+            item{Text("Движение денег · "+cashCount,
                 style=MaterialTheme.typography.titleLarge)}
             if(cash.isEmpty())item{Text("За выбранный период движений нет")}
             items(cash,key={it.id}){row->
@@ -186,16 +202,19 @@ internal fun Lab11FinanceScreen(
                     }
                 }
             }
+            if(cash.size<cashCount)item{
+                OutlinedButton(onClick={cashPages++},modifier=Modifier.fillMaxWidth()){
+                    Text("Показать ещё · "+(cashCount-cash.size))
+                }
+            }
         }
         if(view=="Закупки"){
-            item{Text("Закупки · "+purchases.size,
+            item{Text("Закупки · "+purchaseCount,
                 style=MaterialTheme.typography.titleLarge)}
             if(purchases.isEmpty())item{Text("Закупок пока нет")}
             items(purchases,key={it.id}){row->
                 OutlinedCard(modifier=Modifier.fillMaxWidth(),onClick={
-                    selectedCash=allCash.firstOrNull{
-                        it.source=="purchase" && it.sourceId==row.id
-                    }
+                    selectedCash=db.cashBySource11("purchase",row.id)
                 }){
                     Column(Modifier.padding(14.dp),
                         verticalArrangement=Arrangement.spacedBy(5.dp)){
@@ -205,6 +224,11 @@ internal fun Lab11FinanceScreen(
                             style=MaterialTheme.typography.bodySmall)
                         if(row.qty>0)Text("Количество: "+row.qty+" "+row.unit)
                     }
+                }
+            }
+            if(purchases.size<purchaseCount)item{
+                OutlinedButton(onClick={purchasePages++},modifier=Modifier.fillMaxWidth()){
+                    Text("Показать ещё · "+(purchaseCount-purchases.size))
                 }
             }
         }
