@@ -57,7 +57,7 @@ fun Lab07RouteScreen(
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
         "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
-        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,onEditPlant,modifier)
+        "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,onChanged,onError,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
             if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
