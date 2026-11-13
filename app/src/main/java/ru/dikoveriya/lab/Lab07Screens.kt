@@ -62,6 +62,14 @@ fun Lab07RouteScreen(
             onItem={onNavigate(Lab07Navigation.item(it))},
             onCulture={onNavigate(Lab07Navigation.container(it))},
             onChanged=onChanged,onError=onError,modifier=modifier)
+        "location" -> if(id!=null)Lab11StorageScreen(db,revision,onBack,
+            onItem={onNavigate(Lab07Navigation.item(it))},
+            onCulture={onNavigate(Lab07Navigation.container(it))},
+            onChanged=onChanged,onError=onError,initialFocusId=id,modifier=modifier)
+            else Lab07MissingScreen(onBack,modifier)
+        "asset" -> if(id!=null)Lab11AssetsScreen(db,revision,onBack,
+            onChanged=onChanged,onError=onError,initialAssetId=id,modifier=modifier)
+            else Lab07MissingScreen(onBack,modifier)
         "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,
             onChanged,onError,onOpenItems={onNavigate(Lab07Navigation.ITEMS)},modifier=modifier)
         "items" -> Lab11ItemsScreen(db,revision,onBack,onNewItem,
