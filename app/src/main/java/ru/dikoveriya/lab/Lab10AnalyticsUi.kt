@@ -53,9 +53,11 @@ private fun LabDatabase.analytics10(since:Long?):Lab10AnalyticsData{
 @Composable
 internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
     onMetric:(String)->Unit={},onBreakdown:(String,Long)->Unit={_,_->},
+    onOpenItem:(Long)->Unit={},
     modifier:Modifier=Modifier
 ){
     var period by rememberSaveable{mutableStateOf("30 дней")}
+    var compare by remember{mutableStateOf(false)}
     val since=when(period){
         "30 дней"->System.currentTimeMillis()-30L*86400000L
         "90 дней"->System.currentTimeMillis()-90L*86400000L
@@ -153,8 +155,28 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        item{
+            OutlinedCard(onClick={compare=true},
+                modifier=Modifier.fillMaxWidth(),
+                shape=RoundedCornerShape(17.dp)){
+                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){
+                    Icon(Icons.Outlined.CompareArrows,contentDescription=null,
+                        tint=Lab07Palette.Brass)
+                    Column(Modifier.weight(1f).padding(start=12.dp)){
+                        Text("Сравнить два растения",
+                            style=MaterialTheme.typography.titleMedium)
+                        Text("Фактический рост, листья, корни и темп изменений",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    Icon(Icons.Outlined.ChevronRight,"Открыть сравнение")
+                }
+            }
+        }
         item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision,onBreakdown)}
     }
+    if(compare)Lab11GrowthComparisonDialog(db,
+        onDismiss={compare=false},
+        onOpenItem={id->compare=false;onOpenItem(id)})
 }
 
 @Composable
