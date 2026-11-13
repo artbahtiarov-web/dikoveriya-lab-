@@ -39,13 +39,13 @@ internal fun Lab11FinanceScreen(
     onBack:()->Unit,onSales:()->Unit,onMaterial:()->Unit,
     onOpenItem:(Long)->Unit,onOpenCulture:(Long)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
-    modifier:Modifier=Modifier
+    initialView:String="Обзор",initialAction:String="",modifier:Modifier=Modifier
 ){
     var month by rememberSaveable{mutableStateOf(YearMonth.now().toString())}
     var scope by rememberSaveable{mutableStateOf("Всё время")}
-    var view by rememberSaveable{mutableStateOf("Обзор")}
-    var purchase by remember{mutableStateOf(false)}
-    var expense by remember{mutableStateOf(false)}
+    var view by rememberSaveable(initialView){mutableStateOf(initialView)}
+    var purchase by remember{mutableStateOf(initialAction=="Покупка")}
+    var expense by remember{mutableStateOf(initialAction=="Расход")}
     var selectedCash by remember{mutableStateOf<Lab11CashRow?>(null)}
     val current=remember(month){YearMonth.parse(month)}
     val from=if(scope=="Месяц")current.atDay(1)
