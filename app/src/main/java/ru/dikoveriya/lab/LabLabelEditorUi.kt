@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,6 +75,7 @@ fun Lab080LabelEditor(
     var selected by rememberSaveable(culture.id){mutableStateOf("plant")}
     var zoom by rememberSaveable(culture.id){mutableFloatStateOf(1f)}
     var grid by rememberSaveable(culture.id){mutableStateOf(true)}
+    var fontPickerOpen by rememberSaveable(culture.id){mutableStateOf(false)}
     var snap by rememberSaveable(culture.id){mutableStateOf(true)}
     var templateName by rememberSaveable(culture.id){mutableStateOf("")}
     var confirmDelete by rememberSaveable(culture.id){mutableStateOf<Long?>(null)}
@@ -85,6 +88,7 @@ fun Lab080LabelEditor(
     val bmp=remember(serialized,values){LabLabelDesigner.bitmap(values,layout).asImageBitmap()}
     val warnings=remember(serialized){LabLabelDesigner.warnings(layout)}
     var previewWidthPx by remember{mutableFloatStateOf(1f)}
+    val handleWidthPx=with(LocalDensity.current){48.dp.toPx()}
 
     fun checkpoint(){
         undo.add(serialized)
@@ -139,11 +143,13 @@ fun Lab080LabelEditor(
             "Холст 40 × 12 мм. Перетащи элемент пальцем, настрой размеры и сохрани шаблон.",::requestBack)
         Row(verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Text("Увеличение",style=MaterialTheme.typography.bodySmall)
+            Text("Только просмотр",style=MaterialTheme.typography.bodySmall)
             Slider(value=zoom,onValueChange={zoom=it},valueRange=1f..2.5f,
                 modifier=Modifier.weight(1f))
             Text("${(zoom*100).roundToInt()}%",style=MaterialTheme.typography.bodySmall)
         }
+        Text("Размер объекта меняется за золотые углы наклейки или кнопками + / − ниже.",
+            style=MaterialTheme.typography.bodySmall)
         Row(verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.SpaceBetween,
             modifier=Modifier.fillMaxWidth()){
@@ -184,6 +190,7 @@ fun Lab080LabelEditor(
                                 val mx=point.x/previewWidthPx*40f
                                 val my=point.y/previewWidthPx*40f
                                 origin=latestLayout.layers.asReversed().firstOrNull{layer->
+                                    !layer.locked &&
                                     mx in layer.x..(layer.x+layer.width) &&
                                     my in layer.y..(layer.y+layer.height)
                                 }
@@ -293,6 +300,25 @@ fun Lab080LabelEditor(
                         Field("Свой текст",layer.text,{edit(layer.copy(text=it.take(150)))},
                             single=false)
                     }
+                    Text("РАЗМЕР ВЫБРАННОГО ОБЪЕКТА",
+                        style=MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
+                        OutlinedButton(enabled=!layer.locked,
+                            onClick={edit(layer.scaled(.9f))},
+                            modifier=Modifier.weight(1f).heightIn(min=48.dp)){
+                            Text("− 10%")
+                        }
+                        OutlinedButton(enabled=!layer.locked,
+                            onClick={edit(layer.scaled(1.1f))},
+                            modifier=Modifier.weight(1f).heightIn(min=48.dp)){
+                            Text("+ 10%")
+                        }
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Checkbox(checked=layer.locked,
+                            onCheckedChange={edit(layer.copy(locked=it))})
+                        Text("Закрепить от случайного перемещения")
+                    }
                     Text("Положение, мм",style=MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
                         OutlinedButton(onClick={edit(layer.moved(-.5f,0f))},
@@ -334,15 +360,34 @@ fun Lab080LabelEditor(
                         Slider(value=layer.fontMm,
                             onValueChange={edit(layer.copy(fontMm=it))},
                             valueRange=.65f..4f)
-                        PickOne("Шрифт",listOf("Sans","Serif","Mono"),layer.family,
-                            {edit(layer.copy(family=it))})
+                        OutlinedButton(onClick={fontPickerOpen=true},
+                            modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
+                            Icon(Icons.Outlined.FontDownload,null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Шрифт: "+LabelFontCatalog.option(layer.family).title)
+                            Spacer(Modifier.weight(1f))
+                            Icon(Icons.Outlined.ChevronRight,null)
+                        }
                         PickOne("Выравнивание",listOf("Слева","По центру","Справа"),
                             layer.align,{edit(layer.copy(align=it))})
-                        Row(verticalAlignment=Alignment.CenterVertically){
-                            Checkbox(checked=layer.bold,
-                                onCheckedChange={edit(layer.copy(bold=it))})
-                            Text("Полужирный")
+                        Text("Форматирование · B / I / U можно сочетать",
+                            style=MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            FilterChip(selected=layer.bold,
+                                onClick={edit(layer.copy(bold=!layer.bold))},
+                                label={Text("B · Жирный")},modifier=Modifier.heightIn(min=48.dp))
+                            FilterChip(selected=layer.italic,
+                                onClick={edit(layer.copy(italic=!layer.italic))},
+                                label={Text("I · Курсив")},modifier=Modifier.heightIn(min=48.dp))
                         }
+                        FilterChip(selected=layer.underline,
+                            onClick={edit(layer.copy(underline=!layer.underline))},
+                            label={Text("U · Подчёркнутый")},modifier=Modifier.heightIn(min=48.dp))
+                        Text("Межбуквенный интервал: "+label080(layer.letterSpacingMm)+" мм",
+                            style=MaterialTheme.typography.bodySmall)
+                        Slider(value=layer.letterSpacingMm,
+                            onValueChange={edit(layer.copy(letterSpacingMm=it))},
+                            valueRange=-.2f..0.8f)
                     }
                     PickOne("Поворот",listOf("0","90","180","270"),
                         layer.rotation.toString(),
@@ -458,6 +503,11 @@ fun Lab080LabelEditor(
         Text("Считывание QR зависит от реальной печати, бумаги и камеры. Прямая Bluetooth-печать отсутствует.",
             style=MaterialTheme.typography.bodySmall,
             color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if(fontPickerOpen && chosen!=null && chosen.kind!="qr"){
+        Lab09FontPicker(selected=chosen.family,
+            onSelect={id->edit(chosen.copy(family=id))},
+            onDismiss={fontPickerOpen=false})
     }
     if(confirmLeave)AlertDialog(
         onDismissRequest={confirmLeave=false},
