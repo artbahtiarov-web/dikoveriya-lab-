@@ -114,12 +114,19 @@ fun Lab072RegistryScreen(
         contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)) {
         item(key="top") {
-            Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАБОЧИЙ СПИСОК",
-                initialPlantId?.let {id->
-                    plants.firstOrNull{it.id==id}?.name
-                } ?: title,subtitle,onBack)
+            val currentPlant=plants.firstOrNull{it.id==initialPlantId}
+            if(currentPlant!=null){
+                val visual=remember(currentPlant.id,revision){
+                    db.plantVisuals10()[currentPlant.id]?:Lab10PlantVisual(currentPlant.id)
+                }
+                val count=remember(currentPlant.id,revision){
+                    db.plantCounts072()[currentPlant.id]?:0
+                }
+                Lab10VarietyHeader(currentPlant,visual,count,onBack,onNewContainer)
+            }else Lab07ScreenHeader("ЛАБОРАТОРИЯ / РАБОЧИЙ СПИСОК",
+                title,subtitle,onBack)
         }
-        if(onNewContainer!=null)item(key="new-container"){
+        if(onNewContainer!=null && initialPlantId==null)item(key="new-container"){
             Button(onClick=onNewContainer,
                 modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){
                 Icon(Icons.Outlined.AddCircleOutline,null)
