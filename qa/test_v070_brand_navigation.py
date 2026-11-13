@@ -16,9 +16,9 @@ BUILD=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class BotanicalNavigation07(unittest.TestCase):
     def test_version_is_07_and_db_is_still_08(self):
-        self.assertIn('versionName = "0.7.2"',BUILD)
-        self.assertIn("versionCode = 70200 +",BUILD)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 9)',DB)
+        self.assertIn('versionName = "0.8.0"',BUILD)
+        self.assertIn("versionCode = 80000 +",BUILD)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 10)',DB)
         self.assertIn('namespace = "ru.dikoveriya.lab"',BUILD)
 
     def test_enter_and_back_have_no_clear_all(self):
