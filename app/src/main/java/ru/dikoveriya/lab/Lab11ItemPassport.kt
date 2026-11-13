@@ -199,7 +199,7 @@ internal fun Lab11ItemPassport(
                                     Icon(Icons.Outlined.ChevronRight,null)
                                 }
                             }
-                            lineage.forEach{Text(it,style=MaterialTheme.typography.bodySmall)}
+                            Lab11GenealogyView(db,id,revision,onOpenItem,onOpenCulture)
                             if(item.parentItemId==null && item.parentCultureId==null)
                                 Text("Создано как самостоятельный объект")
                         }
