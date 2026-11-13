@@ -386,7 +386,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия 0.8.0 · локальная база SQLite v10. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v10. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
