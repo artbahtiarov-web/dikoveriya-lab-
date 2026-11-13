@@ -224,6 +224,44 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun customTemplateTypedFieldsAreValidatedAndDoNotBypassStock(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val item=db.addPlantItem11(plant(db),"Горшечное")
+            val name="QA уход "+UUID.randomUUID()
+            val definition=templateFieldsJson11(listOf(
+                Lab11TemplateField("Объём","unit",true,"мл"),
+                Lab11TemplateField("Сезон","choice",true,
+                    choices=listOf("Лето","Зима")),
+                Lab11TemplateField("Дата осмотра","date",false)))
+            db.addTemplate11(name,"Горшечное",definition)
+            val before=db.itemEvents11(item).size
+            var rejected=false
+            try{db.performItemAction11(item,name,System.currentTimeMillis(),
+                customFields=mapOf("Объём" to "не число","Сезон" to "Лето"))}
+            catch(_:Exception){rejected=true}
+            assertTrue(rejected)
+            assertEquals(before,db.itemEvents11(item).size)
+            rejected=false
+            try{db.performItemAction11(item,name,System.currentTimeMillis(),
+                materialQty=3.0,
+                customFields=mapOf("Объём" to "100","Сезон" to "Лето"))}
+            catch(_:Exception){rejected=true}
+            assertTrue("No unlinked inventory movement",rejected)
+            assertEquals(before,db.itemEvents11(item).size)
+            val event=db.performItemAction11(item,name,System.currentTimeMillis(),
+                customFields=mapOf("Объём" to "100.5","Сезон" to "Лето",
+                    "Дата осмотра" to "05.12.2026"))
+            assertTrue(event>0)
+            val saved=db.itemEvents11(item).first{it.id==event}
+            assertTrue(saved.details.contains("Объём"))
+            assertTrue(saved.details.contains("Сезон"))
+            val legacy=parseTemplateFields11("[\\\"Отметка\\\"]")
+            assertEquals("text",legacy.single().kind)
+        }finally{db.close()}
+    }
+
     @Test fun massCultureCreationHasIndependentIdentityAndCommonBatch(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)

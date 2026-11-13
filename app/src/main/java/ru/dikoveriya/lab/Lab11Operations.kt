@@ -27,7 +27,11 @@ internal fun LabDatabase.performItemAction11(
     require(at>0 && at<=System.currentTimeMillis()+86400000L)
     require(note.length<=2000)
     require(newKind==null || newKind in setOf("Горшечное","Черенок","Маточник","Другое"))
-    require(materialId==null || materialQty.isFinite() && materialQty>0)
+    require(materialQty.isFinite() && materialQty>=0)
+    require((materialId==null && materialQty==0.0) ||
+        (materialId!=null && materialQty>0)){
+        "Количество материала без выбранной складской позиции недопустимо"
+    }
     val db=writableDatabase
     db.beginTransaction()
     try{
