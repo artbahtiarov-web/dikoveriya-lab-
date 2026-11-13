@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -97,6 +99,12 @@ fun DikoveriyaApp() {
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var lastExitRequest by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(db){
+        try{
+            val n=withContext(Dispatchers.IO){db.generateRecurringTasks11()}
+            if(n>0)refresh++
+        }catch(e:Exception){error=e.message?:"Не удалось обновить повторяющиеся задачи"}
+    }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
     val plants=remember(refresh){db.plants()}
@@ -230,6 +238,7 @@ fun DikoveriyaApp() {
     val openSection: (String)->Unit = {section->
         when(section){
             "Задачи"->openRoute(Lab07Navigation.TASKS)
+            "Мои растения"->openRoute(Lab07Navigation.ITEMS)
             "Группы контейнеров"->openRoute(Lab07Navigation.GROUPS)
             "Места хранения"->openRoute(Lab07Navigation.PLACES)
             else->{
@@ -326,7 +335,46 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Ещё" && subsection=="Операции") {
+            if(tab=="Ещё" && subsection=="Финансы") {
+                Lab11FinanceScreen(db,refresh,
+                    onBack={subsection=""},
+                    onSales={openSection("Продажи")},
+                    onMaterial={openSection("Склад")},
+                    onOpenItem={openRoute(Lab07Navigation.item(it))},
+                    onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onChanged={refresh++},onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Закупки") {
+                Lab11FinanceScreen(db,refresh,
+                    onBack={subsection=""},
+                    onSales={openSection("Продажи")},
+                    onMaterial={openSection("Склад")},
+                    onOpenItem={openRoute(Lab07Navigation.item(it))},
+                    onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onChanged={refresh++},onError={error=it},
+                    initialView="Закупки",
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Продажи") {
+                Lab11SalesScreen(db,refresh,
+                    onBack={subsection=""},
+                    onItem={id->
+                        tab="Коллекция";openRoute(Lab07Navigation.item(id))
+                    },
+                    onCulture={id->
+                        tab="Коллекция";openRoute(Lab07Navigation.container(id))
+                    },
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Оборудование") {
+                Lab11AssetsScreen(db,refresh,
+                    onBack={subsection=""},onChanged={refresh++},
+                    onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Пользовательские справочники") {
+                Lab11CustomCatalogScreen(db,refresh,
+                    onBack={subsection=""},onChanged={refresh++},
+                    onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Операции") {
                 Lab10OperationsScreen(db,refresh,
                     onBack={subsection=""},
                     onOpenCulture={id->
@@ -339,6 +387,7 @@ fun DikoveriyaApp() {
                     onBack={subsection=""},
                     onNew={dialog="newMaterial"},
                     onMove={materialId=it},
+                    onChanged={refresh++},onError={error=it},
                     modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="Настройки") {
                 Lab10SettingsScreen(darkTheme=darkTheme,
@@ -435,7 +484,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v11. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v12. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -456,7 +505,14 @@ fun DikoveriyaApp() {
                         quickMenu=false
                         quickOperationPicker=true
                     },
-                    onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)}
+                    onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)},
+                    onNewItem={quickMenu=false;dialog="newItem"},
+                    onBulkCulture={quickMenu=false;dialog="bulkCulture"},
+                    onCutting={
+                        quickMenu=false
+                        tab="Коллекция";routeStack=listOf(Lab07Navigation.ITEMS)
+                    },
+                    onFinance={quickMenu=false;openSection("Финансы")}
                 )
             }
             if(quickOperationPicker) {
@@ -473,6 +529,14 @@ fun DikoveriyaApp() {
             }
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
+                "bulkCulture" -> Lab11BulkCultureDialog(db,plants,recipes,
+                    onClose={dialog=""},
+                    onSaved={id->
+                        dialog="";refresh++
+                        if(id!=null){
+                            tab="Коллекция";openRoute(Lab07Navigation.container(id))
+                        }
+                    },onError={error=it})
                 "newItem" -> Lab11NewItemDialog(db,plants,
                     onClose={dialog=""},onSaved={id->
                         dialog="";refresh++;openRoute(Lab07Navigation.item(id))
