@@ -63,6 +63,7 @@ fun DikoveriyaApp() {
     var saleCultureId by remember { mutableStateOf<Long?>(null) }
     var labelCultureId by remember { mutableStateOf<Long?>(null) }
     var legacyAssessmentId by remember { mutableStateOf<Long?>(null) }
+    var taskCultureId by remember { mutableStateOf<Long?>(null) }
     var labelForExport by remember { mutableStateOf<LabLabelSpec?>(null) }
     var labelsForExport by remember { mutableStateOf(emptyList<Long>()) }
     var preselectedPlantId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -196,7 +197,7 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && actionCultureId==null &&
+    BackHandler(enabled=dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
@@ -238,6 +239,7 @@ fun DikoveriyaApp() {
                         onLabel={openRoute(Lab07Navigation.label(it))},
                         onPhotos={photoCultureId=it},
                         onSale={saleCultureId=it},
+                        onTask={taskCultureId=it},
                         onLegacyAssessment={legacyAssessmentId=it},
                         onAction={id,mode->actionPreferredMode=mode;actionCultureId=id},
                         onChanged={refresh++},
@@ -426,6 +428,13 @@ fun DikoveriyaApp() {
                     onSave={status,location,reason->
                         if(act{db.updateCulture(id,culture.quantity,status,location,culture.batchId,reason,
                             culture.recipeId,true)})cultureId=null
+                    })
+            }}
+            taskCultureId?.let{id->db.cultureById(id)?.let{culture->
+                Lab080TaskDialog(culture,onClose={taskCultureId=null},
+                    onSave={name,due,priority,kind->
+                        if(act{db.createTask072(name,due,priority,kind,id,null,null)})
+                            taskCultureId=null
                     })
             }}
             saleCultureId?.let{id->db.cultureById(id)?.let{culture->
