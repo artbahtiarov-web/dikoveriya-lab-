@@ -21,7 +21,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 internal data class Lab11DayTasks(val planned:Int=0,val done:Int=0,val overdue:Int=0,val soon:Int=0)
-fun LabDatabase.taskMonth11(month:YearMonth,now:Long=System.currentTimeMillis()):Map<Int,Lab11DayTasks>{
+internal fun LabDatabase.taskMonth11(month:YearMonth,now:Long=System.currentTimeMillis()):Map<Int,Lab11DayTasks>{
     val rows=mutableMapOf<Int,Lab11DayTasks>()
     readableDatabase.rawQuery("""
         SELECT CAST(strftime('%d',t.due_at/1000,'unixepoch','localtime') AS INTEGER), t.done,t.due_at
