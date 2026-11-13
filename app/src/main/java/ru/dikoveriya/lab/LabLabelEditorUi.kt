@@ -239,6 +239,52 @@ fun Lab080LabelEditor(
                             style=Stroke(width=2.dp.toPx()))
                     }
                 }
+                chosen?.let{layer->
+                    // Four visible resizing corners. Hit zones are 48 dp while
+                    // the gold markers themselves are 16 dp.
+                    listOf(
+                        Triple(0,layer.x,layer.y),
+                        Triple(1,layer.x+layer.width,layer.y),
+                        Triple(2,layer.x,layer.y+layer.height),
+                        Triple(3,layer.x+layer.width,layer.y+layer.height)
+                    ).forEach{(corner,mx,my)->
+                        Box(Modifier
+                            .offset {
+                                IntOffset(
+                                    (mx*previewWidthPx/40f-handleWidthPx/2f).roundToInt(),
+                                    (my*previewWidthPx/40f-handleWidthPx/2f).roundToInt()
+                                )
+                            }
+                            .size(48.dp)
+                            .pointerInput(layer.id,corner,previewWidthPx,layer.locked) {
+                                var baseline=layer
+                                var deltaMm=Offset.Zero
+                                detectDragGestures(
+                                    onDragStart={
+                                        baseline=latestLayout.layers.firstOrNull{it.id==layer.id}?:layer
+                                        deltaMm=Offset.Zero
+                                        if(!baseline.locked)checkpoint()
+                                    },
+                                    onDrag={change,amount->
+                                        change.consume()
+                                        if(!baseline.locked){
+                                            deltaMm+=amount
+                                            val newLayer=baseline.resizedFromCorner(
+                                                corner,deltaMm.x/previewWidthPx*40f,
+                                                deltaMm.y/previewWidthPx*40f)
+                                            commit(latestLayout.replace(newLayer),history=false)
+                                        }
+                                    }
+                                )
+                            },
+                            contentAlignment=Alignment.Center) {
+                            Box(Modifier.size(16.dp)
+                                .border(2.dp,if(layer.locked)Color.Gray
+                                    else Color(0xFFB98635),RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.surface))
+                        }
+                    }
+                }
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp),
