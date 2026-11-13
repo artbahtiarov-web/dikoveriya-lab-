@@ -275,7 +275,10 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            if(tab=="Ещё" && subsection=="База знаний") {
+                Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else LazyColumn(state=rememberLazyListState(),modifier=Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(horizontal=16.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                 item {
                     Row(verticalAlignment=Alignment.CenterVertically){
                         Icon(painterResource(R.drawable.ic_dikoveriya_logo),contentDescription=null,
@@ -335,7 +338,7 @@ fun DikoveriyaApp() {
                     "Ещё" -> {
                         if(subsection.isEmpty()){
                             item { Text("Лаборатория",style=MaterialTheme.typography.titleMedium,color=Lab07Palette.Forest) }
-                            items(listOf("Питательные среды","Маточники","Группы контейнеров","Места хранения","Склад","Оборудование")){label->
+                            items(listOf("Питательные среды","Маточники","Группы контейнеров","Места хранения","Склад","Оборудование","База знаний")){label->
                                 TextEntryRow(label){openSection(label)}
                                 HorizontalDivider()
                             }
