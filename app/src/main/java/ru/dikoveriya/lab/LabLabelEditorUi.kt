@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -183,38 +185,59 @@ fun Lab080LabelEditor(
                         }
                     }
                     .pointerInput(previewWidthPx,snap){
-                        var origin:LabelLayer?=null
-                        var cumulative=Offset.Zero
-                        detectDragGestures(
-                            onDragStart={point->
-                                val mx=point.x/previewWidthPx*40f
-                                val my=point.y/previewWidthPx*40f
-                                origin=latestLayout.layers.asReversed().firstOrNull{layer->
-                                    !layer.locked &&
-                                    mx in layer.x..(layer.x+layer.width) &&
-                                    my in layer.y..(layer.y+layer.height)
+                        awaitEachGesture {
+                            val down=awaitFirstDown(requireUnconsumed=false)
+                            val mmX=down.position.x/previewWidthPx*40f
+                            val mmY=down.position.y/previewWidthPx*40f
+                            var basis=latestLayout.layers.asReversed().firstOrNull{layer->
+                                !layer.locked &&
+                                mmX in layer.x..(layer.x+layer.width) &&
+                                mmY in layer.y..(layer.y+layer.height)
+                            }
+                            basis?.let{selected=it.id}
+                            var startPos=down.position
+                            var startDistance:Float?=null
+                            var checkpointed=false
+                            while(true){
+                                val event=awaitPointerEvent()
+                                val live=event.changes.filter{it.pressed}
+                                if(live.isEmpty())break
+                                val source=basis
+                                if(source!=null){
+                                    var next:LabelLayer?=null
+                                    if(live.size>=2){
+                                        val distance=(live[0].position-live[1].position).getDistance()
+                                        if(startDistance==null){
+                                            basis=latestLayout.layers.firstOrNull{it.id==source.id}
+                                            startDistance=distance.coerceAtLeast(1f)
+                                        }else{
+                                            next=(basis?:source).scaled(distance/startDistance!!)
+                                        }
+                                    }else{
+                                        if(startDistance!=null){
+                                            basis=latestLayout.layers.firstOrNull{it.id==source.id}
+                                            startPos=live[0].position
+                                            startDistance=null
+                                        }
+                                        val movement=live[0].position-startPos
+                                        if(movement.getDistance()>=2f){
+                                            val dx=movement.x/previewWidthPx*40f
+                                            val dy=movement.y/previewWidthPx*40f
+                                            fun step(value:Float)=if(snap)
+                                                (value*2f).roundToInt()/2f else value
+                                            val base=basis?:source
+                                            next=base.copy(x=step(base.x+dx).coerceIn(0f,40f-base.width),
+                                                y=step(base.y+dy).coerceIn(0f,12f-base.height))
+                                        }
+                                    }
+                                    next?.let{changed->
+                                        if(!checkpointed){checkpoint();checkpointed=true}
+                                        commit(latestLayout.replace(changed),history=false)
+                                    }
                                 }
-                                cumulative=Offset.Zero
-                                origin?.let{selected=it.id;checkpoint()}
-                            },
-                            onDrag={change,delta->
-                                change.consume()
-                                val start=origin
-                                if(start!=null){
-                                    cumulative+=delta
-                                    val nx=start.x+cumulative.x/previewWidthPx*40f
-                                    val ny=start.y+cumulative.y/previewWidthPx*40f
-                                    fun nearest(v:Float)=if(snap)
-                                        (v*2f).roundToInt()/2f else v
-                                    val result=start.copy(
-                                        x=nearest(nx).coerceIn(0f,40f-start.width),
-                                        y=nearest(ny).coerceIn(0f,12f-start.height))
-                                    commit(latestLayout.replace(result),history=false)
-                                }
-                            },
-                            onDragEnd={origin=null},
-                            onDragCancel={origin=null}
-                        )
+                                event.changes.forEach{if(it.pressed)it.consume()}
+                            }
+                        }
                     }
             ){
                 Image(bmp,"Предпросмотр наклейки 40 на 12 миллиметров",
