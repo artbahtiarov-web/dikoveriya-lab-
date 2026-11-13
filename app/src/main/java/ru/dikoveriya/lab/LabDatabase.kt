@@ -655,7 +655,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             c.getString(2),c.getDouble(3),c.getDouble(4),c.getDouble(5),c.getString(6))) }
     }
     fun addMaterial(name: String, unit: String, quantity: Double, min: Double, cost: Double, category:String="Расходники") {
-        require(category in setOf("Реактивы","Расходники","Инвентарь","Другое")){"Неверная категория склада"}
+        require(category in setOf("Реактивы","Расходники","Инвентарь","Другое") ||
+            category in (listOf("Материалы","Субстраты","Препараты","Удобрения")
+                .flatMap{categories11(it)})){"Создай пользовательскую категорию в справочнике"}
         require(listOf(quantity,min,cost).all{it.isFinite() && it>=0}) { "Проверь значения" }
         writableDatabase.insertOrThrow("materials",null,cv("name" to checkText(name,120),
             "unit" to checkText(unit,20),"quantity" to quantity,"min_quantity" to min,
