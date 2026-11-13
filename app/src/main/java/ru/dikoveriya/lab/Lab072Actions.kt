@@ -256,7 +256,11 @@ data class Lab072TaskFilter(
 )
 private fun taskFilter072(f:Lab072TaskFilter,now:Long):Pair<String,Array<String>>{
     val w=mutableListOf<String>()
-    w+="NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='task' AND a.entity_id=t.id)"
+    if(f.period=="Отменённые"){
+        w+="EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='task' AND a.entity_id=t.id)"
+    }else{
+        w+="NOT EXISTS (SELECT 1 FROM entity_archives a WHERE a.entity_type='task' AND a.entity_id=t.id)"
+    }
     val args=mutableListOf<String>()
     when(f.period){
         "Просрочено"->{w+="t.done=0 AND t.due_at<?";args+=now.toString()}
@@ -276,6 +280,7 @@ private fun taskFilter072(f:Lab072TaskFilter,now:Long):Pair<String,Array<String>
             args+=begin.toString();args+=start.timeInMillis.toString()
         }
         "Выполнено"->w+="t.done=1"
+        "Отменённые"->Unit
         "Открытые"->w+="t.done=0"
         else->Unit
     }
