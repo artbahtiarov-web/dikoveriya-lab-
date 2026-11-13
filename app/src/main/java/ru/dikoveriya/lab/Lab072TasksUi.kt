@@ -76,7 +76,10 @@ fun Lab072TasksScreen(
         }
         item(key="calendar"){
             Lab10TaskCalendar(db,revision,onDay={date->
-                period="Открытые";fromText=date;toText=date;pages=1
+                // A selected date is the only time constraint, never mixed with
+                // stale relative-period filters or hidden previous selections.
+                period="Все";fromText=date;toText=date;pages=1
+                priority="";kind="";plantId=null;recipeId=null;search=""
             })
         }
         item(key="new"){
@@ -86,29 +89,26 @@ fun Lab072TasksScreen(
                 Text("Новая задача")
             }
         }
-        item(key="search"){Field("Найти задачу, сорт или номер",search,
-            {search=it;pages=1})}
-        item(key="period"){
-            Lab072Chips(listOf("Просрочено","Сегодня","Ближайшие 7 дней",
-                "Открытые","Все","Выполнено","Отменённые"),period,{period=it;pages=1})
-        }
-        item(key="filters"){
-            OutlinedButton(onClick={advanced=true},
-                modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
-                Icon(Icons.Outlined.Tune,null);Spacer(Modifier.width(7.dp))
-                Text("Фильтры: важность, сорт, среда и даты")
-            }
+        item(key="search"){
+            OutlinedTextField(
+                value=search,
+                onValueChange={search=it;pages=1},
+                modifier=Modifier.fillMaxWidth(),
+                singleLine=true,
+                label={Text("Найти задачу, сорт или номер")},
+                leadingIcon={Icon(Icons.Outlined.Search,contentDescription=null)},
+                trailingIcon={
+                    IconButton(onClick={advanced=true}){
+                        Icon(Icons.Outlined.Tune,contentDescription="Фильтры задач")
+                    }
+                }
+            )
         }
         item(key="count"){SectionTitle("Задачи · "+total)}
         if(loading)item(key="loading"){CircularProgressIndicator()}
         if(!loading && rows.isEmpty())item(key="empty"){
-            Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                Text(if(period=="Просрочено")"Просроченных задач не найдено."
-                     else "Задач по выбранным фильтрам нет.")
-                OutlinedButton(onClick={period="Все";pages=1}){
-                    Text("Посмотреть все задачи")
-                }
-            }
+            Text("Задач по выбранным условиям нет.",
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
         items(rows,key={"task-"+it.id}){t->
             val overdue=!t.done && t.dueAt<System.currentTimeMillis()
@@ -179,7 +179,7 @@ fun Lab072TasksScreen(
     }
     if(advanced){
         Lab10TaskFilterSheet(
-            initial=Lab10TaskFilters(priority,kind,plantId,recipeId,fromText,toText,order),
+            initial=Lab10TaskFilters(priority,kind,plantId,recipeId,fromText,toText,order,period),
             plants=plants,recipes=recipes,savedNames=saved.map{it.name},
             onSelectSaved={name->
                 saved.firstOrNull{it.name==name}?.let{view->
@@ -198,7 +198,7 @@ fun Lab072TasksScreen(
             onApply={v->
                 priority=v.priority;kind=v.kind;plantId=v.plantId
                 recipeId=v.recipeId;fromText=v.fromText;toText=v.toText
-                order=v.order;advanced=false;pages=1
+                order=v.order;period=v.period;advanced=false;pages=1
             },
             onDismiss={advanced=false}
         )
@@ -252,12 +252,15 @@ private fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
     var kind by rememberSaveable{mutableStateOf("Осмотр")}
     var cultureCode by rememberSaveable{mutableStateOf("")}
     var recipeId by rememberSaveable{mutableStateOf<Long?>(null)}
-    val date=endOfDay072(deadline)
+    var note by rememberSaveable{mutableStateOf("")}
+    val date=if(validDate11(deadline)!=null)endOfDay072(deadline) else null
     AlertDialog(onDismissRequest=onClose,title={Text("Новая задача")},
         text={Column(Modifier.heightIn(max=490.dp).verticalScroll(rememberScrollState()),
             verticalArrangement=Arrangement.spacedBy(9.dp)){
             Field("Что нужно сделать",title,{title=it},single=false)
-            Field("Срок, дд.мм.гггг",deadline,{deadline=it})
+            Lab11DateField("Срок",deadline,{deadline=it})
+            if(date==null)Text("Выбери дату выполнения в календаре",
+                color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             PickOne("Приоритет",listOf("Низкий","Обычный","Высокий","Срочный"),
                 priority,{priority=it})
             PickOne("Вид работы",listOf("Осмотр","Пересадка","Уход",
@@ -269,6 +272,7 @@ private fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
                 recipes.firstOrNull{it.id==recipeId}?.let{it.name+" · v"+it.version}?:"Нет",
                 {choice->recipeId=recipes.firstOrNull{
                     it.name+" · v"+it.version==choice}?.id})
+            Field("Примечание (необязательно)",note,{note=it},single=false)
             Text("Приоритет и срок назначаются пользователем. Без реальной даты задача не создаётся.",
                 style=MaterialTheme.typography.bodySmall)
         }},
@@ -277,7 +281,7 @@ private fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
                 val c=if(cultureCode.isBlank())null else
                     db.findCulture072(cultureCode.trim())
                         ?: error("Такого контейнера нет: "+cultureCode.trim())
-                db.createTask072(title,requireNotNull(date),priority,kind,c,recipeId,null)
+                db.createTask072(title,requireNotNull(date),priority,kind,c,recipeId,null,note)
                 onSaved()
             }catch(e:Exception){onError(e.message?:"Не удалось сохранить задачу")}
         }){Text("Создать")}},
@@ -290,13 +294,13 @@ private fun Lab072TaskEdit(task:Lab072Task,onClose:()->Unit,
     var priority by rememberSaveable(task.id){mutableStateOf(task.priority)}
     var done by rememberSaveable(task.id){mutableStateOf(task.done)}
     var note by rememberSaveable(task.id){mutableStateOf("")}
-    val date=if(due.isBlank())null else endOfDay072(due)
+    val date=if(due.isBlank())null else validDate11(due)?.let{endOfDay072(due)}
     AlertDialog(onDismissRequest=onClose,title={Text("Изменить задачу")},
         text={Column(Modifier.verticalScroll(rememberScrollState()),
             verticalArrangement=Arrangement.spacedBy(9.dp)){
             Text(task.title,style=MaterialTheme.typography.titleMedium)
             Text("Текущий срок: "+formatDate(task.dueAt))
-            Field("Новый срок, если меняется",due,{due=it})
+            Lab11DateField("Новый срок",due,{due=it},allowClear=true)
             PickOne("Приоритет",
                 listOf("Не менять","Низкий","Обычный","Высокий","Срочный"),
                 priority,{priority=it})
