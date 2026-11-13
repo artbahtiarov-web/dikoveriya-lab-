@@ -552,12 +552,17 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun setTaskDone(id: Long, done: Boolean) {
         writableDatabase.update("tasks",cv("done" to done),"id=?",arrayOf(id.toString()))
     }
-    fun materials(): List<MaterialRecord> = readableDatabase.rawQuery("SELECT id,name,unit,quantity,min_quantity,cost_per_unit FROM materials ORDER BY name COLLATE NOCASE",null).use { c ->
-        buildList { while(c.moveToNext()) add(MaterialRecord(c.getLong(0),c.getString(1),c.getString(2),c.getDouble(3),c.getDouble(4),c.getDouble(5))) }
+    fun materials(): List<MaterialRecord> = readableDatabase.rawQuery(
+        "SELECT id,name,unit,quantity,min_quantity,cost_per_unit,category FROM materials ORDER BY name COLLATE NOCASE",null).use { c ->
+        buildList { while(c.moveToNext()) add(MaterialRecord(c.getLong(0),c.getString(1),
+            c.getString(2),c.getDouble(3),c.getDouble(4),c.getDouble(5),c.getString(6))) }
     }
-    fun addMaterial(name: String, unit: String, quantity: Double, min: Double, cost: Double) {
+    fun addMaterial(name: String, unit: String, quantity: Double, min: Double, cost: Double, category:String="Расходники") {
+        require(category in setOf("Реактивы","Расходники","Инвентарь","Другое")){"Неверная категория склада"}
         require(listOf(quantity,min,cost).all{it.isFinite() && it>=0}) { "Проверь значения" }
-        writableDatabase.insertOrThrow("materials",null,cv("name" to checkText(name,120),"unit" to checkText(unit,20),"quantity" to quantity,"min_quantity" to min,"cost_per_unit" to cost))
+        writableDatabase.insertOrThrow("materials",null,cv("name" to checkText(name,120),
+            "unit" to checkText(unit,20),"quantity" to quantity,"min_quantity" to min,
+            "cost_per_unit" to cost,"category" to category))
     }
     fun moveMaterial(materialId: Long, delta: Double, note: String) {
         require(delta.isFinite() && delta!=0.0) { "Укажи изменение количества" }
