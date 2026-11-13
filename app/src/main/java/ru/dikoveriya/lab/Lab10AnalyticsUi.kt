@@ -152,6 +152,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision)}
     }
 }
 
