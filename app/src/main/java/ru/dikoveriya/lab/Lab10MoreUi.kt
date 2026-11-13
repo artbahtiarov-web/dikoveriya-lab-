@@ -67,7 +67,7 @@ internal fun Lab10MoreMenu(onSection:(String)->Unit){
                                 color=MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(Icons.Outlined.ChevronRight,contentDescription=null,
-                            tint=Lab07Palette.InkBrass)
+                            tint=MaterialTheme.colorScheme.tertiary)
                     }
                 }
             }
