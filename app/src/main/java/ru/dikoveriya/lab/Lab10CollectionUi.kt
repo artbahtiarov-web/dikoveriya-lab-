@@ -185,7 +185,7 @@ internal fun Lab10CollectionScreen(
             IconButton(onClick=onBack){Icon(Icons.Outlined.ArrowBack,"Назад")}
             Column(Modifier.weight(1f)){
                 Text("ДИКОВЕРИЯ / ЛАБОРАТОРИЯ",style=MaterialTheme.typography.labelSmall,
-                    color=Lab07Palette.InkBrass)
+                    color=MaterialTheme.colorScheme.tertiary)
                 Text("Коллекция",style=MaterialTheme.typography.headlineSmall)
             }
             IconButton(onClick={compact=!compact}){
@@ -205,7 +205,7 @@ internal fun Lab10CollectionScreen(
                 modifier=Modifier.size(52.dp).background(
                     MaterialTheme.colorScheme.surface,RoundedCornerShape(16.dp))){
                 Icon(Icons.Outlined.Tune,contentDescription="Фильтры и сортировка",
-                    tint=Lab07Palette.Forest)
+                    tint=MaterialTheme.colorScheme.primary)
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=12.dp),
@@ -331,7 +331,7 @@ internal fun Lab10VarietyHeader(
     Column(verticalArrangement=Arrangement.spacedBy(9.dp)){
         Row(verticalAlignment=Alignment.CenterVertically){
             IconButton(onClick=onBack){Icon(Icons.Outlined.ArrowBack,"Назад")}
-            Text("ПАСПОРТ СОРТА",color=Lab07Palette.InkBrass,
+            Text("ПАСПОРТ СОРТА",color=MaterialTheme.colorScheme.tertiary,
                 style=MaterialTheme.typography.labelLarge)
         }
         Card(shape=RoundedCornerShape(21.dp),
