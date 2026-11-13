@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -61,7 +62,8 @@ internal fun PlantIcon10(iconKey:String,modifier:Modifier=Modifier,tint:Color=La
 }
 
 @Composable
-private fun PlantCover10(filename:String?,icon:String,color:String,modifier:Modifier=Modifier){
+private fun PlantCover10(filename:String?,icon:String,color:String,modifier:Modifier=Modifier,
+    zoom:Float=1f,panX:Float=0f,panY:Float=0f){
     val context=androidx.compose.ui.platform.LocalContext.current
     val bmp by produceState<android.graphics.Bitmap?>(initialValue=null,key1=filename){
         value=withContext(Dispatchers.IO){
@@ -82,7 +84,11 @@ private fun PlantCover10(filename:String?,icon:String,color:String,modifier:Modi
     Box(modifier.background(plantColor10(color)),contentAlignment=Alignment.Center){
         if(bmp!=null){
             Image(bitmap=bmp!!.asImageBitmap(),contentDescription="Фотография растения",
-                modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                modifier=Modifier.fillMaxSize().graphicsLayer {
+                    scaleX=zoom;scaleY=zoom
+                    translationX=panX*size.width
+                    translationY=panY*size.height
+                },contentScale=ContentScale.Crop)
             Box(Modifier.fillMaxSize().background(
                 Brush.verticalGradient(listOf(Color.Transparent,Color(0x990B2E20)))))
         }else PlantIcon10(icon,modifier=Modifier.size(60.dp),tint=Lab07Palette.Brass)
@@ -108,7 +114,8 @@ internal fun Lab10PlantFolder(
             Row(verticalAlignment=Alignment.CenterVertically,
                 modifier=Modifier.heightIn(min=88.dp)){
                 PlantCover10(visual.coverFilename,visual.iconKey,visual.colorKey,
-                    Modifier.size(width=84.dp,height=84.dp).clip(RoundedCornerShape(13.dp)))
+                    Modifier.size(width=84.dp,height=84.dp).clip(RoundedCornerShape(13.dp)),
+                    visual.coverZoom,visual.panX,visual.panY)
                 Column(Modifier.weight(1f).padding(start=12.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
                     Text(plant.name,style=MaterialTheme.typography.titleMedium,maxLines=2,
                         overflow=TextOverflow.Ellipsis)
@@ -122,7 +129,7 @@ internal fun Lab10PlantFolder(
         }else{
             Box(Modifier.fillMaxWidth().height(135.dp)){
                 PlantCover10(visual.coverFilename,visual.iconKey,visual.colorKey,
-                    Modifier.fillMaxSize())
+                    Modifier.fillMaxSize(),visual.coverZoom,visual.panX,visual.panY)
                 IconButton(onClick=onStyle,
                     modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)
                         .background(Lab07Palette.DeepForest.copy(alpha=.78f),RoundedCornerShape(13.dp))){
@@ -271,8 +278,12 @@ internal fun Lab10CollectionScreen(
             val saved=visuals[id]?:Lab10PlantVisual(id)
             var icon by remember(id){mutableStateOf(saved.iconKey)}
             var color by remember(id){mutableStateOf(saved.colorKey)}
+            var zoom by remember(id){mutableFloatStateOf(saved.coverZoom)}
+            var panX by remember(id){mutableFloatStateOf(saved.panX)}
+            var panY by remember(id){mutableFloatStateOf(saved.panY)}
             ModalBottomSheet(onDismissRequest={styleId=null}){
-                Column(Modifier.padding(horizontal=20.dp,vertical=12.dp),
+                Column(Modifier.verticalScroll(rememberScrollState())
+                    .padding(horizontal=20.dp,vertical=12.dp),
                     verticalArrangement=Arrangement.spacedBy(12.dp)){
                     Text("Оформление сорта",style=MaterialTheme.typography.headlineSmall)
                     Text(plant.name,maxLines=2)
@@ -294,13 +305,29 @@ internal fun Lab10CollectionScreen(
                                     RoundedCornerShape(7.dp)))})
                         }
                     }
+                    if(saved.coverFilename!=null){
+                        Text("Кадрирование обложки",style=MaterialTheme.typography.titleMedium)
+                        PlantCover10(saved.coverFilename,icon,color,
+                            Modifier.fillMaxWidth().height(130.dp)
+                                .clip(RoundedCornerShape(17.dp)),zoom,panX,panY)
+                        Text("Масштаб · "+String.format(java.util.Locale.US,"%.1f×",zoom))
+                        Slider(value=zoom,onValueChange={zoom=it},valueRange=1f..3f)
+                        Text("Смещение по горизонтали")
+                        Slider(value=panX,onValueChange={panX=it},valueRange=-0.6f..0.6f)
+                        Text("Смещение по вертикали")
+                        Slider(value=panY,onValueChange={panY=it},valueRange=-0.6f..0.6f)
+                        OutlinedButton(onClick={zoom=1f;panX=0f;panY=0f},
+                            modifier=Modifier.fillMaxWidth()){
+                            Text("Вернуть исходное кадрирование")
+                        }
+                    }
                     Button(onClick={
                         try{
-                            db.stylePlant10(id,icon,color)
+                            db.stylePlant10(id,icon,color,zoom,panX,panY)
                             localReload++;onChanged();styleId=null
                         }catch(e:Exception){onError(e.message?:"Не удалось применить оформление")}
                     },modifier=Modifier.fillMaxWidth()){
-                        Text("Сохранить иконку и цвет")
+                        Text("Сохранить оформление")
                     }
                     OutlinedButton(onClick={picker.launch("image/*")},
                         modifier=Modifier.fillMaxWidth()){
@@ -340,7 +367,8 @@ internal fun Lab10VarietyHeader(
             Row(verticalAlignment=Alignment.CenterVertically,
                 modifier=Modifier.fillMaxWidth().padding(12.dp)){
                 PlantCover10(visual.coverFilename,visual.iconKey,visual.colorKey,
-                    Modifier.size(width=100.dp,height=116.dp).clip(RoundedCornerShape(16.dp)))
+                    Modifier.size(width=100.dp,height=116.dp).clip(RoundedCornerShape(16.dp)),
+                    visual.coverZoom,visual.panX,visual.panY)
                 Column(Modifier.weight(1f).padding(start=12.dp),
                     verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Text(plant.name,color=Lab07Palette.Champagne,
