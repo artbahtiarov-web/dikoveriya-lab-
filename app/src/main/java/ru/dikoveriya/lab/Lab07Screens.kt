@@ -26,7 +26,7 @@ fun Lab07RouteScreen(
     route:String, db:LabDatabase, revision:Int,
     plants:List<PlantRecord>,cultures:List<CultureRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,
+    onNewContainer:(Long?)->Unit,onNewPlant:()->Unit,onEditPlant:(Long)->Unit,
     onEdit:(Long)->Unit,onAction:(Long,String)->Unit,
     onLabel:(Long)->Unit,onPhotos:(Long)->Unit,onSale:(Long)->Unit,
     onTask:(Long)->Unit,
@@ -55,7 +55,7 @@ fun Lab07RouteScreen(
             onBack,onNavigate,onChanged,onError,modifier)
         "groups" -> Lab072GroupsScreen(db,revision,onBack,onNavigate,modifier)
         "places" -> Lab072PlacesScreen(db,revision,onBack,onChanged,onError,modifier)
-        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,modifier)
+        "collection" -> Lab07CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,onEditPlant,modifier)
         "variety" -> {
             val plant=plants.firstOrNull{it.id==id}
             if(plant!=null) Lab07VarietyScreen(plant,db,revision,onBack,onNavigate,onNewContainer,modifier)
@@ -110,7 +110,7 @@ private fun Lab07Filters(values:List<String>,selected:String,onSelect:(String)->
 private fun Lab07CollectionScreen(
     plants:List<PlantRecord>,db:LabDatabase,revision:Int,
     onBack:()->Unit,onNavigate:(String)->Unit,
-    onNewPlant:()->Unit,modifier:Modifier
+    onNewPlant:()->Unit,onEditPlant:(Long)->Unit,modifier:Modifier
 ){
     var search by rememberSaveable{mutableStateOf("")}
     var order by rememberSaveable{mutableStateOf("А–Я")}
@@ -178,8 +178,12 @@ private fun Lab07CollectionScreen(
                             color=MaterialTheme.colorScheme.onSurfaceVariant,
                             style=MaterialTheme.typography.bodySmall)
                     }
-                    Icon(Icons.Outlined.ChevronRight,"Открыть сорт",
-                        tint=Lab07Palette.InkBrass)
+                    IconButton(onClick={onEditPlant(plant.id)},
+                        modifier=Modifier.size(48.dp)){
+                        Icon(Icons.Outlined.MoreVert,
+                            contentDescription="Изменить или архивировать сорт ${plant.name}",
+                            tint=Lab07Palette.InkBrass)
+                    }
                 }
             }
         }
