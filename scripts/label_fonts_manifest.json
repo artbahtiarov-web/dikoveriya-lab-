@@ -173,6 +173,87 @@
       "git_blob_sha": "cb775b80fa0a6f3b2aea114869a7171695b50a62",
       "size": 4628080,
       "license": "ofl/merriweather/OFL.txt"
+    },
+    {
+      "id": "yesevaone",
+      "name": "yesevaone",
+      "asset": "yesevaone.ttf",
+      "path": "ofl/yesevaone/YesevaOne-Regular.ttf",
+      "git_blob_sha": "8c22da37c23bd976e696575a5cb223b88909a2fe",
+      "size": 108016,
+      "license": "ofl/yesevaone/OFL.txt"
+    },
+    {
+      "id": "comfortaa",
+      "name": "comfortaa",
+      "asset": "comfortaa.ttf",
+      "path": "ofl/comfortaa/Comfortaa[wght].ttf",
+      "git_blob_sha": "8b8e5f81bf740a8154bb6cd9f4eee5ac4bda6b18",
+      "size": 201756,
+      "license": "ofl/comfortaa/OFL.txt"
+    },
+    {
+      "id": "cormorantgaramond",
+      "name": "cormorantgaramond",
+      "asset": "cormorantgaramond.ttf",
+      "path": "ofl/cormorantgaramond/CormorantGaramond[wght].ttf",
+      "git_blob_sha": "d992a83ce525c330fad3a19087746bcb2dc038ee",
+      "size": 1195560,
+      "license": "ofl/cormorantgaramond/OFL.txt"
+    },
+    {
+      "id": "philosopher",
+      "name": "philosopher",
+      "asset": "philosopher.ttf",
+      "path": "ofl/philosopher/Philosopher-Regular.ttf",
+      "git_blob_sha": "cec1b938c0ce77e6ef12ec0bd0ca4748965a9be7",
+      "size": 111676,
+      "license": "ofl/philosopher/OFL.txt"
+    },
+    {
+      "id": "forum",
+      "name": "forum",
+      "asset": "forum.ttf",
+      "path": "ofl/forum/Forum-Regular.ttf",
+      "git_blob_sha": "961dffbbcc699392519a525e13df9a652ae33f1a",
+      "size": 303316,
+      "license": "ofl/forum/OFL.txt"
+    },
+    {
+      "id": "prata",
+      "name": "prata",
+      "asset": "prata.ttf",
+      "path": "ofl/prata/Prata-Regular.ttf",
+      "git_blob_sha": "6c0e862cdb2c2409546fb2c42a709319db43f538",
+      "size": 101284,
+      "license": "ofl/prata/OFL.txt"
+    },
+    {
+      "id": "tenorsans",
+      "name": "tenorsans",
+      "asset": "tenorsans.ttf",
+      "path": "ofl/tenorsans/TenorSans-Regular.ttf",
+      "git_blob_sha": "5b63bb960e56995c11f4048bc03037f24c539346",
+      "size": 131896,
+      "license": "ofl/tenorsans/OFL.txt"
+    },
+    {
+      "id": "spectral",
+      "name": "spectral",
+      "asset": "spectral.ttf",
+      "path": "ofl/spectral/Spectral-Regular.ttf",
+      "git_blob_sha": "25a6c47f8050e4ea3c9713a02a4843a8d6c503d5",
+      "size": 261088,
+      "license": "ofl/spectral/OFL.txt"
+    },
+    {
+      "id": "alegreya",
+      "name": "alegreya",
+      "asset": "alegreya.ttf",
+      "path": "ofl/alegreya/Alegreya[wght].ttf",
+      "git_blob_sha": "af2b22024311daaa15ec4ab879bd67f790abb9f1",
+      "size": 425288,
+      "license": "ofl/alegreya/OFL.txt"
     }
   ]
 }
