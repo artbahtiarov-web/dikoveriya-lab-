@@ -141,13 +141,13 @@ internal fun Lab11ActionDialog(
     val templates=remember{db.templates11()}
     val custom=templates.map{it.title}
     var customAnswers by remember{mutableStateOf(emptyMap<String,String>())}
+    var kind by rememberSaveable{mutableStateOf(allowed.first())}
     val fields=remember(kind){
         templates.firstOrNull{it.title==kind}?.let{template->
             val array=org.json.JSONArray(template.fields)
             (0 until array.length()).map{array.getString(it)}
         }?:emptyList()
     }
-    var kind by rememberSaveable{mutableStateOf(allowed.first())}
     var date by rememberSaveable{mutableStateOf(dateText11())}
     var stage by rememberSaveable{mutableStateOf("Не менять")}
     var newLocation by rememberSaveable{mutableStateOf("")}
