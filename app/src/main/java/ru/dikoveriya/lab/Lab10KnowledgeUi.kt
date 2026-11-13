@@ -31,7 +31,7 @@ internal fun Lab10KnowledgeScreen(
             modifier=Modifier.fillMaxWidth().padding(vertical=10.dp)){
             Column(Modifier.weight(1f)){
                 Text("СПРАВОЧНИК / ЛАБОРАТОРИЯ",style=MaterialTheme.typography.labelSmall,
-                    color=Lab07Palette.InkBrass)
+                    color=MaterialTheme.colorScheme.tertiary)
                 Text("База знаний",style=MaterialTheme.typography.headlineSmall)
             }
             IconButton(onClick={editing=true}){
@@ -61,7 +61,7 @@ internal fun Lab10KnowledgeScreen(
                     colors=CardDefaults.outlinedCardColors(
                         containerColor=MaterialTheme.colorScheme.surface)){
                     Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){
-                        Icon(Icons.Outlined.MenuBook,null,tint=Lab07Palette.Forest,
+                        Icon(Icons.Outlined.MenuBook,null,tint=MaterialTheme.colorScheme.primary,
                             modifier=Modifier.size(28.dp))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)){
@@ -122,7 +122,7 @@ internal fun Lab10KnowledgeScreen(
             title={Text(note.title)},
             text={Column(Modifier.verticalScroll(rememberScrollState())){
                 Text(note.category,style=MaterialTheme.typography.labelLarge,
-                    color=Lab07Palette.InkBrass)
+                    color=MaterialTheme.colorScheme.tertiary)
                 Spacer(Modifier.height(8.dp))
                 Text(note.body)
                 if(note.sourceUrl.isNotBlank()){
