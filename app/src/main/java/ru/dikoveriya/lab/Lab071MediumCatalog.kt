@@ -12,11 +12,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 
 /** A single discoverable media centre. Recipe editing, optional preparations and
  * ingredient catalogue are still distinct, but reached from ONE screen.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Lab071MediumCatalog(
     plants:List<PlantRecord>,recipes:List<RecipeRecord>,batches:List<BatchRecord>,
@@ -31,6 +33,7 @@ fun Lab071MediumCatalog(
     var purpose by rememberSaveable{mutableStateOf("Любое назначение")}
     var plantFilter by rememberSaveable{mutableStateOf("Все")}
     var showExtras by rememberSaveable{mutableStateOf(false)}
+    var filtersOpen by rememberSaveable{mutableStateOf(false)}
     val shown=recipes.filter{recipe->
         (query.isBlank() || recipe.name.contains(query,true)) &&
         (purpose=="Любое назначение" || recipe.purpose==purpose) &&
@@ -56,24 +59,45 @@ fun Lab071MediumCatalog(
             }
             item(key="search"){Field("Найти рецепт или версию",query,{query=it})}
             item(key="filter-purpose"){
-                PickOne("Этап выращивания",listOf("Любое назначение")+LabTerms.purposes,
-                    purpose,{purpose=it})
-            }
-            item(key="filter-plant"){
-                PickOne("Растение",listOf("Все")+plants.map{it.name},
-                    plantFilter,{plantFilter=it})
+                OutlinedButton(onClick={filtersOpen=true},
+                    modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
+                    Icon(Icons.Outlined.Tune,null)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Фильтры: назначение и растение")
+                }
             }
             item(key="count"){SectionTitle("Рецептуры · ${shown.size}")}
             if(shown.isEmpty())item(key="empty"){
                 Text("Рецептуры не найдены. Измени поиск или добавь новый рецепт.")
             }
-            items(shown,key={"recipe-${it.id}"}){recipe->
-                Lab07QuickAction("${recipe.name} · v${recipe.version}",
-                    {Icon(Icons.Outlined.MenuBook,null)},
-                    onClick={onRecipe(recipe.id)})
-                Text("${recipe.purpose} · ${recipe.status} · "+
-                    (plants.firstOrNull{it.id==recipe.plantId}?.name?:"Для всех растений"),
-                    style=MaterialTheme.typography.bodySmall)
+            items(shown,key={"recipe-"+it.id}){recipe->
+                OutlinedCard(onClick={onRecipe(recipe.id)},
+                    modifier=Modifier.fillMaxWidth().heightIn(min=91.dp),
+                    shape=RoundedCornerShape(17.dp),
+                    border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.3f)),
+                    colors=CardDefaults.outlinedCardColors(
+                        containerColor=MaterialTheme.colorScheme.surface)){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        Surface(shape=RoundedCornerShape(14.dp),
+                            color=Lab07Palette.Champagne){
+                            Icon(Icons.Outlined.Science,null,tint=Lab07Palette.Forest,
+                                modifier=Modifier.padding(12.dp).size(29.dp))
+                        }
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                            Text(recipe.name+" · v"+recipe.version,
+                                style=MaterialTheme.typography.titleMedium)
+                            Text(recipe.purpose+" · "+recipe.status,
+                                style=MaterialTheme.typography.bodySmall,
+                                color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(plants.firstOrNull{it.id==recipe.plantId}?.name?:"Для всех растений",
+                                style=MaterialTheme.typography.bodySmall)
+                        }
+                        Icon(Icons.Outlined.ChevronRight,contentDescription=null,
+                            tint=Lab07Palette.InkBrass)
+                    }
+                }
             }
             item(key="extras"){
                 OutlinedButton(onClick={showExtras=!showExtras},
@@ -138,6 +162,29 @@ fun Lab071MediumCatalog(
             }
         }
     }
+    if(filtersOpen){
+        var draftPurpose by remember(filtersOpen){mutableStateOf(purpose)}
+        var draftPlant by remember(filtersOpen){mutableStateOf(plantFilter)}
+        ModalBottomSheet(onDismissRequest={filtersOpen=false},
+            containerColor=MaterialTheme.colorScheme.surface){
+            Column(Modifier.padding(horizontal=20.dp,vertical=12.dp),
+                verticalArrangement=Arrangement.spacedBy(14.dp)){
+                Text("Фильтры рецептур",style=MaterialTheme.typography.headlineSmall)
+                PickOne("Назначение",listOf("Любое назначение")+LabTerms.purposes,
+                    draftPurpose,{draftPurpose=it})
+                PickOne("Растение",listOf("Все")+plants.map{it.name},
+                    draftPlant,{draftPlant=it})
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={draftPurpose="Любое назначение";draftPlant="Все"},
+                        modifier=Modifier.weight(1f)){Text("Сбросить")}
+                    Button(onClick={purpose=draftPurpose;plantFilter=draftPlant;filtersOpen=false},
+                        modifier=Modifier.weight(1f)){Text("Применить")}
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+        }
+    }
+
 }
 
 /** Replaces the old three-dialog chain "choose recipe -> details -> advanced -> batch".
