@@ -11,7 +11,7 @@ import android.database.sqlite.SQLiteDatabase
  */
 internal object LabCoreV12 {
     val backupTables = listOf(
-        "custom_categories", "plant_items", "item_events", "item_links",
+        "custom_categories", "plant_items", "item_events", "item_measurements", "item_links",
         "item_photos", "custom_field_definitions", "custom_field_values",
         "operation_templates", "purchases", "cash_ledger", "direct_costs",
         "stock_usage", "equipment_assets", "asset_events", "light_profiles",
@@ -61,6 +61,18 @@ internal object LabCoreV12 {
             details_json TEXT NOT NULL DEFAULT '{}',
             reversal_of INTEGER REFERENCES item_events(id),
             cancelled INTEGER NOT NULL DEFAULT 0
+        )""")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS item_measurements(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL REFERENCES plant_items(id),
+            observed_at INTEGER NOT NULL,
+            height_mm REAL,
+            leaves INTEGER,
+            roots INTEGER,
+            note TEXT NOT NULL DEFAULT '',
+            CHECK(height_mm IS NULL OR height_mm>=0),
+            CHECK(leaves IS NULL OR leaves>=0),
+            CHECK(roots IS NULL OR roots>=0)
         )""")
         db.execSQL("""CREATE TABLE IF NOT EXISTS item_links(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
