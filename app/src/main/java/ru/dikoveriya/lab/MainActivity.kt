@@ -94,6 +94,7 @@ fun DikoveriyaApp() {
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var quickMenu by rememberSaveable { mutableStateOf(false) }
+    var showUpdater by remember { mutableStateOf(false) }
     var quickOperationPicker by rememberSaveable { mutableStateOf(false) }
     var cultureId by remember { mutableStateOf<Long?>(null) }
     var photoCultureId by remember { mutableStateOf<Long?>(null) }
@@ -263,6 +264,7 @@ fun DikoveriyaApp() {
     }
     val openSection: (String)->Unit = {section->
         when(section){
+            "Проверить обновления"->showUpdater=true
             "Задачи"->openRoute(Lab07Navigation.TASKS)
             "Мои растения"->openRoute(Lab07Navigation.ITEMS)
             "Группы контейнеров"->openRoute(Lab07Navigation.GROUPS)
@@ -288,7 +290,7 @@ fun DikoveriyaApp() {
             }
         }
     }
-    BackHandler(enabled=!showOnboarding && !quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
+    BackHandler(enabled=!showOnboarding && !showUpdater && !quickMenu && dialog.isEmpty() && cultureId==null && photoCultureId==null && saleCultureId==null && labelCultureId==null && legacyAssessmentId==null && taskCultureId==null && actionCultureId==null &&
         recipeId==null && advancedRecipeId==null && batchId==null && materialId==null && experimentId==null && restoreUri==null && error==null) {
         goBack()
     }
@@ -764,6 +766,7 @@ fun DikoveriyaApp() {
             restoreUri?.let{uri->AlertDialog(onDismissRequest={restoreUri=null},title={Text("Заменить все данные?")},text={Text("Это удалит текущие записи и заменит их содержимым копии. Отменить после восстановления нельзя. Сделай текущую копию перед продолжением.")},confirmButton={TextButton(onClick={
                 if(act{context.contentResolver.openInputStream(uri)?.use{LabBackup.restore(context,db,it)}?:throw IllegalStateException("Файл недоступен")}) { restoreUri=null }
             }){Text("Да, восстановить",color=MaterialTheme.colorScheme.error)}},dismissButton={TextButton(onClick={restoreUri=null}){Text("Отмена")}})}
+            if(showUpdater)Lab11UpdateDialog(onClose={showUpdater=false})
             error?.let{message->AlertDialog(onDismissRequest={error=null},title={Text("Не удалось выполнить действие")},text={Text(message)},confirmButton={TextButton(onClick={error=null}){Text("Понятно")}})}
         }
     }
