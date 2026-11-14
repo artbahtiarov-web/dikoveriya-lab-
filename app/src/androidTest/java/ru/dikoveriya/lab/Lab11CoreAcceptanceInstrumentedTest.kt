@@ -224,6 +224,45 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun twentyThousandPhysicalPlantsStaySqlPagedWithoutLoadingEntireRegistry(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        val suffix=UUID.randomUUID().toString().take(8)
+        val prefix="QA-STRESS-"+suffix+"-"
+        try{
+            val plantId=plant(db)
+            val raw=db.writableDatabase
+            val now=System.currentTimeMillis()
+            raw.beginTransaction()
+            try{
+                val stmt=raw.compileStatement("""INSERT INTO plant_items(
+                    code,plant_id,kind,stage,status,acquired_at,created_at,updated_at)
+                    VALUES (?,?,'Горшечное','В работе','Активен',?,?,?)""")
+                try{
+                    repeat(20_000){i->
+                        stmt.clearBindings()
+                        stmt.bindString(1,prefix+i)
+                        stmt.bindLong(2,plantId)
+                        stmt.bindLong(3,now)
+                        stmt.bindLong(4,now)
+                        stmt.bindLong(5,now)
+                        stmt.executeInsert()
+                    }
+                }finally{stmt.close()}
+                raw.setTransactionSuccessful()
+            }finally{raw.endTransaction()}
+            assertEquals(20_000,db.itemsCount11(query=prefix))
+            val last=db.plantItems11(query=prefix,limit=40,offset=19960)
+            assertEquals(40,last.size)
+            assertTrue(last.all{it.code.startsWith(prefix)})
+            assertEquals(40,db.plantItems11(query=prefix,limit=40).size)
+            assertTrue(db.item11(last.last().id)!=null)
+        }finally{
+            db.writableDatabase.delete("plant_items","code LIKE ?",arrayOf(prefix+"%"))
+            db.close()
+        }
+    }
+
     @Test fun transplantWithTwoMaterialsAndPotIsAtomicAndFullyReversible(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
