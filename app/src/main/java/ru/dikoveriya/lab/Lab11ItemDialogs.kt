@@ -152,6 +152,7 @@ internal fun Lab11ActionDialog(
     }
     val context=LocalContext.current
     var pendingTemplatePhoto by remember{mutableStateOf<String?>(null)}
+    var actionPhoto by remember{mutableStateOf<String?>(null)}
     val photoPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->
         val target=pendingTemplatePhoto
         pendingTemplatePhoto=null
@@ -160,7 +161,8 @@ internal fun Lab11ActionDialog(
                 db.addItemPhoto11(context,item.id,uri,"Операция: "+kind)
                 val filename=db.itemPhotos11(item.id).firstOrNull()?.first
                     ?:error("Фотография не сохранена")
-                customAnswers=customAnswers+(target to filename)
+                if(target=="__action_photo")actionPhoto=filename
+                else customAnswers=customAnswers+(target to filename)
             }catch(e:Exception){onError(e.message?:"Не удалось сохранить фото")}
         }
     }
@@ -168,10 +170,12 @@ internal fun Lab11ActionDialog(
     var stage by rememberSaveable{mutableStateOf("Не менять")}
     var newLocation by rememberSaveable{mutableStateOf("")}
     var substrate by rememberSaveable{mutableStateOf("")}
+    var newPotMl by rememberSaveable{mutableStateOf("")}
     var stimulant by rememberSaveable{mutableStateOf("")}
     var note by rememberSaveable{mutableStateOf("")}
     var materialId by rememberSaveable{mutableStateOf<Long?>(null)}
     var qty by rememberSaveable{mutableStateOf("")}
+    var extraUses by remember{mutableStateOf(emptyList<Pair<Long?,String>>())}
     val materials=remember{db.materials()}
     val usesMaterial=kind in setOf("Посадка","Пересадка","Подкормка",
         "Обработка","Полив") || kind in custom
@@ -196,9 +200,12 @@ internal fun Lab11ActionDialog(
             if(changesPlace)
                 Field("Новое местоположение (необязательно)",
                     newLocation,{newLocation=it})
-            if(changesSubstrate)
+            if(changesSubstrate){
                 Field("Новый субстрат / состав (необязательно)",
                     substrate,{substrate=it},single=false)
+                Field("Новый горшок, мл (необязательно)",
+                    newPotMl,{newPotMl=it})
+            }
             if(kind=="Укоренение" || kind=="Обработка")
                 Field("Стимулятор / препарат",stimulant,{stimulant=it})
             if(usesMaterial && materials.isNotEmpty()){
@@ -212,6 +219,45 @@ internal fun Lab11ActionDialog(
                         style=MaterialTheme.typography.bodySmall)
                     Field("Сколько использовано (в единице склада)",qty,{qty=it})
                 }
+            }
+            if(usesMaterial && materials.isNotEmpty()){
+                extraUses.forEachIndexed{index,(selectedId,selectedQty)->
+                    val current=materials.firstOrNull{it.id==selectedId}
+                    PickOne("Дополнительный материал "+(index+1),
+                        listOf("Не указан")+materials.map{it.name},
+                        current?.name?:"Не указан",
+                        {label->
+                            val next=extraUses.toMutableList()
+                            next[index]=materials.firstOrNull{it.name==label}?.id to selectedQty
+                            extraUses=next
+                        })
+                    if(current!=null){
+                        Text("Доступно: "+current.quantity+" "+current.unit,
+                            style=MaterialTheme.typography.bodySmall)
+                        Field("Расход, "+current.unit,selectedQty,
+                            {value->
+                                val next=extraUses.toMutableList()
+                                next[index]=selectedId to value
+                                extraUses=next
+                            })
+                    }
+                    TextButton(onClick={
+                        extraUses=extraUses.filterIndexed{i,_->i!=index}
+                    }){Text("Убрать строку")}
+                }
+                if(extraUses.size<11)
+                    OutlinedButton(onClick={
+                        extraUses=extraUses+(null to "")
+                    },modifier=Modifier.fillMaxWidth()){
+                        Text("Добавить ещё материал")
+                    }
+            }
+            OutlinedButton(onClick={
+                pendingTemplatePhoto="__action_photo"
+                photoPicker.launch("image/*")
+            },modifier=Modifier.fillMaxWidth()){
+                Text(if(actionPhoto==null)"Добавить фото действия"
+                    else "Фото действия прикреплено")
             }
             fields.forEach{field->
                 val label=field.name+(if(field.unit.isNotBlank())" ("+field.unit+")" else "")+
@@ -253,6 +299,13 @@ internal fun Lab11ActionDialog(
                             qty.replace(',','.').toDoubleOrNull()
                                 ?:error("Укажи количество материала")
                         else 0.0
+                        val otherMaterials=extraUses.mapNotNull{(id,text)->
+                            if(id==null)null
+                            else id to (text.replace(',','.').toDoubleOrNull()
+                                ?:error("Проверь количество дополнительного материала"))
+                        }
+                        val potVolume=if(newPotMl.isBlank())null
+                            else newPotMl.toIntOrNull()?:error("Неверный объём горшка")
                         val newKind=if(item.kind=="Черенок" &&
                             kind=="Пересадка" && stage=="В горшке")"Горшечное" else null
                         db.performItemAction11(item.id,kind,
@@ -263,6 +316,8 @@ internal fun Lab11ActionDialog(
                             newSubstrate=substrate.takeIf{it.isNotBlank()},
                             stimulant=stimulant.takeIf{it.isNotBlank()},
                             materialId=materialId,materialQty=amount,
+                            extraMaterials=otherMaterials,newPotMl=potVolume,
+                            photoFilename=actionPhoto,
                             customFields=customAnswers.filterKeys{
                                 key->fields.any{it.name==key}
                             })
