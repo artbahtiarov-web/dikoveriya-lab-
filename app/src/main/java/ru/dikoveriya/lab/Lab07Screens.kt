@@ -73,7 +73,8 @@ fun Lab07RouteScreen(
         "collection" -> Lab10CollectionScreen(plants,db,revision,onBack,onNavigate,onNewPlant,
             onChanged,onError,onOpenItems={onNavigate(Lab07Navigation.ITEMS)},modifier=modifier)
         "items" -> Lab11ItemsScreen(db,revision,onBack,onNewItem,
-            onOpen={onNavigate(Lab07Navigation.item(it))},modifier=modifier)
+            onOpen={onNavigate(Lab07Navigation.item(it))},
+            onChanged=onChanged,onError=onError,modifier=modifier)
         "item" -> if(id!=null)Lab11ItemPassport(id,db,revision,onBack,
             onOpenItem={onNavigate(Lab07Navigation.item(it))},
             onOpenCulture={onNavigate(Lab07Navigation.container(it))},
