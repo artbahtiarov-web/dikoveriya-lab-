@@ -41,6 +41,7 @@ private val lab10MoreSections=listOf(
     "Система" to listOf(
         Lab10MoreAction("Настройки","Внешний вид и параметры",Icons.Outlined.Settings),
         Lab10MoreAction("Резервные копии","Сохранение, импорт и восстановление",Icons.Outlined.CloudDownload),
+        Lab10MoreAction("Проверить обновления","Скачать подписанный APK из GitHub Releases",Icons.Outlined.SystemUpdate),
         Lab10MoreAction("О программе","Версия, справка и ограничения",Icons.Outlined.Info)
     )
 )
