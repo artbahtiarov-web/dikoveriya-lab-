@@ -68,7 +68,7 @@ internal fun Lab11ItemCover(
 @Composable
 internal fun Lab11ItemsScreen(
     db:LabDatabase,revision:Int,onBack:()->Unit,onNew:()->Unit,
-    onOpen:(Long)->Unit,modifier:Modifier=Modifier
+    onOpen:(Long)->Unit,onChanged:()->Unit,onError:(String)->Unit,modifier:Modifier=Modifier
 ){
     var query by rememberSaveable{mutableStateOf("")}
     var kind by rememberSaveable{mutableStateOf("")}
