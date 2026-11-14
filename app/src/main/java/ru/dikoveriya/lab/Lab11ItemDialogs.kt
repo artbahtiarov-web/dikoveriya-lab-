@@ -134,7 +134,8 @@ internal fun Lab11NewCuttingDialog(
 @Composable
 internal fun Lab11ActionDialog(
     item:Lab11PlantItem,db:LabDatabase,
-    onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit
+    onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit,
+    onOffshoot:()->Unit={}
 ){
     val allowed=if(item.kind=="Черенок")listOf("Укоренение","Пересадка",
         "Осмотр","Полив","Подкормка","Обработка","Измерение","Потеря",
@@ -183,6 +184,10 @@ internal fun Lab11ActionDialog(
             verticalArrangement=Arrangement.spacedBy(11.dp)){
             Text(item.plantName+" · "+item.kind,
                 style=MaterialTheme.typography.titleSmall)
+            if(item.kind!="Черенок")OutlinedButton(
+                onClick=onOffshoot,modifier=Modifier.fillMaxWidth()){
+                Text("Отделить деток / клубни")
+            }
             PickOne("Операция",allowed+custom.filter{it !in allowed},
                 kind,{kind=it})
             Lab11DateField("Дата операции",date,{date=it})
