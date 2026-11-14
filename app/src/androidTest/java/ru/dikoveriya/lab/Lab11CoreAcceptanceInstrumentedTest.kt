@@ -224,6 +224,49 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun soldCultureCostIsFrozenAfterFurtherCloning(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val plantId=plant(db)
+            val source=db.createCulturesBulk11(plantId,listOf(10),"Растения",0,
+                LabTerms.READY,null,null,null,"",System.currentTimeMillis(),
+                "Проверка себестоимости").single()
+            if("Субстраты" !in db.categories11("Материалы"))
+                db.addCategory11("Материалы","Субстраты")
+            val name="QA COGS "+UUID.randomUUID()
+            db.addMaterial(name,"л",0.0,0.0,0.0,"Субстраты")
+            val materialId=db.materials().first{it.name==name}.id
+            db.purchase11(name,"Субстраты",10000L,System.currentTimeMillis(),
+                materialId=materialId,quantity=1.0,unit="л")
+            db.consumeMaterial11(materialId,1.0,"culture",source)
+            assertEquals(10000L,db.cultureCostBasis11(source))
+            db.sale(source,2,100.0,"Ранняя продажа")
+            val firstSale=db.readableDatabase.rawQuery(
+                "SELECT id FROM sales WHERE culture_id=? ORDER BY id LIMIT 1",
+                arrayOf(source.toString())).use{c->
+                assertTrue(c.moveToFirst());c.getLong(0)
+            }
+            fun recordedCost():Long=db.readableDatabase.rawQuery(
+                "SELECT cogs_minor FROM sale_details WHERE sale_id=?",
+                arrayOf(firstSale.toString())).use{c->
+                assertTrue(c.moveToFirst());c.getLong(0)
+            }
+            assertEquals(2000L,recordedCost())
+            val before=db.cultureCostBasis11(source)
+            assertEquals(8000L,before)
+            db.splitCulture(source,listOf(
+                TransferDestination(4,4,LabTerms.READY,null,null,"Растения")
+            ),0,"Позднее размножение")
+            assertEquals(4000L,db.cultureCostBasis11(source))
+            assertEquals(2000L,recordedCost())
+            val count=db.readableDatabase.rawQuery(
+                "SELECT COUNT(*) FROM culture_cost_transfers WHERE parent_culture_id=? AND reversed=0",
+                arrayOf(source.toString())).use{c->c.moveToFirst();c.getInt(0)}
+            assertTrue(count>=2)
+        }finally{db.close()}
+    }
+
     @Test fun cancellingShelfMoveRestoresActualOccupancyAndKeepsAudit(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
