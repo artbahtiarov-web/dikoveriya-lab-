@@ -40,7 +40,7 @@ class Lab10PlantVisualContracts(unittest.TestCase):
                      "if (oldVersion < 11)","LabCoreV11.create(db)",
                      "BACKUP_ORDER_V10=BACKUP_ORDER_V9+LabCoreV10.backupTables",
                      "BACKUP_ORDER_V11=BACKUP_ORDER_V10+LabCoreV11.backupTables", "BACKUP_ORDER_V12=BACKUP_ORDER_V11+LabCoreV12.backupTables",
-                     'writer.name("schema").value(13)',"root.optInt(\"schema\") in 4..12",
+                     'writer.name("schema").value(13)',"root.optInt(\"schema\") in 4..13",
                      "10->BACKUP_ORDER_V10"):
             self.assertIn(term,DB)
         self.assertIn('root.getInt("schema") in 4..13',ZIP)
