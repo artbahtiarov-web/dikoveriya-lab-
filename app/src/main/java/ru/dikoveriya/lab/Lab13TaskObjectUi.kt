@@ -168,7 +168,7 @@ internal fun Lab13TaskObjectPicker(
                         }?:query)
                     else->Lab13TaskSelection(type,null,description.trim())
                 })
-            }){Text("Выбрать")},
+            }){Text("Выбрать")}},
         dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
     )
 }
