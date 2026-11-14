@@ -356,7 +356,7 @@ internal fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
                     Lab11Reminders.sync(context,db)
                     onSaved()
                 }catch(e:Exception){onError(e.message?:"Не удалось сохранить задачу")}
-            }){Text("Создать")},
+            }){Text("Создать")}
         },
         dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
     )
