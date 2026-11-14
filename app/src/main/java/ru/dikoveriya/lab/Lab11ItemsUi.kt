@@ -267,7 +267,7 @@ private fun Lab11ItemTile(
                         maxLines=2,overflow=TextOverflow.Ellipsis)
                     Text(item.code,style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(item.kind+" · "+item.stage,
+                    Text(item.customKind.ifBlank{item.kind}+" · "+item.stage,
                         style=MaterialTheme.typography.labelSmall,
                         maxLines=2,overflow=TextOverflow.Ellipsis)
                     if(item.favorite)
@@ -286,7 +286,7 @@ private fun Lab11ItemTile(
                     verticalArrangement=Arrangement.spacedBy(4.dp)){
                     Text(item.plantName,style=MaterialTheme.typography.titleMedium,
                         maxLines=2,overflow=TextOverflow.Ellipsis)
-                    Text(item.code+" · "+item.kind,
+                    Text(item.code+" · "+item.customKind.ifBlank{item.kind},
                         style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(item.stage+" · "+item.status,
