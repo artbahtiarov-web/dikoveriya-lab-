@@ -120,6 +120,93 @@ internal fun LabDatabase.addPlantItem11(
     }finally{db.endTransaction()}
 }
 
+internal data class Lab13OffshootResult(
+    val groupId:Long,val offspringIds:List<Long>,val tuberIds:List<Long>
+)
+
+/**
+ * Offshoot separation keeps the parent alive and creates one permanent QR
+ * identity per individual daughter plant/tuber. No in-vitro container is
+ * fabricated for the sphagnum propagation tray.
+ */
+internal fun LabDatabase.separateOffshoots13(
+    parentId:Long,offspring:Int,tubers:Int,date:Long,
+    offspringStage:String="Укоренение",substrate:String="Сфагнум",
+    location:String="",note:String=""
+):Lab13OffshootResult{
+    require(offspring in 0..100 && tubers in 0..100 && offspring+tubers in 1..100){
+        "Укажи от 1 до 100 деток или клубней"
+    }
+    require(date>0 && date<=System.currentTimeMillis()+86400000L)
+    require(offspringStage in setOf("Укоренение","Укоренено","Адаптация","Доращивание","В работе"))
+    require(substrate.trim().length<=500 && location.trim().length<=200 && note.length<=1000)
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        val parent=db.rawQuery("SELECT plant_id,status FROM plant_items WHERE id=?",
+            arrayOf(parentId.toString())).use{c->
+            require(c.moveToFirst()){"Материнское растение не найдено"}
+            c.getLong(0) to c.getString(1)
+        }
+        require(parent.second=="Активен"){"Нельзя отделять деток от закрытого экземпляра"}
+        val now=System.currentTimeMillis()
+        val offspringIds=mutableListOf<Long>()
+        val tuberIds=mutableListOf<Long>()
+        for(i in 0 until offspring+tubers){
+            val offshoot=i<offspring
+            val propagule=if(offshoot)"Детка" else "Клубень"
+            val id=db.newItemRow11(
+                plantId=parent.first,
+                kind=if(offshoot)"Горшечное" else "Другое",
+                acquiredAt=date,supplier="",costMinor=0L,
+                parentItemId=parentId,parentCultureId=null,locationId=null,
+                locationText=location,substrate=substrate,
+                rooting=if(offshoot)"Отделённая детка" else "Проращивание клубня",
+                stimulant="",potMl=null,
+                note=(propagule+". "+note).take(2000),
+                customKind=if(offshoot)"" else "Клубень")
+            db.update("plant_items",ContentValues().apply{
+                put("stage",if(offshoot)offspringStage else "Укоренение")
+                put("updated_at",now)
+            },"id=?",arrayOf(id.toString()))
+            db.update("item_links",ContentValues().apply{put("kind","Отделение: "+propagule)},
+                "child_item_id=?",arrayOf(id.toString()))
+            if(offshoot)offspringIds+=id else tuberIds+=id
+        }
+        val details=JSONObject().apply{
+            put("offspring",offspring);put("tubers",tubers)
+            put("daughter_ids",org.json.JSONArray(offspringIds))
+            put("tuber_ids",org.json.JSONArray(tuberIds))
+            put("substrate",substrate.trim());put("location",location.trim())
+        }.toString()
+        val eventId=db.insertOrThrow("item_events",null,ContentValues().apply{
+            put("item_id",parentId);put("kind","Отделение деток и клубней")
+            put("event_at",date);put("recorded_at",now)
+            put("note","Детки: $offspring · Клубни: $tubers. "+note)
+            put("details_json",details)
+        })
+        val groupId=db.insertOrThrow("offshoot_groups13",null,ContentValues().apply{
+            put("parent_item_id",parentId);put("event_id",eventId)
+            put("occurred_at",date);put("location_text",location.trim())
+            put("substrate",substrate.trim());put("note",note.trim())
+        })
+        offspringIds.forEach{id->
+            db.insertOrThrow("offshoot_members13",null,ContentValues().apply{
+                put("group_id",groupId);put("child_item_id",id)
+                put("propagule_kind","Детка")
+            })
+        }
+        tuberIds.forEach{id->
+            db.insertOrThrow("offshoot_members13",null,ContentValues().apply{
+                put("group_id",groupId);put("child_item_id",id)
+                put("propagule_kind","Клубень")
+            })
+        }
+        db.setTransactionSuccessful()
+        return Lab13OffshootResult(groupId,offspringIds,tuberIds)
+    }finally{db.endTransaction()}
+}
+
 /** One atomic cutting and parental audit event; no silent reduction of a living mother plant. */
 internal fun LabDatabase.takeCutting11(parentItemId:Long,date:Long,
     rooting:String,stimulant:String,location:String,note:String):Long{
