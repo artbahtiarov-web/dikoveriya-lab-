@@ -61,7 +61,7 @@ internal fun Lab13OffshootDialog(
                     pupStage,substrate,location,notes)
                 onSaved(result)
             }catch(e:Exception){onError(e.message?:"Не удалось записать размножение")}
-        }){Text("Создать дочерние растения")},
+        }){Text("Создать дочерние растения")}},
         dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
     )
 }
