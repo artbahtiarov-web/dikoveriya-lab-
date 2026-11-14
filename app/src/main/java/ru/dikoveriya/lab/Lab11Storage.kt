@@ -129,14 +129,16 @@ internal fun LabDatabase.moveItem11(itemId:Long,locationId:Long,
             arrayOf(locationId.toString())).use{c->
             require(c.moveToFirst()){"Место не найдено"};c.getString(0)
         }
-        val old=db.rawQuery("SELECT location_id FROM plant_items WHERE id=?",
-            arrayOf(itemId.toString())).use{c->
+        val old=db.rawQuery("""SELECT location_id,location_text,status FROM plant_items
+            WHERE id=?""",arrayOf(itemId.toString())).use{c->
             require(c.moveToFirst()){"Растение не найдено"}
-            if(c.isNull(0))null else c.getLong(0)
+            Triple(if(c.isNull(0))null else c.getLong(0),c.getString(1),c.getString(2))
         }
-        db.insertOrThrow("item_storage_history",null,ContentValues().apply{
+        require(old.third=="Активен"){"Нельзя перемещать проданное или списанное растение"}
+        require(old.first!=locationId){"Растение уже находится в выбранном месте"}
+        val historyId=db.insertOrThrow("item_storage_history",null,ContentValues().apply{
             put("item_id",itemId)
-            if(old!=null)put("previous_location_id",old)
+            if(old.first!=null)put("previous_location_id",old.first)
             put("new_location_id",locationId);put("location_text",loc)
             put("occurred_at",at);put("note",reason.trim())
         })
@@ -144,10 +146,15 @@ internal fun LabDatabase.moveItem11(itemId:Long,locationId:Long,
             put("location_id",locationId);put("location_text",loc)
             put("updated_at",System.currentTimeMillis())
         },"id=?",arrayOf(itemId.toString()))
+        val audit=org.json.JSONObject()
+            .put("before_status",old.third).put("before_location",old.second)
+            .put("before_location_id",old.first?:org.json.JSONObject.NULL)
+            .put("new_location",loc).put("new_location_id",locationId)
+            .put("storage_history_id",historyId)
         db.insertOrThrow("item_events",null,ContentValues().apply{
             put("item_id",itemId);put("kind","Перемещение")
             put("event_at",at);put("recorded_at",System.currentTimeMillis())
-            put("note",reason+": "+loc)
+            put("note",reason+": "+loc);put("details_json",audit.toString())
         })
         db.setTransactionSuccessful()
     }finally{db.endTransaction()}
