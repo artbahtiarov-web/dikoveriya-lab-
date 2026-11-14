@@ -55,6 +55,12 @@ internal object Lab11Updater {
             val root=JSONObject(conn.inputStream.bufferedReader(Charsets.UTF_8).use{
                 it.readText()
             })
+            parseRelease(root)
+        }finally{conn.disconnect()}
+    }
+
+    /** Parser is isolated from the network and exercised with malicious release fixtures. */
+    internal fun parseRelease(root:JSONObject):Lab11PublishedUpdate{
             require(!root.optBoolean("draft") && !root.optBoolean("prerelease")){
                 "Предварительная версия не предлагается для обновления"
             }
@@ -80,7 +86,6 @@ internal object Lab11Updater {
             }
             candidates.maxByOrNull{it.code}
                 ?:error("В опубликованной версии нет проверяемого APK")
-        }finally{conn.disconnect()}
     }
 
     private fun trustedUrl(value:String):Boolean{
