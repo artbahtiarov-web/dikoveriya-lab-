@@ -53,9 +53,17 @@ internal fun LabDatabase.addAsset11(name:String,category:String,supplier:String,
         return id
     }finally{db.endTransaction()}
 }
-internal fun LabDatabase.retireAsset11(id:Long,status:String,reason:String){
+/**
+ * Closing equipment never repeats its acquisition payment. If it was sold,
+ * actual proceeds are recorded as a separate receipt linked to the audit event.
+ */
+internal fun LabDatabase.retireAsset11(id:Long,status:String,reason:String,
+    saleProceedsMinor:Long=0L){
     require(status in setOf("Сломано","Утеряно","Утилизировано","Продано","Заменено"))
-    require(reason.trim().length>=2)
+    require(reason.trim().length in 2..500)
+    require(saleProceedsMinor>=0 && (status=="Продано" || saleProceedsMinor==0L)){
+        "Выручка допустима только при продаже оборудования"
+    }
     val db=writableDatabase
     db.beginTransaction()
     try{
@@ -64,10 +72,19 @@ internal fun LabDatabase.retireAsset11(id:Long,status:String,reason:String){
         },"id=? AND status='Используется'",arrayOf(id.toString()))==1){
             "Оборудование уже закрыто или не найдено"
         }
-        db.insertOrThrow("asset_events",null,ContentValues().apply{
+        val at=System.currentTimeMillis()
+        val eventId=db.insertOrThrow("asset_events",null,ContentValues().apply{
             put("asset_id",id);put("kind",status)
-            put("note",reason.trim());put("occurred_at",System.currentTimeMillis())
+            put("note",reason.trim());put("occurred_at",at)
         })
+        if(status=="Продано"){
+            db.insertOrThrow("cash_ledger",null,ContentValues().apply{
+                put("direction","Доход");put("category","Продажа оборудования")
+                put("amount_minor",saleProceedsMinor);put("occurred_at",at)
+                put("source_type","asset_sale");put("source_id",eventId)
+                put("note",reason.trim())
+            })
+        }
         db.setTransactionSuccessful()
     }finally{db.endTransaction()}
 }
