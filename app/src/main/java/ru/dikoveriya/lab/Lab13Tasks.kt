@@ -78,7 +78,8 @@ internal fun LabDatabase.createTask13(
     try{
         val refTable=when(type){
             "Контейнер in vitro"->"cultures"
-            "Горшечное растение","Маточник","Черенок"->"plant_items"
+            "Горшечное растение","Маточник","Черенок",
+            "Другое растение / клубень"->"plant_items"
             "Оборудование"->"equipment_assets"
             else->null
         }
@@ -87,10 +88,15 @@ internal fun LabDatabase.createTask13(
             val row=db.rawQuery("SELECT 1 FROM $refTable WHERE id=?",
                 arrayOf(id.toString())).use{it.moveToFirst()}
             require(row){"Связанный объект не найден"}
-            if(refTable=="plant_items" && type!="Горшечное растение"){
+            if(refTable=="plant_items"){
                 val actual=db.rawQuery("SELECT kind FROM plant_items WHERE id=?",
                     arrayOf(id.toString())).use{c->c.moveToFirst();c.getString(0)}
-                require(actual==type){"Тип выбранного растения не совпадает"}
+                val expected=when(type){
+                    "Горшечное растение"->"Горшечное"
+                    "Другое растение / клубень"->"Другое"
+                    else->type
+                }
+                require(actual==expected){"Тип выбранного растения не совпадает"}
             }
         }
         val now=System.currentTimeMillis()
