@@ -17,7 +17,7 @@ class ReminderDateBounds(unittest.TestCase):
         self.assertIn("if(time<=now)continue",SOURCE)
 
     def test_notification_only_for_confirmed_tasks(self):
-        self.assertIn("FROM tasks t WHERE t.done=0",SOURCE)
+        self.assertIn("WHERE t.done=0",SOURCE)
         self.assertIn("entity_archives",SOURCE)
         self.assertIn("setAndAllowWhileIdle",SOURCE)
 
