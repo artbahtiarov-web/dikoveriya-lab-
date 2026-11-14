@@ -306,7 +306,7 @@ internal fun Lab11ActionDialog(
                         }
                         val potVolume=if(newPotMl.isBlank())null
                             else newPotMl.toIntOrNull()?:error("Неверный объём горшка")
-                        val newKind=if(item.kind=="Черенок" &&
+                        val newKind=if((item.kind=="Черенок" || item.customKind=="Клубень") &&
                             kind=="Пересадка" && stage=="В горшке")"Горшечное" else null
                         db.commitItemActionPhotos11(
                             context,item.id,pendingPhotos){photoNames->
