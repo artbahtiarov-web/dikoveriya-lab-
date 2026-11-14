@@ -116,8 +116,10 @@ internal fun Lab10TaskCalendar(db:LabDatabase,revision:Int,onDay:(String)->Unit,
                                             ", просроченных "+stats.overdue
                                     }
                                     .clickable {
-                                        selected=if(isSelected)"" else label
-                                        onDay(selected)
+                                        // Repeated taps on the same date also create a new task.
+                                        // "Сегодня" above is the explicit way to clear selection.
+                                        selected=label
+                                        onDay(label)
                                     },
                                 shape=RoundedCornerShape(10.dp),
                                 color=when{
@@ -148,6 +150,9 @@ internal fun Lab10TaskCalendar(db:LabDatabase,revision:Int,onDay:(String)->Unit,
                     }
                 }
             }
+            Text("Нажмите на дату, чтобы добавить задачу. В списке ниже останутся задачи этого дня.",
+                style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement=Arrangement.spacedBy(12.dp)){
                 listOf(planned to "План",soon to "Скоро",danger to "Просрочено",
