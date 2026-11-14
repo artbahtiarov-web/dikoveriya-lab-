@@ -84,7 +84,7 @@ internal object Lab11Updater {
                         root.optString("body").take(2500)))
                 }
             }
-            candidates.maxByOrNull{it.code}
+            return candidates.maxByOrNull{it.code}
                 ?:error("В опубликованной версии нет проверяемого APK")
     }
 
