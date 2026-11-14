@@ -50,6 +50,7 @@ fun Lab072TasksScreen(
     var advanced by rememberSaveable{mutableStateOf(false)}
     var pages by rememberSaveable{mutableIntStateOf(1)}
     var editTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
+    var createTaskOnDate by rememberSaveable{mutableStateOf<String?>(null)}
     var cancelTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
     var cancelReason by rememberSaveable{mutableStateOf("")}
     var viewDialog by rememberSaveable{mutableStateOf(false)}
@@ -89,10 +90,12 @@ fun Lab072TasksScreen(
         }
         item(key="calendar"){
             Lab10TaskCalendar(db,revision,onDay={date->
-                // A selected date is the only time constraint, never mixed with
-                // stale relative-period filters or hidden previous selections.
+                // A selected day immediately opens a new-task form with its date.
+                // The underlying list stays filtered to that day, so dismissing
+                // the form still lets the user see all tasks already scheduled.
                 period="Все";fromText=date;toText=date;pages=1
                 priority="";kind="";plantId=null;recipeId=null;search=""
+                if(date.isNotBlank())createTaskOnDate=date
             })
         }
         if(Build.VERSION.SDK_INT>=33 && !notificationsEnabled)
@@ -193,6 +196,18 @@ fun Lab072TasksScreen(
             }
         }
     }
+    createTaskOnDate?.let{day->
+        key(day){
+            Lab072TaskForm(db,recipes,
+                onClose={createTaskOnDate=null},
+                onSaved={
+                    createTaskOnDate=null
+                    onChanged()
+                },
+                onError=onError,
+                initialDate=day)
+        }
+    }
     if(advanced){
         Lab10TaskFilterSheet(
             initial=Lab10TaskFilters(priority,kind,plantId,recipeId,fromText,toText,order,period),
@@ -259,9 +274,10 @@ fun Lab072TasksScreen(
 
 @Composable
 internal fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
-    onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit){
+    onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit,
+    initialDate:String=""){
     var title by rememberSaveable{mutableStateOf("")}
-    var deadline by rememberSaveable{mutableStateOf("")}
+    var deadline by rememberSaveable(initialDate){mutableStateOf(initialDate)}
     var priority by rememberSaveable{mutableStateOf("Обычный")}
     var kind by rememberSaveable{mutableStateOf("Осмотр")}
     var cultureCode by rememberSaveable{mutableStateOf("")}
