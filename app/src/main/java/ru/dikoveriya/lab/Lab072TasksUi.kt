@@ -50,7 +50,7 @@ fun Lab072TasksScreen(
     var advanced by rememberSaveable{mutableStateOf(false)}
     var pages by rememberSaveable{mutableIntStateOf(1)}
     var editTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
-    var createTaskOnDate by rememberSaveable{mutableStateOf<String?>(null)}
+    var selectedDay by rememberSaveable{mutableStateOf<String?>(null)}
     var cancelTaskId by rememberSaveable{mutableStateOf<Long?>(null)}
     var cancelReason by rememberSaveable{mutableStateOf("")}
     var viewDialog by rememberSaveable{mutableStateOf(false)}
@@ -81,6 +81,12 @@ fun Lab072TasksScreen(
         try{block();onChanged()}
         catch(e:Exception){onError(e.message?:"Не удалось изменить задачу")}
     }
+    selectedDay?.let{date->
+        Lab13TaskDayPage(date,db,revision,recipes,
+            onBack={selectedDay=null},onNavigate=onNavigate,
+            onChanged=onChanged,onError=onError,modifier=modifier)
+        return
+    }
     LazyColumn(modifier=modifier,state=rememberLazyListState(),
         contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -90,12 +96,9 @@ fun Lab072TasksScreen(
         }
         item(key="calendar"){
             Lab10TaskCalendar(db,revision,onDay={date->
-                // A selected day immediately opens a new-task form with its date.
-                // The underlying list stays filtered to that day, so dismissing
-                // the form still lets the user see all tasks already scheduled.
-                period="Все";fromText=date;toText=date;pages=1
-                priority="";kind="";plantId=null;recipeId=null;search=""
-                if(date.isNotBlank())createTaskOnDate=date
+                // Calendar dates open a dedicated day with its actual tasks.
+                // No hidden registry filters or automatic creation dialog.
+                selectedDay=date.takeIf{it.isNotBlank()}
             })
         }
         if(Build.VERSION.SDK_INT>=33 && !notificationsEnabled)
@@ -196,18 +199,6 @@ fun Lab072TasksScreen(
             }
         }
     }
-    createTaskOnDate?.let{day->
-        key(day){
-            Lab072TaskForm(db,recipes,
-                onClose={createTaskOnDate=null},
-                onSaved={
-                    createTaskOnDate=null
-                    onChanged()
-                },
-                onError=onError,
-                initialDate=day)
-        }
-    }
     if(advanced){
         Lab10TaskFilterSheet(
             initial=Lab10TaskFilters(priority,kind,plantId,recipeId,fromText,toText,order,period),
@@ -276,46 +267,104 @@ fun Lab072TasksScreen(
 internal fun Lab072TaskForm(db:LabDatabase,recipes:List<RecipeRecord>,
     onClose:()->Unit,onSaved:()->Unit,onError:(String)->Unit,
     initialDate:String=""){
+    val context=LocalContext.current
     var title by rememberSaveable{mutableStateOf("")}
     var deadline by rememberSaveable(initialDate){mutableStateOf(initialDate)}
     var priority by rememberSaveable{mutableStateOf("Обычный")}
     var kind by rememberSaveable{mutableStateOf("Осмотр")}
-    var cultureCode by rememberSaveable{mutableStateOf("")}
+    var selection by remember{mutableStateOf(Lab13TaskSelection())}
+    var showObjectPicker by remember{mutableStateOf(false)}
     var recipeId by rememberSaveable{mutableStateOf<Long?>(null)}
     var note by rememberSaveable{mutableStateOf("")}
+    var pest by rememberSaveable{mutableStateOf("")}
+    var treatment by rememberSaveable{mutableStateOf("")}
+    var delivery by rememberSaveable{mutableStateOf("")}
+    var remind by rememberSaveable{mutableStateOf(true)}
+    var remindClock by rememberSaveable{mutableStateOf("09:00")}
+    var ringtone by rememberSaveable{mutableStateOf("")}
     val date=if(validDate11(deadline)!=null)endOfDay072(deadline) else null
+    val remindAt=if(remind)reminderMoment13(deadline,remindClock) else null
     AlertDialog(onDismissRequest=onClose,title={Text("Новая задача")},
-        text={Column(Modifier.heightIn(max=490.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement=Arrangement.spacedBy(9.dp)){
+        text={Column(Modifier.heightIn(max=530.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement=Arrangement.spacedBy(11.dp)){
             Field("Что нужно сделать",title,{title=it},single=false)
-            Lab11DateField("Срок",deadline,{deadline=it})
+            Lab11DateField("Дата задачи",deadline,{deadline=it})
             if(date==null)Text("Выбери дату выполнения в календаре",
-                color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                color=MaterialTheme.colorScheme.error,
+                style=MaterialTheme.typography.bodySmall)
+            PickOne("Вид работы",taskTypes13,kind,{chosen->
+                kind=chosen
+                if(selection.kind.isBlank()){
+                    selection=when(chosen){
+                        "Закупка"->Lab13TaskSelection("Покупка / закупка")
+                        "Отправка заказа"->Lab13TaskSelection("Заказ / отправка")
+                        else->selection
+                    }
+                }
+            })
             PickOne("Приоритет",listOf("Низкий","Обычный","Высокий","Срочный"),
                 priority,{priority=it})
-            PickOne("Вид работы",listOf("Осмотр","Пересадка","Уход",
-                "Подготовка среды","Другое"),kind,{kind=it})
-            Field("Контейнер, например LAB-000123 (необязательно)",cultureCode,
-                {cultureCode=it})
-            PickOne("Среда (необязательно)",
-                listOf("Нет")+recipes.map{it.name+" · v"+it.version},
-                recipes.firstOrNull{it.id==recipeId}?.let{it.name+" · v"+it.version}?:"Нет",
-                {choice->recipeId=recipes.firstOrNull{
-                    it.name+" · v"+it.version==choice}?.id})
+            OutlinedCard(onClick={showObjectPicker=true},
+                modifier=Modifier.fillMaxWidth()){
+                Column(Modifier.padding(14.dp),
+                    verticalArrangement=Arrangement.spacedBy(3.dp)){
+                    Text("Объект · необязательно",
+                        style=MaterialTheme.typography.titleSmall)
+                    Text(if(selection.kind.isBlank())"Выбрать растение, контейнер, "+
+                            "оборудование, закупку или заказ"
+                        else selection.kind+" · "+(selection.text.ifBlank{
+                            selection.id?.let{"#"+it}?: "не указан"
+                        }),style=MaterialTheme.typography.bodySmall)
+                }
+            }
+            if(kind=="Обработка от вредителей"){
+                Field("Вредитель / проблема",pest,{pest=it})
+                Field("Препарат / обработка / концентрация",treatment,{treatment=it},
+                    single=false)
+            }else if(kind=="Подкормка" || kind=="Полив"){
+                Field(if(kind=="Подкормка")"Удобрение и дозировка" else
+                    "Объём воды / способ полива",treatment,{treatment=it},single=false)
+            }else if(kind in setOf("Подготовка к продаже","Отправка заказа")){
+                Field("Покупатель, заказ, упаковка, канал или адрес",
+                    delivery,{delivery=it},single=false)
+            }
+            if(kind=="Подготовка среды"){
+                PickOne("Среда (необязательно)",
+                    listOf("Нет")+recipes.map{it.name+" · v"+it.version},
+                    recipes.firstOrNull{it.id==recipeId}
+                        ?.let{it.name+" · v"+it.version}?:"Нет",
+                    {value->recipeId=recipes.firstOrNull{
+                        it.name+" · v"+it.version==value}?.id})
+            }
+            Lab13ReminderControls(deadline,remind,{remind=it},
+                remindClock,{remindClock=it},ringtone,{ringtone=it})
             Field("Примечание (необязательно)",note,{note=it},single=false)
-            Text("Приоритет и срок назначаются пользователем. Без реальной даты задача не создаётся.",
-                style=MaterialTheme.typography.bodySmall)
         }},
-        confirmButton={Button(enabled=title.isNotBlank() && date!=null,onClick={
-            try{
-                val c=if(cultureCode.isBlank())null else
-                    db.findCulture072(cultureCode.trim())
-                        ?: error("Такого контейнера нет: "+cultureCode.trim())
-                db.createTask072(title,requireNotNull(date),priority,kind,c,recipeId,null,note)
-                onSaved()
-            }catch(e:Exception){onError(e.message?:"Не удалось сохранить задачу")}
-        }){Text("Создать")}},
-        dismissButton={TextButton(onClick=onClose){Text("Отмена")}})
+        confirmButton={Button(
+            enabled=title.trim().length>=2 && date!=null &&
+                (!remind || remindAt!=null) &&
+                (selection.kind !in setOf("Покупка / закупка",
+                    "Заказ / отправка","Другое") ||
+                    selection.text.isNotBlank()),
+            onClick={
+                try{
+                    db.createTask13(title,requireNotNull(date),priority,kind,selection,
+                        note=note,recipeId=recipeId,
+                        reminderAt=if(remind)requireNotNull(remindAt) else null,
+                        ringtoneUri=ringtone.takeIf{it.isNotBlank()},
+                        pest=pest,treatment=treatment,delivery=delivery)
+                    Lab11Reminders.sync(context,db)
+                    onSaved()
+                }catch(e:Exception){onError(e.message?:"Не удалось сохранить задачу")}
+            }){Text("Создать")},
+        },
+        dismissButton={TextButton(onClick=onClose){Text("Отмена")}}
+    )
+    if(showObjectPicker){
+        Lab13TaskObjectPicker(db,kind,selection,
+            onClose={showObjectPicker=false},
+            onChosen={selection=it;showObjectPicker=false},onError=onError)
+    }
 }
 @Composable
 private fun Lab072TaskEdit(task:Lab072Task,onClose:()->Unit,
