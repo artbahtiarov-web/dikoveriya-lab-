@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 
 @Composable
@@ -170,6 +171,9 @@ internal fun Lab11ItemsScreen(
         }
     }
     if(filterOpen){
+        val saved=remember(revision){db.savedViews072("items")}
+        var presetName by remember(filterOpen){mutableStateOf("")}
+        var draftSearch by remember(filterOpen){mutableStateOf(query)}
         var draftKind by remember(filterOpen){mutableStateOf(kind)}
         var draftFav by remember(filterOpen){mutableStateOf(favorites)}
         var draftStage by remember(filterOpen){mutableStateOf(stage)}
@@ -178,6 +182,22 @@ internal fun Lab11ItemsScreen(
             Column(Modifier.padding(20.dp),
                 verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text("Фильтры экземпляров",style=MaterialTheme.typography.headlineSmall)
+                if(saved.isNotEmpty())PickOne("Сохранённый набор",
+                    listOf("Выбрать")+saved.map{it.name},"Выбрать",
+                    {name->
+                        val v=saved.firstOrNull{it.name==name}
+                        if(v!=null)try{
+                            val o=JSONObject(v.config)
+                            draftSearch=o.optString("search","")
+                            draftKind=o.optString("kind","")
+                            draftFav=o.optBoolean("favorite",false)
+                            draftStage=o.optString("stage","")
+                            draftStatus=o.optString("status","")
+                        }catch(e:Exception){onError("Некорректный сохранённый фильтр")}
+                    })
+                OutlinedTextField(draftSearch,{draftSearch=it},
+                    modifier=Modifier.fillMaxWidth(),singleLine=true,
+                    label={Text("Текст поиска")})
                 listOf("Все","Горшечное","Черенок","Маточник","Другое").forEach{option->
                     Row(Modifier.fillMaxWidth().clickable{
                         draftKind=if(option=="Все")"" else option
@@ -195,11 +215,26 @@ internal fun Lab11ItemsScreen(
                     Checkbox(draftFav,{draftFav=it})
                     Text("Только избранное")
                 }
+                OutlinedTextField(presetName,{presetName=it},
+                    label={Text("Название нового набора фильтров")},
+                    modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedButton(enabled=presetName.trim().length in 2..50,
+                    onClick={
+                        try{
+                            val o=JSONObject().put("search",draftSearch)
+                                .put("kind",draftKind).put("favorite",draftFav)
+                                .put("stage",draftStage).put("status",draftStatus)
+                            db.saveView072("items",presetName.trim(),o.toString())
+                            onChanged()
+                        }catch(e:Exception){onError(e.message?:"Не удалось сохранить набор")}
+                    },modifier=Modifier.fillMaxWidth()){
+                    Text("Сохранить набор")
+                }
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(onClick={draftKind="";draftFav=false;draftStage="";draftStatus=""},
+                    OutlinedButton(onClick={draftSearch="";draftKind="";draftFav=false;draftStage="";draftStatus=""},
                         modifier=Modifier.weight(1f)){Text("Сбросить")}
                     Button(onClick={
-                        kind=draftKind;favorites=draftFav;stage=draftStage;status=draftStatus
+                        query=draftSearch;kind=draftKind;favorites=draftFav;stage=draftStage;status=draftStatus
                         page=1;filterOpen=false
                     },modifier=Modifier.weight(1f)){Text("Применить")}
                 }
