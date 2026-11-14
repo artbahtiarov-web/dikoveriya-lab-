@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,6 +137,10 @@ internal fun Lab11SalesScreen(db:LabDatabase,revision:Int,
         }
     }
     if(filterOpen){
+        val saved=remember(revision){db.savedViews072("sales")}
+        var presetName by remember(filterOpen){mutableStateOf("")}
+        var presetError by remember(filterOpen){mutableStateOf("")}
+        var draftSearch by remember(filterOpen){mutableStateOf(search)}
         var draftKind by remember(filterOpen){mutableStateOf(kind)}
         var draftFrom by remember(filterOpen){mutableStateOf(from)}
         var draftTo by remember(filterOpen){mutableStateOf(to)}
@@ -145,6 +150,22 @@ internal fun Lab11SalesScreen(db:LabDatabase,revision:Int,
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
                 Text("Фильтры продаж",style=MaterialTheme.typography.headlineSmall)
+                if(saved.isNotEmpty())PickOne("Сохранённый набор",
+                    listOf("Выбрать")+saved.map{it.name},"Выбрать",
+                    {name->
+                        val row=saved.firstOrNull{it.name==name}
+                        if(row!=null)try{
+                            val o=JSONObject(row.config)
+                            draftSearch=o.optString("search","")
+                            draftKind=o.optString("kind","Все")
+                            draftFrom=o.optString("from","")
+                            draftTo=o.optString("to","")
+                            draftOrder=o.optString("order","Сначала новые")
+                            invalid=false;presetError=""
+                        }catch(e:Exception){presetError="Нельзя прочитать сохранённый набор"}
+                    })
+                OutlinedTextField(draftSearch,{draftSearch=it},
+                    label={Text("Текст поиска")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 PickOne("Тип растения",
                     listOf("Все","in vitro","Горшечное","Черенок","Маточник","Другое"),
                     draftKind,{draftKind=it;invalid=false})
@@ -155,11 +176,28 @@ internal fun Lab11SalesScreen(db:LabDatabase,revision:Int,
                 PickOne("Сортировка",
                     listOf("Сначала новые","Сначала старые","Выручка ↓","Выручка ↑"),
                     draftOrder,{draftOrder=it})
+                OutlinedTextField(presetName,{presetName=it},
+                    label={Text("Название набора фильтров")},
+                    modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedButton(enabled=presetName.trim().length in 2..50,
+                    onClick={
+                        try{
+                            val o=JSONObject().put("search",draftSearch)
+                                .put("kind",draftKind).put("from",draftFrom)
+                                .put("to",draftTo).put("order",draftOrder)
+                            db.saveView072("sales",presetName.trim(),o.toString())
+                            presetError="Набор сохранён"
+                        }catch(e:Exception){presetError=e.message?:"Не удалось сохранить"}
+                    },modifier=Modifier.fillMaxWidth()){
+                    Text("Сохранить набор")
+                }
+                if(presetError.isNotBlank())Text(presetError,
+                    style=MaterialTheme.typography.bodySmall)
                 if(invalid)Text("Неверный период. Проверь даты.",
                     color=MaterialTheme.colorScheme.error)
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={
-                        draftKind="Все";draftFrom="";draftTo=""
+                        draftSearch="";draftKind="Все";draftFrom="";draftTo=""
                         draftOrder="Сначала новые";invalid=false
                     },modifier=Modifier.weight(1f)){Text("Сбросить")}
                     Button(onClick={
@@ -169,7 +207,7 @@ internal fun Lab11SalesScreen(db:LabDatabase,revision:Int,
                             (draftTo.isNotBlank()&&b==null)||
                             (a!=null&&b!=null&&a>b)
                         if(!invalid){
-                            kind=draftKind;from=draftFrom;to=draftTo
+                            search=draftSearch;kind=draftKind;from=draftFrom;to=draftTo
                             order=draftOrder;page=1;filterOpen=false
                         }
                     },modifier=Modifier.weight(1f)){Text("Применить")}
