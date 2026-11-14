@@ -224,6 +224,33 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun equipmentSaleBooksOneReceiptAndNoDuplicateAcquisition(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val asset=db.addAsset11("QA used lamp "+UUID.randomUUID(),
+                "Лампы","QA",180000L,System.currentTimeMillis())
+            val expensesBefore=db.cashRows11(2000).count{
+                it.direction=="Расход" && it.source=="purchase" &&
+                    it.note.startsWith("QA used lamp")
+            }
+            assertEquals(1,expensesBefore)
+            db.retireAsset11(asset,"Продано","Продажа бывшей в употреблении лампы",70000L)
+            val rows=db.cashRows11(2000)
+            assertEquals(1,rows.count{it.source=="asset_sale" &&
+                it.direction=="Доход" && it.amount==70000L})
+            assertEquals(1,rows.count{it.direction=="Расход" &&
+                it.source=="purchase" && it.note.startsWith("QA used lamp")})
+            assertEquals("Продано",db.assets11().first{it.id==asset}.status)
+            var rejected=false
+            try{db.retireAsset11(asset,"Продано","Повторная продажа",70000L)}
+            catch(_:Exception){rejected=true}
+            assertTrue("Duplicate sale must be rejected",rejected)
+            assertEquals(1,db.cashRows11(2000).count{it.source=="asset_sale" &&
+                it.amount==70000L})
+        }finally{db.close()}
+    }
+
     @Test fun customTemplateTypedFieldsAreValidatedAndDoNotBypassStock(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
