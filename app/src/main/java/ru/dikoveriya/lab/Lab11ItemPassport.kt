@@ -53,6 +53,7 @@ internal fun Lab11ItemPassport(
     var tab by rememberSaveable(id){mutableStateOf("Обзор")}
     var showAction by remember{mutableStateOf(false)}
     var showCutting by remember{mutableStateOf(false)}
+    var showOffshoot by remember{mutableStateOf(false)}
     var showSale by remember{mutableStateOf(false)}
     var showMeasure by remember{mutableStateOf(false)}
     var showRepeat by remember{mutableStateOf(false)}
@@ -118,6 +119,8 @@ internal fun Lab11ItemPassport(
                             onClick={menu=false;qrSaver.launch(item.code+".png")})
                         DropdownMenuItem(text={Text("Создать черенок")},
                             onClick={menu=false;showCutting=true})
+                        if(!closed)DropdownMenuItem(text={Text("Отделить деток / клубни")},
+                            onClick={menu=false;showOffshoot=true})
                         DropdownMenuItem(text={Text("Запланировать уход")},
                             onClick={menu=false;showRepeat=true})
                         if(!closed)DropdownMenuItem(text={Text("Оформить продажу")},
@@ -302,7 +305,10 @@ internal fun Lab11ItemPassport(
         }
     }
     if(showAction)Lab11ActionDialog(item,db,onClose={showAction=false},
-        onSaved={showAction=false;onChanged()},onError=onError)
+        onSaved={showAction=false;onChanged()},onError=onError,
+        onOffshoot={showAction=false;showOffshoot=true})
+    if(showOffshoot)Lab13OffshootDialog(item,db,onClose={showOffshoot=false},
+        onSaved={result->showOffshoot=false;onChanged()},onError=onError)
     if(showCutting)Lab11NewCuttingDialog(item,db,onClose={showCutting=false},
         onSaved={id2->showCutting=false;onChanged();onOpenItem(id2)},onError=onError)
     if(showSale)Lab11SaleDialog(item,db,onClose={showSale=false},
