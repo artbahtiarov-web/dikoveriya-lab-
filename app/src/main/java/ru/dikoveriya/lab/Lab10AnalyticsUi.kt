@@ -23,7 +23,7 @@ private data class Lab10AnalyticsData(
     val active:Int,
     val control:Int,
     val operations:Int,
-    val revenue:Double,
+    val revenue:Long,
     val stages:List<Pair<String,Int>>
 )
 
@@ -36,9 +36,15 @@ private fun LabDatabase.analytics10(since:Long?):Lab10AnalyticsData{
     val control=count("SELECT COUNT(*) FROM cultures WHERE status IN ('На контроле','Карантин')")
     val query=if(since==null)"SELECT COUNT(*) FROM lab_operations WHERE status='Проведена'"
         else "SELECT COUNT(*) FROM lab_operations WHERE status='Проведена' AND occurred_at>=?"
-    val operations=count(query,if(since==null)emptyArray() else arrayOf(since.toString()))
-    val revenue=db.rawQuery("SELECT COALESCE(SUM(price),0) FROM sales",null)
-        .use{c->if(c.moveToFirst())c.getDouble(0)else 0.0}
+    val operationsLegacy=count(query,if(since==null)emptyArray() else arrayOf(since.toString()))
+    val extraQuery=if(since==null)
+        "SELECT COUNT(*) FROM item_events WHERE cancelled=0 AND kind NOT IN ('Создание','Отмена')"
+        else "SELECT COUNT(*) FROM item_events WHERE cancelled=0 AND kind NOT IN ('Создание','Отмена') AND event_at>=?"
+    val operations=operationsLegacy+count(extraQuery,
+        if(since==null)emptyArray() else arrayOf(since.toString()))
+    val revenue=db.rawQuery("""SELECT COALESCE(SUM(amount_minor),0) FROM cash_ledger
+        WHERE direction='Доход' AND category='Продажа'""",null)
+        .use{c->if(c.moveToFirst())c.getLong(0)else 0L}
     val stages=db.rawQuery("""
         SELECT stage,COUNT(*) FROM cultures
         WHERE status IN ('В культуре','На контроле','Карантин')
@@ -52,9 +58,12 @@ private fun LabDatabase.analytics10(since:Long?):Lab10AnalyticsData{
 /** All cards use real SQL counts; no fabricated success/efficiency percentages. */
 @Composable
 internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
+    onMetric:(String)->Unit={},onBreakdown:(String,Long)->Unit={_,_->},
+    onOpenItem:(Long)->Unit={},
     modifier:Modifier=Modifier
 ){
     var period by rememberSaveable{mutableStateOf("30 дней")}
+    var compare by remember{mutableStateOf(false)}
     val since=when(period){
         "30 дней"->System.currentTimeMillis()-30L*86400000L
         "90 дней"->System.currentTimeMillis()-90L*86400000L
@@ -83,18 +92,18 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Lab10StatCard("Всего контейнеров",data.total.toString(),
-                        Icons.Outlined.Inventory2,Modifier.weight(1f))
+                        Icons.Outlined.Inventory2,Modifier.weight(1f)){onMetric("all")}
                     Lab10StatCard("Активных",data.active.toString(),
-                        Icons.Outlined.Spa,Modifier.weight(1f))
+                        Icons.Outlined.Spa,Modifier.weight(1f)){onMetric("active")}
                 }
             }
             item{
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
                     Lab10StatCard("На контроле",data.control.toString(),
-                        Icons.Outlined.ReportProblem,Modifier.weight(1f))
+                        Icons.Outlined.ReportProblem,Modifier.weight(1f)){onMetric("attention")}
                     Lab10StatCard("Выручка по записям",
-                        String.format(Locale("ru"),"%.0f ₽",data.revenue),
-                        Icons.Outlined.Payments,Modifier.weight(1f))
+                        kopecks11(data.revenue),
+                        Icons.Outlined.Payments,Modifier.weight(1f)){onMetric("sales")}
                 }
             }
             item{
@@ -108,7 +117,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                 }
             }
             item{
-                Card(colors=CardDefaults.cardColors(
+                Card(onClick={onMetric("operations")},colors=CardDefaults.cardColors(
                     containerColor=MaterialTheme.colorScheme.surface),
                     shape=RoundedCornerShape(18.dp)){
                     Column(Modifier.padding(17.dp)){
@@ -126,7 +135,7 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                 style=MaterialTheme.typography.titleLarge)}
             if(data.stages.isEmpty())item{Text("Нет активных контейнеров")}
             else items(data.stages,key={it.first}){(stage,count)->
-                Card(colors=CardDefaults.cardColors(
+                Card(onClick={onMetric("stage:"+stage)},colors=CardDefaults.cardColors(
                     containerColor=MaterialTheme.colorScheme.surface),
                     shape=RoundedCornerShape(15.dp)){
                     Column(Modifier.fillMaxWidth().padding(13.dp),
@@ -152,14 +161,35 @@ internal fun Lab10AnalyticsScreen(db:LabDatabase,revision:Int,
                     color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision)}
+        item{
+            OutlinedCard(onClick={compare=true},
+                modifier=Modifier.fillMaxWidth(),
+                shape=RoundedCornerShape(17.dp)){
+                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){
+                    Icon(Icons.Outlined.CompareArrows,contentDescription=null,
+                        tint=Lab07Palette.Brass)
+                    Column(Modifier.weight(1f).padding(start=12.dp)){
+                        Text("Сравнить два растения",
+                            style=MaterialTheme.typography.titleMedium)
+                        Text("Фактический рост, листья, корни и темп изменений",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    Icon(Icons.Outlined.ChevronRight,"Открыть сравнение")
+                }
+            }
+        }
+        item(key="detailed-analysis"){Lab10AnalyticsDetails(db,revision,onBreakdown)}
     }
+    if(compare)Lab11GrowthComparisonDialog(db,
+        onDismiss={compare=false},
+        onOpenItem={id->compare=false;onOpenItem(id)})
 }
 
 @Composable
 private fun Lab10StatCard(label:String,value:String,
-    icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier){
-    Card(modifier=modifier,colors=heightInColor(),shape=RoundedCornerShape(18.dp),
+    icon:androidx.compose.ui.graphics.vector.ImageVector,modifier:Modifier=Modifier,
+    onClick:()->Unit){
+    Card(onClick=onClick,modifier=modifier,colors=heightInColor(),shape=RoundedCornerShape(18.dp),
         border=BorderStroke(1.dp,Lab07Palette.Brass.copy(alpha=.28f))){
         Column(Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement=Arrangement.spacedBy(7.dp)){

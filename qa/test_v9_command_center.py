@@ -104,13 +104,13 @@ class LabV9Migration(unittest.TestCase):
                          ("Старый свободный текст","Не уточнено"))
 
     def test_v9_backup_is_parent_first_and_previous_json_supported(self):
-        self.assertIn('null, 11)',DB)
-        self.assertIn('put("schema",11)',DB)
+        self.assertIn('null, 12)',DB)
+        self.assertIn('put("schema",12)',DB)
         self.assertIn('BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")',DB)
         self.assertIn('BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables',DB)
         self.assertIn('8->BACKUP_ORDER_V8',DB)
-        self.assertIn('root.optInt("schema") in 4..11',DB)
-        self.assertIn('root.getInt("schema") in 4..11',BACKUP)
+        self.assertIn('root.optInt("schema") in 4..12',DB)
+        self.assertIn('root.getInt("schema") in 4..12',BACKUP)
         self.assertIn('LabCoreV9.create(db)',DB)
         self.assertIn('if (oldVersion < 9) {',DB)
         self.assertIn('LabCoreV9.create(db)',DB)
@@ -151,7 +151,12 @@ class LabV9Migration(unittest.TestCase):
         self.assertIn("AND m.plants IS NOT NULL",REG)
         self.assertIn("last_shoots DESC",REG)
         self.assertIn("last_plants DESC",REG)
-        self.assertIn("db.findCulture072(it)",(SRC/"MainActivity.kt").read_text("utf-8"))
+        main=(SRC/"MainActivity.kt").read_text("utf-8")
+        self.assertRegex(main,r"db\.findCulture072\((?:code|it)\)")
+        self.assertRegex(main,r"db\.itemIdByCode11\((?:code|it)\)")
+        for prefix in ("LAB-","PLT-","MAT-","ГР-","LOC-","AST-"):
+            self.assertIn('code.startsWith("'+prefix+'")',main)
+        self.assertIn("не найден",main)
 
     def test_four_action_cards_have_clear_names_and_real_routes(self):
         for title in ("В пробирках","Требуют внимания","Растут","Задачи"):

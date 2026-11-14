@@ -28,13 +28,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
 class MainActivity : ComponentActivity() {
+    var reminderIntentVersion by mutableIntStateOf(0)
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { DikoveriyaApp() }
+    }
+
+    override fun onNewIntent(intent:android.content.Intent){
+        super.onNewIntent(intent)
+        setIntent(intent)
+        reminderIntentVersion++
     }
 }
 
@@ -60,8 +71,9 @@ fun DikoveriyaApp() {
     val stateHolder=rememberSaveableStateHolder()
     val currentRoute=Lab07Navigation.current(routeStack)
     val activeNavigationTab=when(currentRoute?.substringBefore(':')) {
-        "collection","variety"->"Коллекция"
+        "collection","items","item","losses","location","variety"->"Коллекция"
         "container","growth","medium","operations","history","label","work","groups","places"->"Коллекция"
+        "asset"->"Ещё"
         "tasks"->"Главная"
         else->if(tab=="Среды")"Ещё" else tab
     }
@@ -70,6 +82,15 @@ fun DikoveriyaApp() {
         routeStack=Lab07Navigation.enter(routeStack,next)
     }
     fun backRoute() { routeStack=Lab07Navigation.back(routeStack) }
+    val reminderIntentVersion=(context as? MainActivity)?.reminderIntentVersion ?: 0
+    LaunchedEffect(context,reminderIntentVersion){
+        val fromReminder=(context as? MainActivity)?.intent?.getBooleanExtra("open_tasks",false)==true
+        if(fromReminder){
+            tab="Главная"
+            routeStack=listOf(Lab07Navigation.TASKS)
+            (context as? MainActivity)?.intent?.removeExtra("open_tasks")
+        }
+    }
     var subsection by rememberSaveable { mutableStateOf("") }
     var dialog by rememberSaveable { mutableStateOf("") }
     var quickMenu by rememberSaveable { mutableStateOf(false) }
@@ -97,6 +118,17 @@ fun DikoveriyaApp() {
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var lastExitRequest by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(db){
+        try{
+            val n=withContext(Dispatchers.IO){db.generateRecurringTasks11()}
+            if(n>0)refresh++
+        }catch(e:Exception){error=e.message?:"Не удалось обновить повторяющиеся задачи"}
+    }
+    LaunchedEffect(db,refresh){
+        try{
+            withContext(Dispatchers.IO){Lab11Reminders.sync(context.applicationContext,db)}
+        }catch(e:Exception){error=e.message?:"Не удалось настроить напоминания"}
+    }
     fun act(block: ()->Unit): Boolean = try { block(); refresh++; true } catch(e:Exception) { error=e.message?:"Не удалось сохранить данные"; false }
 
     val plants=remember(refresh){db.plants()}
@@ -114,6 +146,8 @@ fun DikoveriyaApp() {
         else db.tasks()
     }
     val dashboardCounts=remember(refresh){db.dashboard072()}
+    val mainFinance=remember(refresh){db.financeSummary11()}
+    val recentEvents=remember(refresh){db.recentEvents11(4)}
     val materials=remember(refresh){db.materials()}
     val equipment=remember(refresh){db.equipment()}
     val incidents=remember(refresh){db.incidents()}
@@ -181,16 +215,56 @@ fun DikoveriyaApp() {
         labelsForExport=emptyList()
     }
     val scanner=rememberLauncherForActivityResult(ScanContract()){result->
-        if(result.contents!=null) {
+        if(result.contents!=null){
             val code=LabQr.getCode(result.contents)
-            val id=code?.let{db.findCulture072(it)}
-            if(id!=null) { tab="Коллекция";routeStack=Lab07Navigation.enter(emptyList(),Lab07Navigation.container(id)) } else error="Код не найден в этой базе. Проверь этикетку и резервную копию."
+            when {
+                code==null->error="Это не QR-код Диковерия LAB"
+                code.startsWith("LAB-")->{
+                    val id=db.findCulture072(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.container(id))}
+                    else error="Контейнер "+code+" не найден"
+                }
+                code.startsWith("PLT-")->{
+                    val id=db.itemIdByCode11(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.item(id))}
+                    else error="Растение "+code+" не найдено"
+                }
+                code.startsWith("MAT-")->{
+                    val m=db.mothers().firstOrNull{it.code==code}
+                    if(m!=null)dialog="motherInfo:"+m.id
+                    else error="Маточник "+code+" не найден"
+                }
+                code.startsWith("ГР-")->{
+                    val id=db.groupIdByCode11(code)
+                    if(id!=null){tab="Коллекция";routeStack=listOf(Lab07Navigation.groupWork(id))}
+                    else error="Партия "+code+" не найдена"
+                }
+                code.startsWith("LOC-")->{
+                    val id=code.removePrefix("LOC-").toLongOrNull()
+                    if(id!=null && db.locationExists11(id)){
+                        tab="Коллекция";routeStack=listOf(Lab07Navigation.location(id))
+                    }else error="Место "+code+" не найдено"
+                }
+                code.startsWith("AST-")->{
+                    val id=code.removePrefix("AST-").toLongOrNull()
+                    if(id!=null && db.assets11().any{it.id==id}){
+                        tab="Ещё";subsection="";routeStack=listOf(Lab07Navigation.asset(id))
+                    }else error="Оборудование "+code+" не найдено"
+                }
+                else->error="Этот QR-код пока не связан с поддерживаемым объектом"
+            }
         }
     }
-    val scan= { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Наведите камеру на QR-код контейнера").setBeepEnabled(false).setOrientationLocked(false)) }
+    val scan={
+        scanner.launch(ScanOptions()
+            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setPrompt("Наведите камеру на QR растения, контейнера или места")
+            .setBeepEnabled(false).setOrientationLocked(false))
+    }
     val openSection: (String)->Unit = {section->
         when(section){
             "Задачи"->openRoute(Lab07Navigation.TASKS)
+            "Мои растения"->openRoute(Lab07Navigation.ITEMS)
             "Группы контейнеров"->openRoute(Lab07Navigation.GROUPS)
             "Места хранения"->openRoute(Lab07Navigation.PLACES)
             else->{
@@ -248,6 +322,7 @@ fun DikoveriyaApp() {
                         onNavigate={openRoute(it)},
                         onNewContainer={plantId->preselectedPlantId=plantId;dialog="newCulture"},
                         onNewPlant={dialog="addPlant"},
+                        onNewItem={dialog="newItem"},
                         onEditPlant={dialog="plantInfo:$it"},
                         onEdit={cultureId=it},
                         onLabel={openRoute(Lab07Navigation.label(it))},
@@ -286,7 +361,50 @@ fun DikoveriyaApp() {
                 }
             } else {
             stateHolder.SaveableStateProvider("legacy:$tab:$subsection") {
-            if(tab=="Ещё" && subsection=="Операции") {
+            if(tab=="Ещё" && subsection=="Финансы") {
+                Lab11FinanceScreen(db,refresh,
+                    onBack={subsection=""},
+                    onSales={openSection("Продажи")},
+                    onMaterial={openSection("Склад")},
+                    onAsset={openSection("Оборудование")},
+                    onOpenItem={openRoute(Lab07Navigation.item(it))},
+                    onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onVariety={plantId->openRoute(Lab07Navigation.plantWork(plantId))},
+                    onChanged={refresh++},onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Закупки") {
+                Lab11FinanceScreen(db,refresh,
+                    onBack={subsection=""},
+                    onSales={openSection("Продажи")},
+                    onMaterial={openSection("Склад")},
+                    onAsset={openSection("Оборудование")},
+                    onOpenItem={openRoute(Lab07Navigation.item(it))},
+                    onOpenCulture={openRoute(Lab07Navigation.container(it))},
+                    onVariety={plantId->openRoute(Lab07Navigation.plantWork(plantId))},
+                    onChanged={refresh++},onError={error=it},
+                    initialView="Закупки",
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Продажи") {
+                Lab11SalesScreen(db,refresh,
+                    onBack={subsection=""},
+                    onItem={id->
+                        tab="Коллекция";openRoute(Lab07Navigation.item(id))
+                    },
+                    onCulture={id->
+                        tab="Коллекция";openRoute(Lab07Navigation.container(id))
+                    },
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Оборудование") {
+                Lab11AssetsScreen(db,refresh,
+                    onBack={subsection=""},onChanged={refresh++},
+                    onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Пользовательские справочники") {
+                Lab11CustomCatalogScreen(db,refresh,
+                    onBack={subsection=""},onChanged={refresh++},
+                    onError={error=it},
+                    modifier=Modifier.fillMaxSize().padding(padding))
+            } else if(tab=="Ещё" && subsection=="Операции") {
                 Lab10OperationsScreen(db,refresh,
                     onBack={subsection=""},
                     onOpenCulture={id->
@@ -299,6 +417,7 @@ fun DikoveriyaApp() {
                     onBack={subsection=""},
                     onNew={dialog="newMaterial"},
                     onMove={materialId=it},
+                    onChanged={refresh++},onError={error=it},
                     modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="Настройки") {
                 Lab10SettingsScreen(darkTheme=darkTheme,
@@ -307,7 +426,26 @@ fun DikoveriyaApp() {
                         labPreferences.edit().putBoolean("dark_theme",value).apply()
                     },onBack={subsection=""},modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Аналитика") {
-                Lab10AnalyticsScreen(db,refresh,modifier=Modifier.fillMaxSize().padding(padding))
+                Lab10AnalyticsScreen(db,refresh,
+                    onMetric={key->
+                        when {
+                            key in setOf("all","active","attention")->
+                                openRoute(Lab07Navigation.work(key))
+                            key=="operations"->openSection("Операции")
+                            key=="sales"->openSection("Продажи")
+                            key.startsWith("stage:")->
+                                openRoute(Lab07Navigation.stageWork(key.substringAfter("stage:")))
+                        }
+                    },
+                    onOpenItem={id->tab="Коллекция";openRoute(Lab07Navigation.item(id))},
+                    onBreakdown={section,id->
+                        when(section){
+                            "Потери"->openRoute(Lab07Navigation.losses(id))
+                            "Среды"->recipeId=id
+                            else->openRoute(Lab07Navigation.plantWork(id))
+                        }
+                    },
+                    modifier=Modifier.fillMaxSize().padding(padding))
             } else if(tab=="Ещё" && subsection=="База знаний") {
                 Lab10KnowledgeScreen(db,refresh,onError={error=it},onChanged={refresh++},
                     modifier=Modifier.fillMaxSize().padding(padding))
@@ -337,7 +475,15 @@ fun DikoveriyaApp() {
                                 onScan=scan,
                                 counts=dashboardCounts,
                                 onMetric={key->if(key=="tasks")openRoute(Lab07Navigation.TASKS)
-                                    else openRoute(Lab07Navigation.work(key))}
+                                    else openRoute(Lab07Navigation.work(key))},
+                                financeNetMinor=mainFinance.income-mainFinance.paid,
+                                onFinance={openSection("Финансы")},
+                                recent=recentEvents,
+                                onRecent={type,id->
+                                    tab="Коллекция"
+                                    openRoute(if(type=="item")Lab07Navigation.item(id)
+                                        else Lab07Navigation.container(id))
+                                }
                             )
                         }
                     }
@@ -377,7 +523,7 @@ fun DikoveriyaApp() {
                                     item{Text("Восстановление полностью заменяет текущие записи. Перед ним рекомендуется сохранить текущую копию.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                                 }
                                 else -> {
-                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v11. Приложение работает без интернета.")}
+                                    item{Text("Версия ${context.packageManager.getPackageInfo(context.packageName,0).versionName} · локальная база SQLite v12. Приложение работает без интернета.")}
                                     item{Text("Google Sheets/Drive и ИИ-аналитик пока не подключены. В редакторе этикеток доступна тестовая прямая Bluetooth-печать NIIMBOT, требующая проверки на физическом принтере.")}
                                     item{Text("Названия пассажей скрыты из обычных экранов. В технических данных и аналитике они сохраняются.")}
                                 }
@@ -398,7 +544,14 @@ fun DikoveriyaApp() {
                         quickMenu=false
                         quickOperationPicker=true
                     },
-                    onOpenTasks={quickMenu=false;openRoute(Lab07Navigation.TASKS)}
+                    onOpenTasks={quickMenu=false;dialog="newTask"},
+                    onNewItem={quickMenu=false;dialog="newItem"},
+                    onBulkCulture={quickMenu=false;dialog="bulkCulture"},
+                    onCutting={
+                        quickMenu=false
+                        tab="Коллекция";routeStack=listOf(Lab07Navigation.ITEMS)
+                    },
+                    onFinance={quickMenu=false;openSection("Финансы")}
                 )
             }
             if(quickOperationPicker) {
@@ -415,6 +568,18 @@ fun DikoveriyaApp() {
             }
             when(dialog){
                 "addPlant" -> AddPlantDialog(onClose={dialog=""},onSave={name,notes->if(act{db.addPlant(name,notes)})dialog=""})
+                "bulkCulture" -> Lab11BulkCultureDialog(db,plants,recipes,
+                    onClose={dialog=""},
+                    onSaved={id->
+                        dialog="";refresh++
+                        if(id!=null){
+                            tab="Коллекция";openRoute(Lab07Navigation.container(id))
+                        }
+                    },onError={error=it})
+                "newItem" -> Lab11NewItemDialog(db,plants,
+                    onClose={dialog=""},onSaved={id->
+                        dialog="";refresh++;openRoute(Lab07Navigation.item(id))
+                    },onError={error=it})
                 "addMother" -> AddMotherDialog(plants,onClose={dialog=""},onSave={p,origin,note->if(act{db.addMother(p,origin,note)})dialog=""})
                 "newCulture" -> QuickCultureDialog(db,preselectedRecipeId,preselectedPlantId,onClose={dialog="";preselectedRecipeId=null;preselectedPlantId=null},
                     onSaved={id->dialog="";preselectedRecipeId=null;preselectedPlantId=null;refresh++;openRoute(Lab07Navigation.container(id))},onChanged={refresh++})
@@ -425,8 +590,13 @@ fun DikoveriyaApp() {
                     onUseExisting={id->dialog="";recipeId=id})
                 "batchChooser" -> ChooseBatchRecipeDialog(recipes,onClose={dialog=""},onPick={recipeId=it;dialog=""})
                 "prepareBatch" -> Lab071PrepareBatchDialog(db,onClose={dialog=""},onSaved={dialog="";refresh++})
-                "newTask" -> AddTaskDialog(cultures,onClose={dialog=""},onSave={title,due,c->if(act{db.createTask(title,due,c)})dialog=""})
-                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""})
+                "newTask" -> Lab072TaskForm(db,recipes,
+                    onClose={dialog=""},onSaved={dialog="";refresh++},
+                    onError={error=it})
+                "newMaterial" -> AddMaterialDialog(onClose={dialog=""},
+                    onSave={n,u,q,m,c,category->if(act{db.addMaterial(n,u,q,m,c,category)})dialog=""},
+                    customCategories=listOf("Материалы","Субстраты","Препараты","Удобрения")
+                        .flatMap{db.categories11(it)})
                 "newEquipment" -> AddEquipmentDialog(onClose={dialog=""},onSave={n,l->if(act{db.addEquipment(n,l)})dialog=""})
                 "newIncident" -> AddIncidentDialog(cultures,onClose={dialog=""},onSave={t,n,c->if(act{db.addIncident(t,n,c)})dialog=""})
                 "newExperiment" -> AddExperimentDialog(onClose={dialog=""},onSave={t,h->if(act{db.addExperiment(t,h)})dialog=""})

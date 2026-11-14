@@ -66,7 +66,7 @@ object LabBackup {
             }
             val data=json?:error("В архиве отсутствует база данных")
             val root=JSONObject(data)
-            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..11){"Неподдерживаемая версия копии"}
+            require(root.getString("format")=="DIKOVERIYA_LAB" && root.getInt("schema") in 4..12){"Неподдерживаемая версия копии"}
             val photoRows=root.getJSONObject("tables").getJSONArray("culture_photos")
             val expected=buildSet{
                 for(i in 0 until photoRows.length())add(photoRows.getJSONObject(i).getString("filename"))
@@ -80,6 +80,24 @@ object LabBackup {
                             add(filename)
                         }
                     }
+                }
+                if(root.getInt("schema")>=12){
+                    val tables=root.getJSONObject("tables")
+                    listOf("custom_field_values" to "photo_filename", "materials" to "photo_filename", "item_photos" to "filename","plant_items" to "cover_filename",
+                        "purchases" to "receipt_filename","equipment_assets" to "photo_filename")
+                        .forEach{(table,column)->
+                            val rows=tables.getJSONArray(table)
+                            for(i in 0 until rows.length()){
+                                val row=rows.getJSONObject(i)
+                                if(!row.isNull(column)){
+                                    val filename=row.getString(column)
+                                    require(Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp|heic)").matches(filename)){
+                                        "Неверное имя изображения в $table"
+                                    }
+                                    add(filename)
+                                }
+                            }
+                        }
                 }
             }
             require(expected==found){"В архиве нет части фотографий или есть лишние фотографии"}

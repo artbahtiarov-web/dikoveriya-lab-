@@ -14,7 +14,7 @@ import java.util.UUID
 import java.security.MessageDigest
 
 /** Local source of truth. Every multi-record operation is one SQLite transaction. */
-class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11) {
+class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
         db.setForeignKeyConstraintsEnabled(true)
@@ -29,6 +29,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         LabCoreV9.create(db)
         LabCoreV10.create(db)
         LabCoreV11.create(db)
+        LabCoreV12.create(db)
         listOf("Alocasia Black Velvet Aurea", "Alocasia Dragon Scale Mint", "Philodendron Burle Marx Flame").forEach { n ->
             db.insertOrThrow("plants", null, cv("name" to n))
         }
@@ -137,6 +138,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         if (oldVersion < 11) {
             LabCoreV11.create(db)
             LabCoreV11.validate(db)
+        }
+        if (oldVersion < 12) {
+            LabCoreV12.create(db)
+            LabCoreV12.validate(db)
         }
     }
     private fun cv(vararg pairs: Pair<String, Any?>) = ContentValues().apply {
@@ -322,6 +327,84 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }
         return resultId
     }
+    /**
+     * One transaction creates N independent QR-addressable culture containers,
+     * one shared production group, exact biological unit and recipe history.
+     * Existing cultures and their lineage are never overwritten.
+     */
+    fun createCulturesBulk11(
+        plantId:Long,counts:List<Int>,quantityKind:String,passage:Int,
+        stage:String,recipeId:Long?,motherId:Long?,
+        locationId:Long?,location:String,occurredAt:Long,note:String
+    ):List<Long>{
+        require(counts.size in 1..200 && counts.all{it in 1..1000000}){
+            "Укажи от 1 до 200 контейнеров и положительное количество биоматериала"
+        }
+        require(quantityKind in LabTerms.quantityKinds.drop(1)){"Укажи единицу биоматериала"}
+        require(passage in 0..999 && stage in LabTerms.stages)
+        require(occurredAt in 1..(System.currentTimeMillis()+86400000L))
+        require(plants().any{it.id==plantId}){"Сорт не найден"}
+        if(motherId!=null)verifyMother(plantId,motherId)
+        if(recipeId!=null){
+            val r=recipes().firstOrNull{it.id==recipeId}?:error("Среда не найдена")
+            require(r.status=="Утверждена" && (r.plantId==null || r.plantId==plantId)){
+                "Выбери утверждённую среду для этого сорта"
+            }
+        }
+        val created=mutableListOf<Long>()
+        writableDatabase.tx {
+            val realLocation=locationId?.let{key->
+                rawQuery("SELECT full_path FROM storage_locations WHERE id=?",
+                    arrayOf(key.toString())).use{c->
+                    require(c.moveToFirst()){"Место не найдено"};c.getString(0)
+                }
+            }?:location
+            val operation=newOperation(this,"Массовое создание","Контейнеров: "+counts.size+
+                " · "+note,occurredAt)
+            val groupId=insertOrThrow("production_groups",null,cv(
+                "code" to "TMP-"+UUID.randomUUID(),"title" to "Партия от "+formatDate(occurredAt),
+                "plant_id" to plantId,"mother_id" to motherId,
+                "note" to note,"created_at" to occurredAt))
+            update("production_groups",cv("code" to "ГР-%06d".format(Locale.US,groupId)),
+                "id=?",arrayOf(groupId.toString()))
+            counts.forEach{qty->
+                val id=createCultureInDb(this,plantId,qty,LabTerms.IN_CULTURE,
+                    passage,stage,realLocation,null,motherId,note,operation,occurredAt,quantityKind)
+                if(locationId!=null)insertOrThrow("culture_storage",null,cv(
+                    "culture_id" to id,"location_id" to locationId,
+                    "assigned_at" to occurredAt))
+                insertOrThrow("culture_groups",null,cv("culture_id" to id,
+                    "group_id" to groupId,"linked_at" to occurredAt))
+                insertOrThrow("group_history",null,cv(
+                    "culture_id" to id,"new_group_id" to groupId,
+                    "recorded_at" to occurredAt,"reason" to "Массовая партия"))
+                if(recipeId!=null){
+                    update("cultures",cv("medium_recipe_id" to recipeId),
+                        "id=?",arrayOf(id.toString()))
+                    insertOrThrow("culture_recipe_history",null,cv(
+                        "culture_id" to id,"recipe_id" to recipeId,
+                        "applied_at" to occurredAt,"note" to "Первоначальное назначение"))
+                }
+                changeSnapshot(this,operation,id,null,qty,LabTerms.IN_CULTURE)
+                created.add(id)
+            }
+        }
+        return created
+    }
+    /** Existing operation engine verifies material balance and lineage atomically. */
+    fun splitCulturesBulk11(
+        sourceId:Long,usedPerChild:List<Int>,producedPerChild:List<Int>,
+        stage:String,kind:String,recipeId:Long?,location:String?,lost:Int,note:String,
+        occurredAt:Long=System.currentTimeMillis()
+    ){
+        require(usedPerChild.size==producedPerChild.size && usedPerChild.size in 1..25)
+        val parts=usedPerChild.indices.map{index->
+            TransferDestination(usedPerChild[index],producedPerChild[index],
+                stage,null,location,kind,recipeId)
+        }
+        splitCulture(sourceId,parts,lost,note,occurredAt)
+    }
+
     fun updateCulture(id: Long, quantity: Int, status: String, location: String, batchId: Long?, note: String, recipeId: Long? = null, recipeChosen: Boolean = false) {
         require(status in LabTerms.statuses || status == LabTerms.TRANSFERRED) { "Некорректный статус" }
         val reason=checkText(note,2000)
@@ -393,7 +476,21 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             }
             require(quantity<=c.quantity) { "Недостаточно растений" }
             val rest=c.quantity-quantity
-            insertOrThrow("sales",null,cv("culture_id" to cultureId,"quantity" to quantity,"price" to total,"sold_at" to System.currentTimeMillis(),"note" to notes))
+            val soldAt=System.currentTimeMillis()
+            val saleId=insertOrThrow("sales",null,cv("culture_id" to cultureId,
+                "quantity" to quantity,"price" to total,"sold_at" to soldAt,"note" to notes))
+            val amountMinor=decimalMinor11(total)
+            val hasBasis=hasCultureCostEvidence11(cultureId)
+            val allocated=if(hasBasis)allocateCultureCost11(cultureId,c.quantity,
+                listOf(Lab11CostPart(null,quantity,"Продажа")),
+                saleId=saleId,at=soldAt) else 0L
+            val costSnapshot=if(hasBasis)allocated else null
+            insertOrThrow("sale_details",null,cv("sale_id" to saleId,
+                "cogs_minor" to costSnapshot))
+            insertOrThrow("cash_ledger",null,cv("direction" to "Доход",
+                "category" to "Продажа","amount_minor" to amountMinor,
+                "occurred_at" to soldAt,"source_type" to "legacy_sale",
+                "source_id" to saleId,"note" to notes))
             update("cultures",cv("quantity" to rest,"status" to if(rest==0)LabTerms.SOLD else c.status),"id=?",arrayOf(cultureId.toString()))
             event(this,cultureId,"Продажа","Реализовано: $quantity; сумма: $total руб.; $notes",c.quantity,rest,c.batchId)
         }
@@ -558,7 +655,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             c.getString(2),c.getDouble(3),c.getDouble(4),c.getDouble(5),c.getString(6))) }
     }
     fun addMaterial(name: String, unit: String, quantity: Double, min: Double, cost: Double, category:String="Расходники") {
-        require(category in setOf("Реактивы","Расходники","Инвентарь","Другое")){"Неверная категория склада"}
+        require(category in setOf("Реактивы","Расходники","Инвентарь","Другое") ||
+            category in (listOf("Материалы","Субстраты","Препараты","Удобрения")
+                .flatMap{categories11(it)})){"Создай пользовательскую категорию в справочнике"}
         require(listOf(quantity,min,cost).all{it.isFinite() && it>=0}) { "Проверь значения" }
         writableDatabase.insertOrThrow("materials",null,cv("name" to checkText(name,120),
             "unit" to checkText(unit,20),"quantity" to quantity,"min_quantity" to min,
@@ -688,6 +787,11 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 changeSnapshot(this,group,child,null,part.produced,LabTerms.IN_CULTURE)
                 event(this,child,"Происхождение","Из ${source.code}; исходных объектов ${part.used}, получено ${part.produced}. $note",null,part.produced,part.batchId,group,occurredAt)
             }
+            allocateCultureCost11(sourceId,source.quantity,
+                createdChildren.mapIndexed{index,child->
+                    Lab11CostPart(child,destinations[index].used,"Разделение")
+                }+(if(lost>0)listOf(Lab11CostPart(null,lost,"Потеря")) else emptyList()),
+                operationId=group,at=occurredAt)
             // All daughters in this operation have a verified common parent.
             // Group by the actual split event, not by guessed genetic provenance.
             if(createdChildren.size>1) {
@@ -742,6 +846,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 val rest=remains[index]
                 changeCount(this,c,rest,if(rest==0)LabTerms.TRANSFERRED else c.status,"Объединение","В ${parent.plantName}: использовано $consumed для нового контейнера; ${if(!certain)"происхождение смешанное. " else ""}$note",group,occurredAt)
                 insertOrThrow("culture_links",null,cv("parent_culture_id" to c.id,"child_culture_id" to child,"used_qty" to consumed,"result_qty" to produced,"event_group" to group))
+                allocateCultureCost11(c.id,c.quantity,
+                    listOf(Lab11CostPart(child,consumed,"Объединение")),
+                    operationId=group,at=occurredAt)
             }
             event(this,child,"Происхождение","Объединены источники: ${sources.joinToString { it.code }}. Маркировка: $origin. $note",null,produced,batchId,group,occurredAt)
         }
@@ -781,6 +888,9 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
             val rest=LabOperationRules.remainingAfterLoss(c.quantity,count)
             val group=newOperation(this,"Потери", "$cause. $explanation",occurredAt)
             insertOrThrow("operation_losses",null,cv("operation_id" to group,"culture_id" to cultureId,"quantity" to count,"reason" to cause))
+            allocateCultureCost11(cultureId,c.quantity,
+                listOf(Lab11CostPart(null,count,"Потеря")),
+                operationId=group,at=occurredAt)
             changeCount(this,c,rest,if(rest==0)LabTerms.DISPOSED else c.status,"Потери","Потеряно: $count; причина: $cause. $explanation",group,occurredAt)
         }
     }
@@ -898,6 +1008,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 event(this,ch.cultureId,"Отмена операции","Отменена ${original.first}: $reason. Старые записи сохранены",c.quantity,restoreQty,c.batchId,group)
             }
             update("culture_links",cv("cancelled" to 1),"event_group=?",arrayOf(originalId))
+            update("culture_cost_transfers",cv("reversed" to 1),
+                "operation_id=?",arrayOf(originalId))
             if(original.first=="Авария") update("incidents",cv("state" to "Аннулирован"),"operation_id=?",arrayOf(originalId))
         }
     }
@@ -911,7 +1023,8 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         val BACKUP_ORDER_V8=BACKUP_ORDER_V7+listOf("culture_audit")
         val BACKUP_ORDER_V9=BACKUP_ORDER_V8+LabCoreV9.backupTables
         val BACKUP_ORDER_V10=BACKUP_ORDER_V9+LabCoreV10.backupTables
-        val BACKUP_ORDER=BACKUP_ORDER_V10+LabCoreV11.backupTables
+        val BACKUP_ORDER_V11=BACKUP_ORDER_V10+LabCoreV11.backupTables
+        val BACKUP_ORDER=BACKUP_ORDER_V11+LabCoreV12.backupTables
     }
     /**
      * Stream backup JSON directly to ZIP without constructing a giant JSONObject
@@ -927,7 +1040,7 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         try{
             writer.beginObject()
             writer.name("format").value("DIKOVERIYA_LAB")
-            writer.name("schema").value(11)
+            writer.name("schema").value(12)
             writer.name("exported_at").value(System.currentTimeMillis())
             writer.name("tables").beginObject()
             BACKUP_ORDER.forEach {table->
@@ -937,7 +1050,13 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 db.rawQuery(sql,null).use{c->
                     val photoIndex=when(table){
                         "culture_photos"->c.getColumnIndex("filename")
+                        "materials"->c.getColumnIndex("photo_filename")
+                        "custom_field_values"->c.getColumnIndex("photo_filename")
                         "plant_visuals"->c.getColumnIndex("cover_filename")
+                        "plant_items"->c.getColumnIndex("cover_filename")
+                        "item_photos"->c.getColumnIndex("filename")
+                        "purchases"->c.getColumnIndex("receipt_filename")
+                        "equipment_assets"->c.getColumnIndex("photo_filename")
                         else->-1
                     }
                     while(c.moveToNext()){
@@ -964,12 +1083,12 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
         }finally{
             db.endTransaction()
         }
-        return photoNames
+        return photoNames.distinct()
     }
 
     fun exportJson(): String {
         val db=readableDatabase
-        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",11).put("exported_at",System.currentTimeMillis())
+        val root=JSONObject().put("format","DIKOVERIYA_LAB").put("schema",12).put("exported_at",System.currentTimeMillis())
         val tables=JSONObject()
         // A consistent read snapshot prevents a backup that mixes partially completed operations.
         db.beginTransactionNonExclusive()
@@ -1005,10 +1124,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
     fun importJson(payload: String) {
         require(payload.toByteArray(Charsets.UTF_8).size<=50_000_000) { "Файл резервной копии слишком большой" }
         val root=JSONObject(payload)
-        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..11) { "Неизвестная версия резервной копии" }
+        require(root.optString("format")=="DIKOVERIYA_LAB" && root.optInt("schema") in 4..12) { "Неизвестная версия резервной копии" }
         val fromVersion=root.getInt("schema")
         val tables=root.getJSONObject("tables")
-        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;9->BACKUP_ORDER_V9;10->BACKUP_ORDER_V10;else->BACKUP_ORDER}
+        val importOrder=when(fromVersion){4->BACKUP_ORDER_V4;5->BACKUP_ORDER_V5;6->BACKUP_ORDER_V6;7->BACKUP_ORDER_V7;8->BACKUP_ORDER_V8;9->BACKUP_ORDER_V9;10->BACKUP_ORDER_V10;11->BACKUP_ORDER_V11;else->BACKUP_ORDER}
         importOrder.forEach{require(tables.has(it) && tables.get(it) is JSONArray){"В копии отсутствует таблица $it"}}
         writableDatabase.tx {
             BACKUP_ORDER.reversed().forEach{delete(it,null,null)}
@@ -1050,8 +1169,10 @@ class LabDatabase(context: Context) : SQLiteOpenHelper(context, "dikoveriya_lab.
                 execSQL("UPDATE cultures SET origin_state=CASE WHEN mother_id IS NULL THEN 'Не установлено' ELSE 'По маточнику' END")
                 execSQL("INSERT OR IGNORE INTO culture_links(parent_culture_id,child_culture_id,used_qty,result_qty,event_group) SELECT parent_culture_id,child_culture_id,used_qty,resulting_qty,event_group FROM lineage")
             }
+            if(fromVersion<12)LabCoreV12.create(this) // seed legacy sales after restoring pre-v12 data
             LabCoreV10.validate(this)
             LabCoreV11.validate(this)
+            LabCoreV12.validate(this)
         }
     }
 }

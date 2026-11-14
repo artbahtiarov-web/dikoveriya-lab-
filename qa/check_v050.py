@@ -23,8 +23,8 @@ gradle=read('app/build.gradle.kts')
 models=read('app/src/main/java/ru/dikoveriya/lab/LabModels.kt')
 
 checks={
- 'db v11': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11)' in db,
- 'v11 backup': 'put("schema",11)' in db and 'root.getInt("schema") in 4..11' in backup,
+ 'db v12': 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)' in db,
+ 'v12 backup': 'put("schema",12)' in db and 'root.getInt("schema") in 4..12' in backup,
  'migration': 'ALTER TABLE cultures ADD COLUMN medium_recipe_id' in db and 'ALTER TABLE recipe_parts ADD COLUMN sugar_g_l' in db,
  'snapshot/history': 'CREATE TABLE IF NOT EXISTS culture_recipe_history' in db,
  'measurements': 'CREATE TABLE IF NOT EXISTS culture_measurements' in db,
@@ -34,9 +34,9 @@ checks={
  'sugar / agar mass': 'sugar_g_l' in store and 'agar_g_l' in store and 'Сколько сахара внутри' in ui,
  'new workflow': 'QuickCultureDialog(db,preselectedRecipeId' in main and 'QuickMediumDialog(db' in main,
  'growth': 'Lab07GrowthScreen(' in read('app/src/main/java/ru/dikoveriya/lab/Lab07Screens.kt') and 'addGrowthSample(' in store,
- 'plant results': 'plantResults()' in store and 'mediumResults()' in store and 'Lab10AnalyticsDetails(db,revision)' in read('app/src/main/java/ru/dikoveriya/lab/Lab10AnalyticsUi.kt'),
+ 'plant results': 'plantResults()' in store and 'mediumResults()' in store and 'Lab10AnalyticsDetails(db,revision,onBreakdown)' in read('app/src/main/java/ru/dikoveriya/lab/Lab10AnalyticsUi.kt'),
  'approved design': 'DikoveriyaTheme' in main and 'Lab07Palette' in theme,
- 'single version': 'versionCode = 100000 +' in gradle,
+ 'single version': 'versionCode = 110000 +' in gradle,
  'copy of old linked cultures': 'Перенесено из существующего учёта партий' in db,
  'history in model': 'val recipeId: Long? = null' in models,
 }

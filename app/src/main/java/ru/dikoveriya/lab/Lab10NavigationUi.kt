@@ -2,6 +2,7 @@ package ru.dikoveriya.lab
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -44,8 +47,9 @@ internal fun Lab10BottomNav(
                         tint=Lab07Palette.DeepForest,modifier=Modifier.size(27.dp))
                 }
             },
-            label={Text("Добавить",maxLines=1)},
-            alwaysShowLabel=true,
+            // Central + is a primary action, not a fifth content destination.
+            label=null,
+            alwaysShowLabel=false,
             colors=NavigationBarItemDefaults.colors(
                 unselectedIconColor=Lab07Palette.Brass,
                 unselectedTextColor=Lab07Palette.Champagne
@@ -71,7 +75,13 @@ private fun RowScope.Lab10Tab(
         selected=selected,
         onClick=onClick,
         icon={Icon(icon,contentDescription=name)},
-        label={Text(name,maxLines=1)},
+        label={
+            // Keep every Russian tab name on one line even at enlarged system scale.
+            Text(name,maxLines=1,softWrap=false,
+                style=MaterialTheme.typography.labelSmall.copy(fontSize=8.sp,
+                    lineHeight=10.sp),
+                overflow=TextOverflow.Clip)
+        },
         colors=NavigationBarItemDefaults.colors(
             selectedIconColor=Lab07Palette.Brass,
             selectedTextColor=Lab07Palette.Champagne,
@@ -91,24 +101,31 @@ internal fun Lab10QuickActions(
     onNewCulture:()->Unit,
     onScan:()->Unit,
     onChooseOperation:()->Unit,
-    onOpenTasks:()->Unit
+    onOpenTasks:()->Unit,
+    onNewItem:()->Unit={},
+    onBulkCulture:()->Unit={},
+    onCutting:()->Unit={},
+    onFinance:()->Unit={}
 ) {
     ModalBottomSheet(
         onDismissRequest=onDismiss,
         containerColor=MaterialTheme.colorScheme.surface,
         shape=RoundedCornerShape(topStart=24.dp,topEnd=24.dp)
     ) {
-        Column(Modifier.fillMaxWidth().padding(bottom=22.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(bottom=22.dp)) {
             Text("Быстрые действия",style=MaterialTheme.typography.headlineSmall,
                 color=Lab07Palette.Forest,modifier=Modifier.padding(horizontal=20.dp,vertical=8.dp))
             Text("Выберите, что нужно сделать",style=MaterialTheme.typography.bodyMedium,
                 color=MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier=Modifier.padding(start=20.dp,end=20.dp,bottom=12.dp))
-            Lab10QuickRow("Добавить сорт","Новая запись в коллекции",Icons.Outlined.LocalFlorist,onNewPlant)
-            Lab10QuickRow("Новый контейнер","Создать культуру из существующего сорта",Icons.Outlined.AddBox,onNewCulture)
-            Lab10QuickRow("Сканировать QR","Открыть контейнер по этикетке",Icons.Outlined.QrCodeScanner,onScan)
-            Lab10QuickRow("Операция с контейнером","Сначала выберите контейнер",Icons.Outlined.SwapHoriz,onChooseOperation)
-            Lab10QuickRow("Задачи","Открыть список и создать задачу",Icons.Outlined.EventNote,onOpenTasks)
+            Lab10QuickRow("Растение","Горшечное, маточник или черенок",Icons.Outlined.Spa,onNewItem)
+            Lab10QuickRow("Контейнеры","Один контейнер или производственная партия",Icons.Outlined.AddBox,onBulkCulture)
+            Lab10QuickRow("Черенок","Выбрать родительское растение",Icons.Outlined.Grass,onCutting)
+            Lab10QuickRow("Операция","Действие с существующим объектом",Icons.Outlined.SwapHoriz,onChooseOperation)
+            Lab10QuickRow("Задача","Календарь и планирование",Icons.Outlined.EventNote,onOpenTasks)
+            Lab10QuickRow("Покупка / расход","Движение денег и материалы",Icons.Outlined.ReceiptLong,onFinance)
+            Lab10QuickRow("Сканировать QR","Быстро открыть объект",Icons.Outlined.QrCodeScanner,onScan)
         }
     }
 }

@@ -333,19 +333,20 @@ fun LabDatabase.taskCount072(f:Lab072TaskFilter,now:Long=System.currentTimeMilli
 }
 
 fun LabDatabase.createTask072(title:String,dueAt:Long,priority:String,kind:String,
-    cultureId:Long?,recipeId:Long?,groupId:Long?)=lab072Tx{
+    cultureId:Long?,recipeId:Long?,groupId:Long?,note:String="")=lab072Tx{
     require(priority in priority072){"Укажи важность"}
     require(dueAt>0){"Укажи дату выполнения"}
     val now=System.currentTimeMillis()
     val id=insertOrThrow("tasks",null,lab072CV(
         "title" to lab072Text(title,200),"due_at" to dueAt,
-        "culture_id" to cultureId,"done" to 0))
+        "culture_id" to cultureId,"done" to 0,"note" to note.trim().take(2000)))
     insertOrThrow("task_metadata",null,lab072CV(
         "task_id" to id,"priority" to priority,"kind" to lab072Text(kind,60),
         "recipe_id" to recipeId,"group_id" to groupId,"updated_at" to now))
     insertOrThrow("task_history",null,lab072CV(
         "task_id" to id,"recorded_at" to now,"action" to "Создана",
-        "next_due_at" to dueAt,"next_done" to 0,"next_priority" to priority))
+        "next_due_at" to dueAt,"next_done" to 0,"next_priority" to priority,
+        "note" to note.trim().take(2000)))
 }
 
 fun LabDatabase.updateTask072(taskId:Long,done:Boolean?=null,

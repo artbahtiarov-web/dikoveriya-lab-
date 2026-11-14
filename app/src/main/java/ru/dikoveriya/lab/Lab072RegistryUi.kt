@@ -36,7 +36,8 @@ internal fun endOfDay072(raw:String):Long?=calendarDay072(raw)?.plus(86400000L-1
 
 @Composable
 fun Lab072RegistryScreen(
-    mode:String,initialGroupId:Long?,initialPlantId:Long?=null,db:LabDatabase,revision:Int,
+    mode:String,initialGroupId:Long?,initialPlantId:Long?=null,
+    initialStage:String="",db:LabDatabase,revision:Int,
     plants:List<PlantRecord>,recipes:List<RecipeRecord>,
     onBack:()->Unit,onNavigate:(String)->Unit,
     onChanged:()->Unit,onError:(String)->Unit,
@@ -48,12 +49,14 @@ fun Lab072RegistryScreen(
     val title=when(mode) {
         "vitro"->"В пробирках"
         "attention"->"Требуют внимания"
+        "active"->"Активные контейнеры"
         "growth"->"Растут"
         else->"Все контейнеры"
     }
     val subtitle=when(mode) {
         "vitro"->"Все живые контейнеры в стерильной культуре"
         "attention"->"Проблемы, карантин и запланированные проверки"
+        "active"->"Только контейнеры, находящиеся в работе"
         "growth"->"Адаптация, доращивание и фактические измерения"
         else->"Поиск по номеру, растению, линии, среде или месту"
     }
@@ -62,7 +65,7 @@ fun Lab072RegistryScreen(
     var recipeId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var locationId by rememberSaveable(mode){mutableStateOf<Long?>(null)}
     var groupId by rememberSaveable(mode){mutableStateOf(initialGroupId)}
-    var stage by rememberSaveable(mode){mutableStateOf("")}
+    var stage by rememberSaveable(mode){mutableStateOf(initialStage)}
     var status by rememberSaveable(mode){mutableStateOf("")}
     var period by rememberSaveable(mode){mutableStateOf("Всё время")}
     var order by rememberSaveable(mode){mutableStateOf("Новые")}

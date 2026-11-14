@@ -16,9 +16,9 @@ BUILD=(ROOT/"app/build.gradle.kts").read_text(encoding="utf-8")
 
 class BotanicalNavigation07(unittest.TestCase):
     def test_version_is_07_and_db_is_still_08(self):
-        self.assertIn('versionName = "1.0.0"',BUILD)
-        self.assertIn("versionCode = 100000 +",BUILD)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 11)',DB)
+        self.assertIn('versionName = "1.1.0-rc1"',BUILD)
+        self.assertIn("versionCode = 110000 +",BUILD)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)',DB)
         self.assertIn('namespace = "ru.dikoveriya.lab"',BUILD)
 
     def test_enter_and_back_have_no_clear_all(self):
@@ -62,7 +62,10 @@ class BotanicalNavigation07(unittest.TestCase):
 
     def test_layout_has_responsive_actions_and_real_data_graph(self):
         self.assertIn("Lab07Metric(",WIDGETS)
-        self.assertIn("Lab07QuickAction(\"Сканировать контейнер\"",WIDGETS)
+        quick=(SRC/"Lab10NavigationUi.kt").read_text(encoding="utf-8")
+        self.assertIn('Lab10QuickRow("Сканировать QR"',quick)
+        self.assertNotIn('Lab07QuickAction("Сканировать контейнер"',WIDGETS)
+        self.assertIn('onMetric("tasks")',WIDGETS)
         self.assertIn("Lab07ObservationPlot(samples,plotted)",SCREEN)
         self.assertIn("value?.let{sample.date to it}",WIDGETS)
         self.assertIn("Для графика нужны минимум два измерения",WIDGETS)

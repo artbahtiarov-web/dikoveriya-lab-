@@ -111,27 +111,24 @@ fun Lab07QuickAction(text:String,icon:@Composable ()->Unit,primary:Boolean=false
 }
 
 @Composable
-fun Lab07Dashboard(
+internal fun Lab07Dashboard(
     plants:List<PlantRecord>,cultures:List<CultureRecord>,tasks:List<TaskRecord>,
     onCollection:()->Unit,onContainer:(Long)->Unit,
     onNewContainer:()->Unit,onNewPlant:()->Unit,onMediums:()->Unit,onScan:()->Unit,
-    counts:Lab072Counts?=null,onMetric:(String)->Unit={}
+    counts:Lab072Counts?=null,onMetric:(String)->Unit={},
+    financeNetMinor:Long?=null,onFinance:()->Unit={},
+    recent:List<Lab11RecentEvent> = emptyList(),
+    onRecent:(String,Long)->Unit={_,_->}
 ) {
     val active=cultures.filter{it.status in setOf(LabTerms.IN_CULTURE,LabTerms.CONTROL,LabTerms.QUARANTINE)}
     val inVitro=counts?.tubes ?: active.count{it.stage==LabTerms.IN_VITRO}
     val controls=counts?.attention ?: active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
     val growth=counts?.growing ?: active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
     val due=counts?.tasksDue ?: tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
-    Column(verticalArrangement=Arrangement.spacedBy(14.dp)){
-        Lab07BrandHero("Моя лаборатория",
-            "Растения, наблюдения, операции и задачи — в одном месте.",
-            "ДИКОВЕРИЯ LAB · ЦЕНТР УПРАВЛЕНИЯ")
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge,
-                modifier=Modifier.weight(1f))
-            Icon(Icons.Outlined.Tune,null,tint=MaterialTheme.colorScheme.tertiary,
-                modifier=Modifier.size(20.dp))
-        }
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+        // The app bar already contains the name/logo. A second full-width
+        // hero previously hid live metrics below the first mobile viewport.
+        Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge)
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",
                 Lab07Palette.Forest,Modifier.weight(1f)){onMetric("vitro")}
@@ -144,31 +141,52 @@ fun Lab07Dashboard(
             Lab07Metric("Задачи",due.toString(),"к выполнению",
                 Lab07Palette.InkBrass,Modifier.weight(1f)){onMetric("tasks")}
         }
-        Text("Сделать сейчас",style=MaterialTheme.typography.titleLarge)
-        Row(horizontalArrangement=Arrangement.spacedBy(9.dp)){
-            Lab07QuickAction("Новый контейнер",
-                {Icon(Icons.Outlined.AddCircleOutline,null)},true,Modifier.weight(1f),
-                onClick=onNewContainer)
-            Lab07QuickAction("Сканировать контейнер",
-                {Icon(Icons.Outlined.QrCodeScanner,null)},
-                modifier=Modifier.weight(1f),onClick=onScan)
-        }
-        OutlinedCard(onClick={onMetric("tasks")},
+        OutlinedCard(onClick=onFinance,
+            modifier=Modifier.fillMaxWidth(),
             colors=CardDefaults.outlinedCardColors(containerColor=MaterialTheme.colorScheme.surface),
             shape=RoundedCornerShape(17.dp)){
             Row(Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment=Alignment.CenterVertically,
                 horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                Icon(Icons.Outlined.EventNote,null,tint=MaterialTheme.colorScheme.primary,
+                Icon(Icons.Outlined.AccountBalanceWallet,null,
+                    tint=MaterialTheme.colorScheme.primary,
                     modifier=Modifier.size(28.dp))
                 Column(Modifier.weight(1f)){
-                    Text("План на сегодня",style=MaterialTheme.typography.titleMedium)
-                    Text(if(due==0)"Просроченных и сегодняшних задач нет"
-                        else "Задач к выполнению: "+due,
+                    Text("Финансы проекта",style=MaterialTheme.typography.titleMedium)
+                    Text(financeNetMinor?.let{kopecks11(it)}?:"Данные не загружены",
+                        style=MaterialTheme.typography.titleLarge)
+                    Text("Денежный поток: поступления минус выплаты",
                         style=MaterialTheme.typography.bodySmall,
                         color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Icon(Icons.Outlined.ChevronRight,null,tint=MaterialTheme.colorScheme.tertiary)
+                Icon(Icons.Outlined.ChevronRight,"Открыть финансы",
+                    tint=MaterialTheme.colorScheme.tertiary)
+            }
+        }
+        Text("Последние события",style=MaterialTheme.typography.titleLarge)
+        if(recent.isEmpty())Text("Новых событий пока нет",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant)
+        recent.take(4).forEach{event->
+            OutlinedCard(onClick={onRecent(event.objectType,event.objectId)},
+                modifier=Modifier.fillMaxWidth(),
+                shape=RoundedCornerShape(14.dp),
+                colors=CardDefaults.outlinedCardColors(
+                    containerColor=MaterialTheme.colorScheme.surface)){
+                Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){
+                    Icon(Icons.Outlined.History,null,
+                        tint=MaterialTheme.colorScheme.tertiary)
+                    Column(Modifier.weight(1f).padding(start=10.dp)){
+                        Text(event.code+" · "+event.kind,
+                            style=MaterialTheme.typography.titleSmall)
+                        Text(formatDate(event.date)+" · "+event.note,
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.Outlined.ChevronRight,
+                        contentDescription="Открыть исходный объект")
+                }
             }
         }
     }
