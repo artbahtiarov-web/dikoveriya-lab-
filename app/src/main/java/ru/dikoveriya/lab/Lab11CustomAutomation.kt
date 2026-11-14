@@ -34,6 +34,78 @@ internal fun LabDatabase.archiveCategory11(domain:String,name:String){
     },"domain=? AND name=?",arrayOf(domain,name))>0)
 }
 
+/**
+ * Unused catalogue entries may be deleted. Referenced entries are only archived
+ * so old material prices, procedures and supplier documents stay intelligible.
+ * Returns true for physical deletion; false if historical references required archive.
+ */
+internal fun LabDatabase.deleteOrArchiveCategory11(domain:String,name:String):Boolean{
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        val allowed=db.rawQuery("""SELECT id FROM custom_categories
+            WHERE domain=? AND name=? AND archived=0""",arrayOf(domain,name))
+            .use{it.moveToFirst()}
+        require(allowed){"Категория не найдена"}
+        fun used(table:String,column:String):Boolean=db.rawQuery(
+            "SELECT 1 FROM "+table+" WHERE "+column+"=? LIMIT 1",arrayOf(name)
+        ).use{it.moveToFirst()}
+        val referenced=used("materials","category") ||
+            used("purchases","category") ||
+            used("equipment_assets","category") ||
+            used("operation_templates","name") ||
+            used("item_events","kind") ||
+            used("lab_operations","kind")
+        if(referenced){
+            db.update("custom_categories",ContentValues().apply{put("archived",1)},
+                "domain=? AND name=?",arrayOf(domain,name))
+        }else db.delete("custom_categories","domain=? AND name=?",arrayOf(domain,name))
+        db.setTransactionSuccessful()
+        return !referenced
+    }finally{db.endTransaction()}
+}
+
+/** Same rule for user-defined fields; keep values that are already part of history. */
+internal fun LabDatabase.deleteOrArchiveField11(id:Long):Boolean{
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        val exists=db.rawQuery("SELECT 1 FROM custom_field_definitions WHERE id=?",
+            arrayOf(id.toString())).use{it.moveToFirst()}
+        require(exists){"Поле не найдено"}
+        val referenced=db.rawQuery(
+            "SELECT 1 FROM custom_field_values WHERE field_id=? LIMIT 1",
+            arrayOf(id.toString())).use{it.moveToFirst()}
+        if(referenced)
+            db.update("custom_field_definitions",ContentValues().apply{
+                put("archived",1)
+            },"id=?",arrayOf(id.toString()))
+        else db.delete("custom_field_definitions","id=?",arrayOf(id.toString()))
+        db.setTransactionSuccessful()
+        return !referenced
+    }finally{db.endTransaction()}
+}
+
+internal fun LabDatabase.deleteOrArchiveTemplate11(id:Long):Boolean{
+    val db=writableDatabase
+    db.beginTransaction()
+    try{
+        val name=db.rawQuery("SELECT name FROM operation_templates WHERE id=?",
+            arrayOf(id.toString())).use{c->
+            require(c.moveToFirst()){"Шаблон не найден"};c.getString(0)
+        }
+        val referenced=db.rawQuery(
+            "SELECT 1 FROM item_events WHERE kind=? LIMIT 1",arrayOf(name)
+        ).use{it.moveToFirst()}
+        if(referenced)db.update("operation_templates",ContentValues().apply{
+            put("archived",1)
+        },"id=?",arrayOf(id.toString()))
+        else db.delete("operation_templates","id=?",arrayOf(id.toString()))
+        db.setTransactionSuccessful()
+        return !referenced
+    }finally{db.endTransaction()}
+}
+
 internal fun LabDatabase.defineField11(entity:String,label:String,
     kind:String,required:Boolean,choices:List<String> = emptyList()):Long{
     require(entity in setOf("item","culture","material","asset","purchase"))
