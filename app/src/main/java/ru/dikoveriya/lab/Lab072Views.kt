@@ -12,7 +12,7 @@ fun LabDatabase.savedViews072(screen:String):List<Lab072SavedView> =
             cursor.getLong(0),cursor.getString(1),cursor.getString(2)))
     }}
 fun LabDatabase.saveView072(screen:String,name:String,config:String){
-    require(screen in listOf("vitro","attention","growth","all","tasks")){"Неизвестный реестр"}
+    require(screen in listOf("vitro","attention","growth","all","tasks","items","sales")){"Неизвестный реестр"}
     val title=lab072Text(name,50)
     require(config.length<=8000){"Фильтр слишком большой"}
     JSONObject(config) // validate JSON before writing
