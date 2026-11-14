@@ -213,18 +213,25 @@ internal fun LabDatabase.recordItemEvent11(
     val db=writableDatabase
     db.beginTransaction()
     try{
-        val row=db.rawQuery("SELECT status FROM plant_items WHERE id=?",
+        val old=db.rawQuery("""SELECT status,stage,location_text,location_id,
+            substrate,stimulant,kind FROM plant_items WHERE id=?""",
             arrayOf(id.toString())).use{c->
-            require(c.moveToFirst()){"Объект не найден"};c.getString(0)
+            require(c.moveToFirst()){"Объект не найден"}
+            listOf(c.getString(0),c.getString(1),c.getString(2),
+                c.getString(3),c.getString(4),c.getString(5),c.getString(6))
         }
-        require(row!="Утилизирован" && row!="Продан" || kind=="Исправление"){
+        require(old[0] !in setOf("Утилизирован","Продан") || kind=="Исправление"){
             "Нельзя менять закрытое растение без исправления"
         }
-        val details=JSONObject()
-        if(newStage!=null)details.put("stage",newStage)
-        if(newLocation!=null)details.put("location",newLocation)
-        if(substrate!=null)details.put("substrate",substrate)
-        if(stimulant!=null)details.put("stimulant",stimulant)
+        val details=JSONObject().put("before_status",old[0])
+            .put("before_stage",old[1]).put("before_location",old[2])
+            .put("before_location_id",old[3]?.toLongOrNull()?:JSONObject.NULL)
+            .put("before_substrate",old[4]).put("before_stimulant",old[5])
+            .put("before_kind",old[6])
+        if(newStage!=null)details.put("new_stage",newStage)
+        if(newLocation!=null)details.put("new_location",newLocation)
+        if(substrate!=null)details.put("new_substrate",substrate)
+        if(stimulant!=null)details.put("new_stimulant",stimulant)
         db.insertOrThrow("item_events",null,ContentValues().apply{
             put("item_id",id);put("kind",text11(kind,80))
             put("event_at",at);put("recorded_at",System.currentTimeMillis())
@@ -232,7 +239,10 @@ internal fun LabDatabase.recordItemEvent11(
         })
         val changes=ContentValues().apply{
             if(newStage!=null)put("stage",text11(newStage,100))
-            if(newLocation!=null)put("location_text",text11(newLocation,200))
+            if(newLocation!=null){
+                put("location_text",text11(newLocation,200))
+                putNull("location_id")
+            }
             if(substrate!=null)put("substrate",text11(substrate,500))
             if(stimulant!=null)put("stimulant",text11(stimulant,300))
             if(kind=="Утилизация")put("status","Утилизирован")
