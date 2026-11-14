@@ -2,6 +2,7 @@ package ru.dikoveriya.lab
 
 import android.content.ContentValues
 import org.json.JSONObject
+import org.json.JSONArray
 
 private val standardOps11=setOf("Посадка","Введение в культуру",
     "Субкультивирование","Черенкование","Укоренение","Пересадка",
@@ -19,7 +20,9 @@ internal fun LabDatabase.performItemAction11(
     note:String="",newStage:String?=null,newKind:String?=null,newLocation:String?=null,
     newSubstrate:String?=null,stimulant:String?=null,
     materialId:Long?=null,materialQty:Double=0.0,
-    customFields:Map<String,String> = emptyMap()
+    customFields:Map<String,String> = emptyMap(),
+    extraMaterials:List<Pair<Long,Double>> = emptyList(),
+    newPotMl:Int?=null,photoFilename:String?=null
 ):Long{
     require(kind in standardOps11 || templates11().any{it.title==kind}){
         "Неизвестная операция. Добавь её через шаблон."
@@ -32,14 +35,27 @@ internal fun LabDatabase.performItemAction11(
         (materialId!=null && materialQty>0)){
         "Количество материала без выбранной складской позиции недопустимо"
     }
+    require(newPotMl==null || kind in setOf("Посадка","Пересадка") &&
+        newPotMl in 1..500000){"Объём нового горшка должен быть положительным"}
+    val chosenMaterials=buildList{
+        if(materialId!=null)add(materialId to materialQty)
+        addAll(extraMaterials)
+    }
+    require(chosenMaterials.size<=12 && chosenMaterials.all{
+        it.first>0 && it.second.isFinite() && it.second>0
+    } && chosenMaterials.map{it.first}.distinct().size==chosenMaterials.size){
+        "Проверь количество и уникальность позиций материалов"
+    }
     val db=writableDatabase
     db.beginTransaction()
     try{
-        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,stimulant,kind,location_id
+        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,
+            stimulant,kind,location_id,pot_volume_ml
             FROM plant_items WHERE id=?""",arrayOf(itemId.toString())).use{c->
             require(c.moveToFirst()){"Растение не найдено"}
             listOf(c.getString(0),c.getString(1),c.getString(2),
-                c.getString(3),c.getString(4),c.getString(5),c.getString(6))
+                c.getString(3),c.getString(4),c.getString(5),c.getString(6),
+                c.getString(7))
         }
         val selectedTemplate=templates11().firstOrNull{it.title==kind}
         if(selectedTemplate!=null){
@@ -58,6 +74,19 @@ internal fun LabDatabase.performItemAction11(
             .put("before_substrate",before[3])
             .put("before_stimulant",before[4]).put("before_kind",before[5])
             .put("before_location_id",before[6]?.toLongOrNull()?:JSONObject.NULL)
+            .put("before_pot_ml",before[7]?.toIntOrNull()?:JSONObject.NULL)
+        if(newPotMl!=null)details.put("new_pot_ml",newPotMl)
+        if(photoFilename!=null){
+            require(Regex("[a-zA-Z0-9_-]+\\.(jpg|png|webp|heic)").matches(photoFilename)){
+                "Некорректное имя фотографии"
+            }
+            db.rawQuery("""SELECT 1 FROM item_photos
+                WHERE entity_kind='item' AND entity_id=? AND filename=?""",
+                arrayOf(itemId.toString(),photoFilename)).use{c->
+                require(c.moveToFirst()){"Фотография операции не найдена"}
+            }
+            details.put("photo_filename",photoFilename)
+        }
         if(newStage!=null)details.put("new_stage",newStage)
         if(newKind!=null)details.put("new_kind",newKind)
         if(newLocation!=null)details.put("new_location",newLocation)
@@ -74,42 +103,50 @@ internal fun LabDatabase.performItemAction11(
             put("event_at",at);put("recorded_at",System.currentTimeMillis())
             put("note",note);put("details_json",details.toString())
         })
-        if(materialId!=null){
+        val usageIds=JSONArray()
+        var totalMaterialsMinor=0L
+        chosenMaterials.forEach{(id,qty)->
             val material=db.rawQuery("""SELECT quantity,cost_per_unit FROM materials WHERE id=?""",
-                arrayOf(materialId.toString())).use{c->
+                arrayOf(id.toString())).use{c->
                 require(c.moveToFirst()){"Материал не найден"}
                 c.getDouble(0) to c.getDouble(1)
             }
-            require(materialQty<=material.first+1e-8){"На складе недостаточно материала"}
+            require(qty<=material.first+1e-8){"На складе недостаточно материала"}
             val unitCost=decimalMinor11(material.second)
-            val total=decimalMinor11(materialQty*material.second)
-            require(total>=0)
+            val amount=decimalMinor11(qty*material.second)
+            require(amount>=0)
             db.update("materials",ContentValues().apply{
-                put("quantity",(material.first-materialQty).coerceAtLeast(0.0))
-            },"id=?",arrayOf(materialId.toString()))
+                put("quantity",(material.first-qty).coerceAtLeast(0.0))
+            },"id=?",arrayOf(id.toString()))
             db.insertOrThrow("material_moves",null,ContentValues().apply{
-                put("material_id",materialId);put("delta",-materialQty)
+                put("material_id",id);put("delta",-qty)
                 put("note",kind+" · "+note);put("created_at",at)
             })
             val usageId=db.insertOrThrow("stock_usage",null,ContentValues().apply{
-                put("material_id",materialId);put("entity_kind","item")
-                put("entity_id",itemId);put("quantity",materialQty)
-                put("unit_cost_minor",unitCost);put("total_minor",total)
+                put("material_id",id);put("entity_kind","item")
+                put("entity_id",itemId);put("quantity",qty)
+                put("unit_cost_minor",unitCost);put("total_minor",amount)
                 put("used_at",at);put("note",kind)
             })
             db.insertOrThrow("direct_costs",null,ContentValues().apply{
                 put("entity_kind","item");put("entity_id",itemId)
-                put("amount_minor",total);put("category","Материалы")
+                put("amount_minor",amount);put("category","Материалы")
                 put("occurred_at",at);put("source_type","stock_usage")
                 put("source_id",usageId);put("note",kind)
             })
-            details.put("usage_id",usageId).put("material_id",materialId)
-                .put("material_qty",materialQty).put("direct_cost_minor",total)
+            usageIds.put(usageId)
+            totalMaterialsMinor+=amount
+        }
+        if(usageIds.length()>0){
+            details.put("usage_ids",usageIds)
+            details.put("direct_cost_minor",totalMaterialsMinor)
+            if(usageIds.length()==1)details.put("usage_id",usageIds.getLong(0))
             db.update("item_events",ContentValues().apply{
                 put("details_json",details.toString())
             },"id=?",arrayOf(eventId.toString()))
         }
         val cv=ContentValues().apply{
+            if(newPotMl!=null)put("pot_volume_ml",newPotMl)
             if(newStage!=null)put("stage",newStage.take(100))
             if(newKind!=null)put("kind",newKind)
             if(newLocation!=null){
@@ -158,8 +195,15 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
                 put("cancelled",1)
             },"id=?",arrayOf(d.getLong("measurement_id").toString()))
         }
-        if(d.has("usage_id")){
-            val usageId=d.getLong("usage_id")
+        val historicalUsages=when{
+            d.has("usage_ids")->{
+                val arr=d.getJSONArray("usage_ids")
+                (0 until arr.length()).map{arr.getLong(it)}
+            }
+            d.has("usage_id")->listOf(d.getLong("usage_id"))
+            else->emptyList()
+        }
+        historicalUsages.forEach{usageId->
             val stock=db.rawQuery("""SELECT material_id,quantity,reversed
                 FROM stock_usage WHERE id=?""",arrayOf(usageId.toString())).use{c->
                 require(c.moveToFirst()){"Использование материала не найдено"}
@@ -192,6 +236,10 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
             }
             if(d.has("before_substrate"))put("substrate",d.getString("before_substrate"))
             if(d.has("before_stimulant"))put("stimulant",d.getString("before_stimulant"))
+            if(d.has("before_pot_ml")){
+                if(d.isNull("before_pot_ml"))putNull("pot_volume_ml")
+                else put("pot_volume_ml",d.getInt("before_pot_ml"))
+            }
             put("updated_at",System.currentTimeMillis())
         }
         db.update("plant_items",previous,"id=?",arrayOf(id.toString()))
