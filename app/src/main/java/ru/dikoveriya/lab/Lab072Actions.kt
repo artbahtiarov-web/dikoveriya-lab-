@@ -366,6 +366,23 @@ fun LabDatabase.updateTask072(taskId:Long,done:Boolean?=null,
     val now=System.currentTimeMillis()
     update("tasks",lab072CV("done" to if(targetDone)1 else 0,
         "due_at" to targetDue),"id=?",arrayOf(taskId.toString()))
+    // When a date is rescheduled, retain its chosen reminder clock time on
+    // the new date. Do not leave a stale notification on the old date.
+    if(dueAt!=null && targetDue!=before.second){
+        val oldReminder=rawQuery("SELECT reminder_at FROM task_details13 WHERE task_id=?",
+            arrayOf(taskId.toString())).use{c->
+                if(c.moveToFirst() && !c.isNull(0))c.getLong(0) else null
+            }
+        if(oldReminder!=null){
+            val zone=java.time.ZoneId.systemDefault()
+            val clock=java.time.Instant.ofEpochMilli(oldReminder)
+                .atZone(zone).toLocalTime()
+            val day=java.time.Instant.ofEpochMilli(targetDue).atZone(zone).toLocalDate()
+            val shifted=day.atTime(clock).atZone(zone).toInstant().toEpochMilli()
+            update("task_details13",lab072CV("reminder_at" to shifted,
+                "updated_at" to now),"task_id=?",arrayOf(taskId.toString()))
+        }
+    }
     if(priority!=null){
         insertWithOnConflict("task_metadata",null,lab072CV(
             "task_id" to taskId,"priority" to priority,
