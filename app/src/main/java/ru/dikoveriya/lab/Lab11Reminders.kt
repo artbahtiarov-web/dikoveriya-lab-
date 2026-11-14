@@ -9,6 +9,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
+import java.security.MessageDigest
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -55,9 +58,11 @@ internal object Lab11Reminders {
         val todayStart=Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
             .toLocalDate().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val rows=db.readableDatabase.rawQuery("""
-            SELECT t.id,t.title,t.due_at
-            FROM tasks t WHERE t.done=0
+            SELECT t.id,t.title,t.due_at,d.reminder_at,d.task_id
+            FROM tasks t LEFT JOIN task_details13 d ON d.task_id=t.id
+            WHERE t.done=0
             AND t.due_at BETWEEN ? AND ?
+            AND (d.task_id IS NULL OR d.reminder_at IS NOT NULL)
             AND NOT EXISTS(SELECT 1 FROM entity_archives a
                 WHERE a.entity_type='task' AND a.entity_id=t.id)
             ORDER BY t.due_at,t.id LIMIT 100
@@ -67,7 +72,7 @@ internal object Lab11Reminders {
             while(c.moveToNext()){
                 val id=c.getLong(0)
                 val due=c.getLong(2)
-                val time=dueReminderAt(due)
+                val time=if(c.isNull(4))dueReminderAt(due) else c.getLong(3)
                 if(time<=now)continue
                 alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,time,
                     request(context,id,c.getString(1)))
@@ -83,25 +88,47 @@ internal object Lab11Reminders {
     fun notify(context:Context,taskId:Long){
         if(!permitted(context))return
         val db=LabDatabase(context)
-        val title=try{
+        val record=try{
             db.readableDatabase.rawQuery("""
-                SELECT title,due_at FROM tasks WHERE id=? AND done=0
+                SELECT t.title,d.ringtone_uri,d.task_id,d.reminder_at
+                FROM tasks t LEFT JOIN task_details13 d ON d.task_id=t.id
+                WHERE t.id=? AND t.done=0
                 AND NOT EXISTS(SELECT 1 FROM entity_archives a
-                    WHERE a.entity_type='task' AND a.entity_id=tasks.id)
+                    WHERE a.entity_type='task' AND a.entity_id=t.id)
             """.trimIndent(),arrayOf(taskId.toString())).use{c->
                 if(!c.moveToFirst())return
-                c.getString(0)
+                // New task with reminders disabled must never notify.
+                if(!c.isNull(2) && c.isNull(3))return
+                c.getString(0) to (if(c.isNull(1))null else c.getString(1))
             }
         }finally{db.close()}
+        val title=record.first
+        val sound=record.second
         val manager=context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(NotificationChannel(CHANNEL,
-            "Задачи и уход",NotificationManager.IMPORTANCE_DEFAULT))
+        val channelId=if(sound.isNullOrBlank())CHANNEL else{
+            val digest=MessageDigest.getInstance("SHA-256")
+                .digest(sound.toByteArray(Charsets.UTF_8))
+                .take(10).joinToString(""){"%02x".format(it)}
+            CHANNEL+"_"+digest
+        }
+        val channel=NotificationChannel(channelId,"Задачи и уход",
+            NotificationManager.IMPORTANCE_DEFAULT)
+        when{
+            sound=="silent"->channel.setSound(null,null)
+            !sound.isNullOrBlank()->{
+                channel.setSound(Uri.parse(sound),AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build())
+            }
+        }
+        manager.createNotificationChannel(channel)
         val launch=PendingIntent.getActivity(context,taskId.hashCode(),
             Intent(context,MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .putExtra("open_tasks",true),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        manager.notify(taskId.hashCode(),NotificationCompat.Builder(context,CHANNEL)
+        manager.notify(taskId.hashCode(),NotificationCompat.Builder(context,channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Диковерия LAB · запланированная задача")
             .setContentText(title.take(150))
