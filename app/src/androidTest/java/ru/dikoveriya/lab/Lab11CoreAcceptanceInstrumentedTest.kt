@@ -263,6 +263,48 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }
     }
 
+    @Test fun operationPhotoDoesNotSurviveFailedStockTransaction(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        val folder=java.io.File(context.cacheDir,"labels").apply{mkdirs()}
+        val file=java.io.File(folder,"qa_photo_"+UUID.randomUUID()+".png")
+        val bmp=android.graphics.Bitmap.createBitmap(16,16,
+            android.graphics.Bitmap.Config.ARGB_8888)
+        try{
+            file.outputStream().use{
+                assertTrue(bmp.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))
+            }
+            val uri=androidx.core.content.FileProvider.getUriForFile(
+                context,context.packageName+".share",file)
+            val item=db.addPlantItem11(plant(db),"Горшечное")
+            val photosBefore=db.itemPhotos11(item).size
+            var rejected=false
+            try{
+                db.commitItemActionPhotos11(context,item,
+                    mapOf("__action_photo" to uri)){names->
+                    db.performItemAction11(item,"Пересадка",System.currentTimeMillis(),
+                        materialId=-1L,materialQty=1.0,
+                        photoFilename=names["__action_photo"])
+                }
+            }catch(_:Exception){rejected=true}
+            assertTrue("Rollback must include photo and stock",rejected)
+            assertEquals(photosBefore,db.itemPhotos11(item).size)
+            assertNull(db.item11(item)!!.cover)
+            val event=db.commitItemActionPhotos11(context,item,
+                mapOf("__action_photo" to uri)){names->
+                db.performItemAction11(item,"Осмотр",System.currentTimeMillis(),
+                    note="QA photo",photoFilename=names["__action_photo"])
+            }
+            assertTrue(event>0)
+            assertEquals(photosBefore+1,db.itemPhotos11(item).size)
+            val details=org.json.JSONObject(db.itemEvents11(item)
+                .first{it.id==event}.details)
+            assertEquals(db.item11(item)!!.cover,details.getString("photo_filename"))
+        }finally{
+            bmp.recycle();file.delete();db.close()
+        }
+    }
+
     @Test fun transplantWithTwoMaterialsAndPotIsAtomicAndFullyReversible(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
