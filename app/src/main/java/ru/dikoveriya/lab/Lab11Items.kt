@@ -273,7 +273,7 @@ internal fun LabDatabase.itemLineage11(id:Long):List<String>{
 }
 
 /** Store photo in the existing portable media directory to retain ZIP compatibility. */
-internal fun LabDatabase.addItemPhoto11(context:Context,itemId:Long,uri:Uri,caption:String){
+internal fun LabDatabase.addItemPhoto11(context:Context,itemId:Long,uri:Uri,caption:String):String{
     require(item11(itemId)!=null){"Объект не найден"}
     val ext=when(context.contentResolver.getType(uri)){
         "image/jpeg"->"jpg";"image/png"->"png";"image/webp"->"webp"
@@ -313,6 +313,7 @@ internal fun LabDatabase.addItemPhoto11(context:Context,itemId:Long,uri:Uri,capt
             },"id=?",arrayOf(itemId.toString()))
             db.setTransactionSuccessful()
         }finally{db.endTransaction()}
+        return name
     }catch(e:Exception){file.delete();throw e}
 }
 
