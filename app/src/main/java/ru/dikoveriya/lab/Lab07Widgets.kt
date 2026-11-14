@@ -125,10 +125,9 @@ internal fun Lab07Dashboard(
     val controls=counts?.attention ?: active.count{it.status==LabTerms.CONTROL || it.status==LabTerms.QUARANTINE}
     val growth=counts?.growing ?: active.count{it.stage==LabTerms.ADAPTATION || it.stage==LabTerms.GROWING}
     val due=counts?.tasksDue ?: tasks.count{!it.done && it.dueAt<=System.currentTimeMillis()}
-    Column(verticalArrangement=Arrangement.spacedBy(14.dp)){
-        Lab07BrandHero("Моя лаборатория",
-            "Растения, наблюдения, операции и задачи — в одном месте.",
-            "ДИКОВЕРИЯ LAB · ЦЕНТР УПРАВЛЕНИЯ")
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+        // The app bar already contains the name/logo. A second full-width
+        // hero previously hid live metrics below the first mobile viewport.
         Text("Что происходит сейчас",style=MaterialTheme.typography.titleLarge)
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Lab07Metric("В пробирках",inVitro.toString(),"контейнеров",
