@@ -13,7 +13,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-/** Calendar date is an actionable task-creation shortcut, not only a filter. */
+/** Calendar first opens a dedicated date page; its + starts creation. */
 @RunWith(AndroidJUnit4::class)
 class Lab11CalendarQuickCreateInstrumentedTest {
     @get:Rule val rule=createComposeRule()
@@ -37,12 +37,16 @@ class Lab11CalendarQuickCreateInstrumentedTest {
             fun openToday(){
                 rule.onNodeWithContentDescription(today+", незавершённых",
                     substring=true).performScrollTo().performClick()
+                rule.onNodeWithText("Задачи на этот день",substring=true).assertExists()
+                rule.onNodeWithContentDescription("Создать задачу на "+today)
+                    .performClick()
                 rule.onNodeWithText("Новая задача").assertExists()
-                rule.onNodeWithText("Срок: "+today).assertExists()
+                rule.onNodeWithText("Дата задачи: "+today).assertExists()
             }
             openToday()
             rule.onNodeWithText("Отмена").performClick()
-            // A second tap must create again, not toggle the date off.
+            rule.onNodeWithContentDescription("К календарю").performClick()
+            // A second tap also opens the day; only + starts creation.
             openToday()
             rule.onNodeWithText("Отмена").performClick()
             rule.runOnIdle{assertEquals("",failure)}
