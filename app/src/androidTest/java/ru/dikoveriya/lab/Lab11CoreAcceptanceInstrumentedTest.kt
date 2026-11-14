@@ -297,6 +297,26 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun unusedCatalogCanBeDeletedButReferencedPriceHistoryIsProtected(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val name="QA category "+UUID.randomUUID()
+            db.addCategory11("Материалы",name)
+            assertTrue(name in db.categories11("Материалы"))
+            assertTrue(db.deleteOrArchiveCategory11("Материалы",name))
+            assertFalse(name in db.categories11("Материалы"))
+            db.addCategory11("Материалы",name)
+            val materialName="QA protected "+UUID.randomUUID()
+            db.addMaterial(materialName,"л",1.0,0.0,20.0,name)
+            assertFalse(db.deleteOrArchiveCategory11("Материалы",name))
+            assertFalse(name in db.categories11("Материалы"))
+            val category=db.materials().first{it.name==materialName}
+            assertEquals(name,category.category)
+            assertEquals(20.0,category.costPerUnit,0.0001)
+        }finally{db.close()}
+    }
+
     @Test fun equipmentSaleBooksOneReceiptAndNoDuplicateAcquisition(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
