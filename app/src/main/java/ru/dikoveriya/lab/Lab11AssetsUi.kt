@@ -51,6 +51,7 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
     var showLightingUnitCost by rememberSaveable{mutableStateOf(false)}
     var unitsForLighting by rememberSaveable{mutableStateOf("")}
     var reason by remember{mutableStateOf("")}
+    var saleProceeds by remember{mutableStateOf("")}
     var state by remember{mutableStateOf("Сломано")}
     LazyColumn(modifier=modifier,contentPadding=PaddingValues(16.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)){
@@ -228,12 +229,16 @@ internal fun Lab11AssetsScreen(db:LabDatabase,revision:Int,
                 PickOne("Состояние",listOf("Сломано","Утеряно","Утилизировано",
                     "Продано","Заменено"),state,{state=it})
                 Field("Причина",reason,{reason=it},single=false)
-                Text("Это изменение статуса имущества, не новая денежная выплата.",
+                if(state=="Продано")Field("Фактически получено от продажи, ₽",
+                    saleProceeds,{saleProceeds=it})
+                Text("Статус имущества меняется без повторного списания покупки. При продаже фактически полученные деньги записываются отдельным поступлением.",
                     style=MaterialTheme.typography.bodySmall)
             }},
-            confirmButton={Button(enabled=reason.trim().length>=2,onClick={
-                try{db.retireAsset11(id,state,reason)
-                    retire=null;reason="";onChanged()
+            confirmButton={Button(enabled=reason.trim().length>=2 &&
+                (state!="Продано" || runCatching{rubles11(saleProceeds)}.isSuccess),onClick={
+                try{db.retireAsset11(id,state,reason,
+                    if(state=="Продано")rubles11(saleProceeds) else 0L)
+                    retire=null;reason="";saleProceeds="";onChanged()
                 }catch(e:Exception){onError(e.message?:"Не удалось вывести оборудование")}
             }){Text("Подтвердить")}},
             dismissButton={TextButton(onClick={retire=null}){Text("Отмена")}})
