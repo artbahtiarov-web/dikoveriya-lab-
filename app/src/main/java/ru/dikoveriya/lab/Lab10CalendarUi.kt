@@ -150,7 +150,7 @@ internal fun Lab10TaskCalendar(db:LabDatabase,revision:Int,onDay:(String)->Unit,
                     }
                 }
             }
-            Text("Нажмите на дату, чтобы добавить задачу. В списке ниже останутся задачи этого дня.",
+            Text("Нажми на дату, чтобы открыть страницу дня. Там показаны все задачи и есть кнопка «+».",
                 style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.horizontalScroll(rememberScrollState()),
