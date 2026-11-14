@@ -141,7 +141,7 @@ internal fun Lab11ItemPassport(
                         verticalArrangement=Arrangement.spacedBy(7.dp)){
                         Text(item.plantName,color=Lab07Palette.Champagne,
                             style=MaterialTheme.typography.titleLarge)
-                        Text(item.kind+" · "+item.stage,color=Lab07Palette.Champagne)
+                        Text(item.customKind.ifBlank{item.kind}+" · "+item.stage,color=Lab07Palette.Champagne)
                         Text(item.status,color=Lab07Palette.Brass,
                             style=MaterialTheme.typography.labelMedium)
                     }
@@ -172,7 +172,7 @@ internal fun Lab11ItemPassport(
                         containerColor=MaterialTheme.colorScheme.surface)){
                         Column(Modifier.padding(16.dp)){
                             InfoRow11("Вид / сорт",item.plantName)
-                            InfoRow11("Тип",item.kind)
+                            InfoRow11("Тип",item.customKind.ifBlank{item.kind})
                             InfoRow11("Этап",item.stage)
                             InfoRow11("Дата появления",formatDate(item.acquiredAt))
                             InfoRow11("Место",item.location.ifBlank{"Не указано"})
@@ -292,7 +292,7 @@ internal fun Lab11ItemPassport(
                             if(expanded){
                                 if(event.details!="{}")Text(event.details,
                                     style=MaterialTheme.typography.bodySmall)
-                                if(!event.cancelled && event.kind !in setOf("Создание","Продажа","Отмена")){
+                                if(!event.cancelled && event.kind !in setOf("Создание","Продажа","Отмена","Отделение деток и клубней")){
                                     TextButton(onClick={cancelEvent=event.id}){
                                         Text("Отменить ошибочную операцию")
                                     }
