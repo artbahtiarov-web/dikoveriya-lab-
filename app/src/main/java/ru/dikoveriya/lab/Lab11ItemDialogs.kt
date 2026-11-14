@@ -152,19 +152,14 @@ internal fun Lab11ActionDialog(
     }
     val context=LocalContext.current
     var pendingTemplatePhoto by remember{mutableStateOf<String?>(null)}
-    var actionPhoto by remember{mutableStateOf<String?>(null)}
+    var pendingPhotos by remember{mutableStateOf(emptyMap<String,android.net.Uri>())}
     val photoPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->
         val target=pendingTemplatePhoto
         pendingTemplatePhoto=null
-        if(uri!=null && target!=null){
-            try{
-                db.addItemPhoto11(context,item.id,uri,"Операция: "+kind)
-                val filename=db.itemPhotos11(item.id).firstOrNull()?.first
-                    ?:error("Фотография не сохранена")
-                if(target=="__action_photo")actionPhoto=filename
-                else customAnswers=customAnswers+(target to filename)
-            }catch(e:Exception){onError(e.message?:"Не удалось сохранить фото")}
-        }
+        // Selecting an image never writes it to the live collection.
+        // Save commits it together with the operation; Cancel leaves no changes.
+        if(uri!=null && target!=null)
+            pendingPhotos=pendingPhotos+(target to uri)
     }
     var date by rememberSaveable{mutableStateOf(dateText11())}
     var stage by rememberSaveable{mutableStateOf("Не менять")}
@@ -256,8 +251,8 @@ internal fun Lab11ActionDialog(
                 pendingTemplatePhoto="__action_photo"
                 photoPicker.launch("image/*")
             },modifier=Modifier.fillMaxWidth()){
-                Text(if(actionPhoto==null)"Добавить фото действия"
-                    else "Фото действия прикреплено")
+                Text(if(pendingPhotos.containsKey("__action_photo"))
+                    "Фото действия выбрано" else "Добавить фото действия")
             }
             fields.forEach{field->
                 val label=field.name+(if(field.unit.isNotBlank())" ("+field.unit+")" else "")+
@@ -279,8 +274,8 @@ internal fun Lab11ActionDialog(
                         pendingTemplatePhoto=field.name
                         photoPicker.launch("image/*")
                     },modifier=Modifier.fillMaxWidth()){
-                        Text(if(value.isNotBlank())"Фото прикреплено · "+label
-                            else "Добавить фото · "+label)
+                        Text(if(pendingPhotos.containsKey(field.name))
+                            "Фото выбрано · "+label else "Добавить фото · "+label)
                     }
                     else->Field(label,value,
                         {v->customAnswers=customAnswers+(field.name to v)},
@@ -308,19 +303,22 @@ internal fun Lab11ActionDialog(
                             else newPotMl.toIntOrNull()?:error("Неверный объём горшка")
                         val newKind=if(item.kind=="Черенок" &&
                             kind=="Пересадка" && stage=="В горшке")"Горшечное" else null
-                        db.performItemAction11(item.id,kind,
-                            at=requireNotNull(atDate11(date)),
-                            note=note,newStage=stage.takeUnless{it=="Не менять"},
-                            newKind=newKind,
-                            newLocation=newLocation.takeIf{it.isNotBlank()},
-                            newSubstrate=substrate.takeIf{it.isNotBlank()},
-                            stimulant=stimulant.takeIf{it.isNotBlank()},
-                            materialId=materialId,materialQty=amount,
-                            extraMaterials=otherMaterials,newPotMl=potVolume,
-                            photoFilename=actionPhoto,
-                            customFields=customAnswers.filterKeys{
-                                key->fields.any{it.name==key}
-                            })
+                        db.commitItemActionPhotos11(
+                            context,item.id,pendingPhotos){photoNames->
+                            db.performItemAction11(item.id,kind,
+                                at=requireNotNull(atDate11(date)),
+                                note=note,newStage=stage.takeUnless{it=="Не менять"},
+                                newKind=newKind,
+                                newLocation=newLocation.takeIf{it.isNotBlank()},
+                                newSubstrate=substrate.takeIf{it.isNotBlank()},
+                                stimulant=stimulant.takeIf{it.isNotBlank()},
+                                materialId=materialId,materialQty=amount,
+                                extraMaterials=otherMaterials,newPotMl=potVolume,
+                                photoFilename=photoNames["__action_photo"],
+                                customFields=(customAnswers+photoNames)
+                                    .filterKeys{key->fields.any{it.name==key}}
+                            )
+                        }
                         onSaved()
                     }catch(e:Exception){onError(e.message?:"Не удалось записать действие")}
                 }){Text("Записать")}
