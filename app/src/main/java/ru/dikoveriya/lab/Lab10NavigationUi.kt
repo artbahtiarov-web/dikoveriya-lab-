@@ -76,10 +76,10 @@ private fun RowScope.Lab10Tab(
         onClick=onClick,
         icon={Icon(icon,contentDescription=name)},
         label={
-            // Preserve full Russian labels at 360dp and at 160% system text scale.
-            Text(name,maxLines=2,softWrap=true,
-                style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,
-                    lineHeight=12.sp),
+            // Keep every Russian tab name on one line even at enlarged system scale.
+            Text(name,maxLines=1,softWrap=false,
+                style=MaterialTheme.typography.labelSmall.copy(fontSize=8.sp,
+                    lineHeight=10.sp),
                 overflow=TextOverflow.Clip)
         },
         colors=NavigationBarItemDefaults.colors(
