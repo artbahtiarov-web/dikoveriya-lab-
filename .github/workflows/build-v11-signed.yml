@@ -106,7 +106,7 @@ jobs:
           set -euo pipefail
           grep -q 'versionName = "1.1.0-rc1"' app/build.gradle.kts
           grep -q 'versionCode = 110000 +' app/build.gradle.kts
-          grep -q 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)' app/src/main/java/ru/dikoveriya/lab/LabDatabase.kt
+          grep -q 'SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 13)' app/src/main/java/ru/dikoveriya/lab/LabDatabase.kt
           test -f app/src/main/java/ru/dikoveriya/lab/Lab10CollectionUi.kt
           test -f app/src/main/java/ru/dikoveriya/lab/Lab10OperationsUi.kt
           test -f app/src/main/java/ru/dikoveriya/lab/Lab10AnalyticsDetailsUi.kt
@@ -114,6 +114,7 @@ jobs:
           test -f app/src/main/java/ru/dikoveriya/lab/Lab11Finance.kt
           test -f app/src/main/java/ru/dikoveriya/lab/Lab11TemplateFields.kt
           test -f app/src/main/java/ru/dikoveriya/lab/Lab11Reminders.kt
+          test -f app/src/main/java/ru/dikoveriya/lab/LabCoreV13.kt
           test -f app/src/androidTest/java/ru/dikoveriya/lab/Lab11CoreAcceptanceInstrumentedTest.kt
           echo "Release identity and required feature modules verified"
 
