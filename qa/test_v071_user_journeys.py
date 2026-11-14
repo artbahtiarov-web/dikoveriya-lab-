@@ -24,7 +24,7 @@ class UnifiedJourneys071(unittest.TestCase):
     def test_version_keeps_db_and_certificate(self):
         self.assertIn('versionName = "1.1.0-rc1"',GRADLE)
         self.assertIn('versionCode = 110000 +',GRADLE)
-        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)',DB)
+        self.assertIn('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 13)',DB)
         self.assertIn('applicationId = "ru.dikoveriya.lab"',GRADLE)
         self.assertIn('file("signing/dikoveriya.p12")',GRADLE)
 
