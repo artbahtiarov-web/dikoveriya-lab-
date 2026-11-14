@@ -50,6 +50,10 @@ internal object Lab11Reminders {
     fun sync(context:Context,db:LabDatabase,now:Long=System.currentTimeMillis()):Int{
         if(!permitted(context))return 0
         val alarm=context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        // Task deadlines may be stored at local midnight. Include the entire
+        // current day so a 09:00 reminder is not skipped after 00:00.
+        val todayStart=Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
+            .toLocalDate().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val rows=db.readableDatabase.rawQuery("""
             SELECT t.id,t.title,t.due_at
             FROM tasks t WHERE t.done=0
@@ -57,7 +61,7 @@ internal object Lab11Reminders {
             AND NOT EXISTS(SELECT 1 FROM entity_archives a
                 WHERE a.entity_type='task' AND a.entity_id=t.id)
             ORDER BY t.due_at,t.id LIMIT 100
-        """.trimIndent(),arrayOf(now.toString(),(now+180L*86400000L).toString()))
+        """.trimIndent(),arrayOf(todayStart.toString(),(now+180L*86400000L).toString()))
         var scheduled=0
         rows.use{c->
             while(c.moveToNext()){
