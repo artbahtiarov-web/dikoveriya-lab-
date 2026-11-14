@@ -6,7 +6,7 @@ on:
     branches: ['release/1.1.0']
 
 permissions:
-  contents: read
+  contents: write  # only the signed release workflow can publish immutable GitHub assets
 
 jobs:
   build:
@@ -139,3 +139,41 @@ jobs:
           name: dikoveriya-lab-1.1.0-rc1-permanent-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: Publish a durable public GitHub Release for in-app update checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Do not publish from debug or feature branches. The release job above
+          # has verified the permanent signing certificate and all source tests.
+          test "$GITHUB_REF" = "refs/heads/release/1.1.0"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          actual_code="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            sed -n "s/.*versionCode='\\([0-9]*\\)'.*/\\1/p" | head -n 1)"
+          expected_code="$((110000+GITHUB_RUN_NUMBER))"
+          if [ "$actual_code" != "$expected_code" ]; then
+            echo "::error::APK versionCode is not the signed-workflow build number"
+            exit 1
+          fi
+          asset="dikoveriya-lab-1.1.0-vc${actual_code}.apk"
+          cp "$apk" "$asset"
+          checksum="$(sha256sum "$asset" | cut -d ' ' -f 1)"
+          cat > release-notes.md <<EOF
+          Диковерия LAB 1.1.0 · сборка ${actual_code}
+
+          Android APK с постоянной подписью. Номер пакета: ru.dikoveriya.lab.
+          SHA-256 сертификата: dc6afaf6df81d6a48dd643ef8f038a441791a99e572e783c38cd8e2e083ce7f5
+          SHA-256 APK: ${checksum}
+
+          При обновлении поверх установленной версии Android сохраняет локальную базу данных
+          при условии совпадения подписи. Перед обновлением рекомендуется сделать ZIP-копию.
+
+          GitHub Actions: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          tag="v1.1.0-build.${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" "$asset" --target "$GITHUB_SHA" \
+            --title "Диковерия LAB 1.1.0 · сборка ${actual_code}" \
+            --notes-file release-notes.md --latest
+          echo "Published verified release $tag ($asset)"
