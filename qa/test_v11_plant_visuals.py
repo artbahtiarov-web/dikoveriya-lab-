@@ -36,14 +36,14 @@ class Lab10PlantVisualContracts(unittest.TestCase):
             self.assertIn(term,V11)
 
     def test_upgrade_and_backward_compatible_archive(self):
-        for term in ('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 12)',
+        for term in ('SQLiteOpenHelper(context, "dikoveriya_lab.db", null, 13)',
                      "if (oldVersion < 11)","LabCoreV11.create(db)",
                      "BACKUP_ORDER_V10=BACKUP_ORDER_V9+LabCoreV10.backupTables",
-                     "BACKUP_ORDER_V11=BACKUP_ORDER_V10+LabCoreV11.backupTables", "BACKUP_ORDER=BACKUP_ORDER_V11+LabCoreV12.backupTables",
-                     'writer.name("schema").value(12)',"root.optInt(\"schema\") in 4..12",
+                     "BACKUP_ORDER_V11=BACKUP_ORDER_V10+LabCoreV11.backupTables", "BACKUP_ORDER_V12=BACKUP_ORDER_V11+LabCoreV12.backupTables",
+                     'writer.name("schema").value(13)',"root.optInt(\"schema\") in 4..12",
                      "10->BACKUP_ORDER_V10"):
             self.assertIn(term,DB)
-        self.assertIn('root.getInt("schema") in 4..12',ZIP)
+        self.assertIn('root.getInt("schema") in 4..13',ZIP)
         self.assertIn('getJSONArray("plant_visuals")',ZIP)
         self.assertIn('"plant_visuals"->c.getColumnIndex("cover_filename")',DB)
         self.assertIn('if(photoIndex>=0 && !c.isNull(photoIndex))',DB)
