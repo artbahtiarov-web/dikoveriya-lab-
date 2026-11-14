@@ -130,7 +130,7 @@ internal fun Lab13ReminderEditDialog(
                         sound.takeIf{it.isNotBlank()})
                     onSaved()
                 }catch(e:Exception){onError(e.message?:"Не удалось изменить напоминание")}
-            }){Text("Сохранить")},
+            }){Text("Сохранить")}
         },
         dismissButton={TextButton(onClick=onDismiss){Text("Отмена")}}
     )
