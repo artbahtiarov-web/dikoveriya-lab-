@@ -35,11 +35,11 @@ internal fun LabDatabase.performItemAction11(
     val db=writableDatabase
     db.beginTransaction()
     try{
-        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,stimulant,kind
+        val before=db.rawQuery("""SELECT status,stage,location_text,substrate,stimulant,kind,location_id
             FROM plant_items WHERE id=?""",arrayOf(itemId.toString())).use{c->
             require(c.moveToFirst()){"Растение не найдено"}
             listOf(c.getString(0),c.getString(1),c.getString(2),
-                c.getString(3),c.getString(4),c.getString(5))
+                c.getString(3),c.getString(4),c.getString(5),c.getString(6))
         }
         val selectedTemplate=templates11().firstOrNull{it.title==kind}
         if(selectedTemplate!=null){
@@ -57,6 +57,7 @@ internal fun LabDatabase.performItemAction11(
             .put("before_location",before[2])
             .put("before_substrate",before[3])
             .put("before_stimulant",before[4]).put("before_kind",before[5])
+            .put("before_location_id",before[6]?.toLongOrNull()?:JSONObject.NULL)
         if(newStage!=null)details.put("new_stage",newStage)
         if(newKind!=null)details.put("new_kind",newKind)
         if(newLocation!=null)details.put("new_location",newLocation)
@@ -111,7 +112,11 @@ internal fun LabDatabase.performItemAction11(
         val cv=ContentValues().apply{
             if(newStage!=null)put("stage",newStage.take(100))
             if(newKind!=null)put("kind",newKind)
-            if(newLocation!=null)put("location_text",newLocation.take(200))
+            if(newLocation!=null){
+                put("location_text",newLocation.take(200))
+                // Free-text move cannot keep pointing to an unrelated physical shelf.
+                putNull("location_id")
+            }
             if(newSubstrate!=null)put("substrate",newSubstrate.take(500))
             if(stimulant!=null)put("stimulant",stimulant.take(300))
             if(kind=="Утилизация")put("status","Утилизирован")
@@ -137,12 +142,17 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
         }
         val id=row[1].toLong()
         require(row[5]=="0"){"Событие уже отменено"}
-        require(row[2]!="Создание" && row[2]!="Продажа"){"Используй специальную корректировку"}
+        require(row[2] !in setOf("Создание","Продажа","Отмена")){
+            "Для этой записи требуется специальная корректировка"
+        }
         val newer=db.rawQuery("""SELECT COUNT(*) FROM item_events
-            WHERE item_id=? AND id>? AND cancelled=0""",
+            WHERE item_id=? AND id>? AND cancelled=0 AND kind<>'Отмена'""",
             arrayOf(id.toString(),eventId.toString())).use{it.moveToFirst();it.getInt(0)}
         require(newer==0){"Можно отменить только последнее событие: последующие зависят от него"}
         val d=JSONObject(row[4])
+        require(d.has("before_status") || d.has("measurement_id")){
+            "Для этой старой записи нет снимка состояния — автоматическая отмена небезопасна"
+        }
         if(d.has("measurement_id")){
             db.update("item_measurements",ContentValues().apply{
                 put("cancelled",1)
@@ -176,11 +186,34 @@ internal fun LabDatabase.cancelItemEvent11(eventId:Long,reason:String){
             if(d.has("before_kind"))put("kind",d.getString("before_kind"))
             if(d.has("before_stage"))put("stage",d.getString("before_stage"))
             if(d.has("before_location"))put("location_text",d.getString("before_location"))
+            if(d.has("before_location_id")){
+                if(d.isNull("before_location_id"))putNull("location_id")
+                else put("location_id",d.getLong("before_location_id"))
+            }
             if(d.has("before_substrate"))put("substrate",d.getString("before_substrate"))
             if(d.has("before_stimulant"))put("stimulant",d.getString("before_stimulant"))
             put("updated_at",System.currentTimeMillis())
         }
         db.update("plant_items",previous,"id=?",arrayOf(id.toString()))
+        if(d.has("storage_history_id")){
+            val oldId=if(d.isNull("before_location_id"))null
+                else d.getLong("before_location_id")
+            val nowId=db.rawQuery("""SELECT new_location_id FROM item_storage_history
+                WHERE id=? AND item_id=?""",
+                arrayOf(d.getLong("storage_history_id").toString(),id.toString()))
+                .use{c->
+                    require(c.moveToFirst()){"Запись перемещения не найдена"}
+                    if(c.isNull(0))null else c.getLong(0)
+                }
+            db.insertOrThrow("item_storage_history",null,ContentValues().apply{
+                put("item_id",id)
+                if(nowId!=null)put("previous_location_id",nowId)
+                if(oldId!=null)put("new_location_id",oldId)
+                put("location_text",d.optString("before_location",""))
+                put("occurred_at",System.currentTimeMillis())
+                put("note","Отмена перемещения #"+eventId+": "+reason)
+            })
+        }
         db.update("item_events",ContentValues().apply{
             put("cancelled",1)
         },"id=?",arrayOf(eventId.toString()))
