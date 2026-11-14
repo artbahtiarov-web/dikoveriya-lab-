@@ -58,16 +58,35 @@ internal fun Lab11CustomCatalogScreen(db:LabDatabase,revision:Int,
                         "Удобрения","Операции","Растения","Оборудование","Места","Метки"),
                         domain,{domain=it})
                 }
+                item{Text("Неиспользуемую запись можно удалить. Если запись уже встречается в истории, она будет архивирована.",
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant)}
                 if(categoryRows.isEmpty())item{Text("Категории не созданы")}
                 items(categoryRows,key={it}){name->
                     Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),
                         modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp)){
                         Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically){
                             Text(name,modifier=Modifier.weight(1f))
-                            TextButton(onClick={
-                                try{db.archiveCategory11(domain,name);onChanged()}
-                                catch(e:Exception){onError(e.message?:"Не удалось архивировать")}
-                            }){Text("Архив")}
+                            var menu by remember(name){mutableStateOf(false)}
+                            Box{
+                                IconButton(onClick={menu=true}){
+                                    Icon(Icons.Outlined.MoreVert,"Действия с категорией")
+                                }
+                                DropdownMenu(expanded=menu,onDismissRequest={menu=false}){
+                                    DropdownMenuItem(text={Text("Удалить неиспользуемую")},
+                                        onClick={
+                                            menu=false
+                                            try{db.deleteOrArchiveCategory11(domain,name);onChanged()}
+                                            catch(e:Exception){onError(e.message?:"Не удалось удалить")}
+                                        })
+                                    DropdownMenuItem(text={Text("В архив")},
+                                        onClick={
+                                            menu=false
+                                            try{db.archiveCategory11(domain,name);onChanged()}
+                                            catch(e:Exception){onError(e.message?:"Не удалось архивировать")}
+                                        })
+                                }
+                            }
                         }
                     }
                 }
@@ -86,9 +105,24 @@ internal fun Lab11CustomCatalogScreen(db:LabDatabase,revision:Int,
                                 Text(field.type+(if(field.required)" · обязательно" else ""),
                                     style=MaterialTheme.typography.bodySmall)
                             }
-                            TextButton(onClick={
-                                db.archiveField11(field.id);onChanged()
-                            }){Text("Архив")}
+                            var menu by remember(field.id){mutableStateOf(false)}
+                            Box{
+                                IconButton(onClick={menu=true}){
+                                    Icon(Icons.Outlined.MoreVert,"Действия с полем")
+                                }
+                                DropdownMenu(expanded=menu,onDismissRequest={menu=false}){
+                                    DropdownMenuItem(text={Text("Удалить неиспользуемое")},
+                                        onClick={
+                                            menu=false
+                                            try{db.deleteOrArchiveField11(field.id);onChanged()}
+                                            catch(e:Exception){onError(e.message?:"Не удалось удалить")}
+                                        })
+                                    DropdownMenuItem(text={Text("В архив")},
+                                        onClick={
+                                            menu=false;db.archiveField11(field.id);onChanged()
+                                        })
+                                }
+                            }
                         }
                     }
                 }
@@ -103,9 +137,22 @@ internal fun Lab11CustomCatalogScreen(db:LabDatabase,revision:Int,
                                 Text(template.applicable+" · "+JSONArray(template.fields).length()+
                                     " доп. полей",style=MaterialTheme.typography.bodySmall)
                             }
-                            TextButton(onClick={
-                                db.archiveTemplate11(template.id);onChanged()
-                            }){Text("Архив")}
+                            var menu by remember(template.id){mutableStateOf(false)}
+                            Box{
+                                IconButton(onClick={menu=true}){
+                                    Icon(Icons.Outlined.MoreVert,"Действия с шаблоном")
+                                }
+                                DropdownMenu(expanded=menu,onDismissRequest={menu=false}){
+                                    DropdownMenuItem(text={Text("Удалить неиспользуемый")},
+                                        onClick={
+                                            menu=false
+                                            try{db.deleteOrArchiveTemplate11(template.id);onChanged()}
+                                            catch(e:Exception){onError(e.message?:"Не удалось удалить")}
+                                        })
+                                    DropdownMenuItem(text={Text("В архив")},
+                                        onClick={menu=false;db.archiveTemplate11(template.id);onChanged()})
+                                }
+                            }
                         }
                     }
                 }
