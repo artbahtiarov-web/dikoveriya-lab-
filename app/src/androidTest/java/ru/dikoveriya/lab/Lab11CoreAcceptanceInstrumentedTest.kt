@@ -224,6 +224,53 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun transplantWithTwoMaterialsAndPotIsAtomicAndFullyReversible(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val item=db.addPlantItem11(plant(db),"Горшечное",substrate="Исходный грунт")
+            if("Субстраты" !in db.categories11("Материалы"))
+                db.addCategory11("Материалы","Субстраты")
+            val substrate="QA mixture "+UUID.randomUUID()
+            val pot="QA pot "+UUID.randomUUID()
+            db.addMaterial(substrate,"л",0.0,0.0,0.0,"Субстраты")
+            db.addMaterial(pot,"шт",0.0,0.0,0.0,"Субстраты")
+            val materialA=db.materials().first{it.name==substrate}.id
+            val materialB=db.materials().first{it.name==pot}.id
+            db.purchase11(substrate,"Субстраты",10000L,System.currentTimeMillis(),
+                materialId=materialA,quantity=1.0,unit="л")
+            db.purchase11(pot,"Субстраты",5000L,System.currentTimeMillis(),
+                materialId=materialB,quantity=1.0,unit="шт")
+            val before=db.itemEvents11(item).size
+            var rejected=false
+            try{
+                db.performItemAction11(item,"Пересадка",System.currentTimeMillis(),
+                    materialId=materialA,materialQty=.2,
+                    extraMaterials=listOf(materialB to 99.0),
+                    newPotMl=500,newSubstrate=substrate)
+            }catch(_:Exception){rejected=true}
+            assertTrue(rejected)
+            assertEquals(before,db.itemEvents11(item).size)
+            assertEquals(1.0,db.materials().first{it.id==materialA}.quantity,1e-7)
+            assertEquals(1.0,db.materials().first{it.id==materialB}.quantity,1e-7)
+            val event=db.performItemAction11(item,"Пересадка",
+                System.currentTimeMillis(),newSubstrate=substrate,newPotMl=500,
+                materialId=materialA,materialQty=.2,
+                extraMaterials=listOf(materialB to 1.0))
+            assertEquals(500,db.item11(item)!!.potMl)
+            assertEquals(substrate,db.item11(item)!!.substrate)
+            assertEquals(7000L,db.directCost11("item",item))
+            assertEquals(2,org.json.JSONObject(db.itemEvents11(item)
+                .first{it.id==event}.details).getJSONArray("usage_ids").length())
+            db.cancelItemEvent11(event,"Указан неверный горшок")
+            assertNull(db.item11(item)!!.potMl)
+            assertEquals("Исходный грунт",db.item11(item)!!.substrate)
+            assertEquals(0L,db.directCost11("item",item))
+            assertEquals(1.0,db.materials().first{it.id==materialA}.quantity,1e-7)
+            assertEquals(1.0,db.materials().first{it.id==materialB}.quantity,1e-7)
+        }finally{db.close()}
+    }
+
     @Test fun soldCultureCostIsFrozenAfterFurtherCloning(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
