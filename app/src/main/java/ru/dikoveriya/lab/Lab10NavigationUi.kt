@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -45,8 +47,9 @@ internal fun Lab10BottomNav(
                         tint=Lab07Palette.DeepForest,modifier=Modifier.size(27.dp))
                 }
             },
-            label={Text("Добавить",maxLines=1)},
-            alwaysShowLabel=true,
+            // Central + is a primary action, not a fifth content destination.
+            label=null,
+            alwaysShowLabel=false,
             colors=NavigationBarItemDefaults.colors(
                 unselectedIconColor=Lab07Palette.Brass,
                 unselectedTextColor=Lab07Palette.Champagne
@@ -72,7 +75,13 @@ private fun RowScope.Lab10Tab(
         selected=selected,
         onClick=onClick,
         icon={Icon(icon,contentDescription=name)},
-        label={Text(name,maxLines=1)},
+        label={
+            // Preserve full Russian labels at 360dp and at 160% system text scale.
+            Text(name,maxLines=2,softWrap=true,
+                style=MaterialTheme.typography.labelSmall.copy(fontSize=10.sp,
+                    lineHeight=12.sp),
+                overflow=TextOverflow.Clip)
+        },
         colors=NavigationBarItemDefaults.colors(
             selectedIconColor=Lab07Palette.Brass,
             selectedTextColor=Lab07Palette.Champagne,
