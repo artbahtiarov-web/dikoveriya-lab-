@@ -224,6 +224,36 @@ class Lab11CoreAcceptanceInstrumentedTest {
         }finally{db.close()}
     }
 
+    @Test fun cancellingShelfMoveRestoresActualOccupancyAndKeepsAudit(){
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val db=LabDatabase(context)
+        try{
+            val plantId=plant(db)
+            val rack=db.createRack11("QA moving "+UUID.randomUUID().toString().take(6),
+                "Стеллаж",1,2)
+            val slots=db.racks11().first{it.id==rack}.shelves.first().slots
+            val item=db.addPlantItem11(plantId,"Горшечное")
+            db.moveItem11(item,slots[0].id,reason="Первая позиция")
+            assertEquals(slots[0].id,db.item11(item)!!.locationId)
+            db.moveItem11(item,slots[1].id,reason="Вторая позиция")
+            assertEquals(slots[1].id,db.item11(item)!!.locationId)
+            val latest=db.itemEvents11(item).first{it.kind=="Перемещение"}
+            db.cancelItemEvent11(latest.id,"Ошибочно выбрана вторая полка")
+            assertEquals(slots[0].id,db.item11(item)!!.locationId)
+            assertEquals(slots[0].id,
+                db.findLocationForCode11(db.item11(item)!!.code))
+            assertTrue(db.slotOccupants11(slots[0].id).any{it.id==item})
+            assertFalse(db.slotOccupants11(slots[1].id).any{it.id==item})
+            assertTrue(db.itemEvents11(item).first{it.kind=="Отмена"}
+                .note.contains("Ошибочно"))
+            val first=db.itemEvents11(item).first{it.kind=="Перемещение" &&
+                !it.cancelled}
+            db.cancelItemEvent11(first.id,"Первое место тоже указано неверно")
+            assertNull(db.item11(item)!!.locationId)
+            assertNull(db.findLocationForCode11(db.item11(item)!!.code))
+        }finally{db.close()}
+    }
+
     @Test fun equipmentSaleBooksOneReceiptAndNoDuplicateAcquisition(){
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val db=LabDatabase(context)
